@@ -19,7 +19,10 @@
     "dist:all": "npm run build && electron-builder -mwl",
     "mobile:sync": "vite build && npx cap sync",
     "mobile:ios": "vite build && npx cap open ios",
-    "mobile:android": "vite build && npx cap open android"
+    "mobile:android": "vite build && npx cap open android",
+    "bump:patch": "node scripts/bump_version.cjs patch",
+    "bump:minor": "node scripts/bump_version.cjs minor",
+    "bump:major": "node scripts/bump_version.cjs major"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

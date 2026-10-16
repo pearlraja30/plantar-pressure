@@ -80,6 +80,27 @@ npm run mobile:android    # Open native Android project in Android Studio
 
 ---
 
+## 🔄 Upgrading Versions & Triggering Releases
+
+The application includes single-command version synchronization across Web, Desktop, Android, and iOS:
+
+```bash
+# 1. Bump version across all platforms
+npm run bump:patch    # e.g. 1.0.0 -> 1.0.1
+# or: npm run bump:minor / npm run bump:major
+
+# 2. Commit and Tag
+git commit -am "chore(release): bump to version 1.0.1"
+git tag v1.0.1
+
+# 3. Push to GitHub to trigger multi-platform CI/CD build
+git push origin main --tags
+```
+
+GitHub Actions will automatically build all 4 platforms in parallel and publish an official GitHub Release with downloadable installers. Existing installations on client devices update in-place without erasing saved patient scans or custom orthotic settings.
+
+---
+
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-13)
 
 The system includes an automated clinical verification battery covering all 13 test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.

@@ -221,3 +221,94 @@ Push to main / tag
 1. Every time changes are pushed (`git push origin main`), navigate to:
    [https://github.com/pearlraja30/plantar-pressure/actions](https://github.com/pearlraja30/plantar-pressure/actions)
 2. Click the completed workflow run and download the installer for any desired platform under the **Artifacts** section.
+
+---
+
+## 10. System Upgradability, Versioning & Maintenance Protocols
+
+This system is engineered for continuous, non-breaking upgradability across web, desktop, and mobile targets. All local patient databases, calibrated scan measurements, and custom orthotic configurations are preserved across upgrades.
+
+### 10.1 Single-Command Multi-Platform Version Bumping
+
+The project provides an automated synchronization script ([`scripts/bump_version.cjs`](file:///Users/rajasekaran/Projects/plantar-pressure/scripts/bump_version.cjs)) that coordinates versions across all native platforms simultaneously:
+
+```bash
+# 1. Patch Upgrade (bug fixes, algorithm refinements: e.g. 1.0.0 -> 1.0.1)
+npm run bump:patch
+
+# 2. Minor Feature Upgrade (new clinical indices, report styles: e.g. 1.0.0 -> 1.1.0)
+npm run bump:minor
+
+# 3. Major Release Upgrade (architectural overhaul, schema migrations: e.g. 1.0.0 -> 2.0.0)
+npm run bump:major
+```
+
+#### What `npm run bump:*` Automatically Synchronizes:
+- **`package.json`**: Updates `"version"` string consumed by Vite, Electron Builder, and Web UI.
+- **`android/app/build.gradle`**: Automatically increments `versionCode` (e.g. `1` -> `2`) and updates `versionName` (e.g. `"1.0.1"`). *Note: Android OS strictly refuses in-place upgrades if `versionCode` is not incremented.*
+- **`ios/App/App/Info.plist`**: Updates `CFBundleShortVersionString` and increments `CFBundleVersion` build integer.
+
+---
+
+### 10.2 Automated GitHub Releases via Version Tags
+
+To build and deliver an upgraded installer suite to clients, simply push a version tag:
+
+```bash
+# 1. Bump version
+npm run bump:patch
+
+# 2. Commit and Tag
+git commit -am "chore(release): bump to version 1.0.1"
+git tag v1.0.1
+
+# 3. Push to GitHub
+git push origin main --tags
+```
+
+#### What Happens Automatically on GitHub Actions:
+1. The tag triggers [`.github/workflows/build-all-platforms.yml`](file:///Users/rajasekaran/Projects/plantar-pressure/.github/workflows/build-all-platforms.yml).
+2. Parallel virtual machines build the new **Windows (`.exe`)**, **macOS (`.dmg`)**, **Android (`.apk`)**, and **iOS (`.ipa`)** packages.
+3. The `package-and-publish` job creates an official **GitHub Release** (`v1.0.1`) and attaches all installer binaries as direct download links.
+
+---
+
+### 10.3 Client-Side In-Place Upgrade Procedures (Data Preservation)
+
+Upgrading existing client installations preserves all patient records, footprint scans, and historical orthotic reports without manual export or re-entry:
+
+| Platform | Client Upgrade Procedure | Data Preservation Mechanism |
+| :--- | :--- | :--- |
+| **Android Phone / Tablet** | Download new `.apk` and tap **Install**.<br>*(Or run `adb install -r plantar-pressure.apk`)* | Android OS performs an in-place package upgrade. Local IndexedDB/SQLite database inside the app sandbox remains 100% intact. |
+| **Windows Desktop** | Run the newly generated `Plantar Pressure Analysis System-Windows-Setup.exe`. | NSIS installer replaces binaries in `Program Files`. Patient records stored in `%APPDATA%\com.technomind.plantarpressure\` are untouched. |
+| **macOS Desktop** | Open the newly generated `.dmg` and drag the `.app` into `/Applications`, choosing **Replace**. | macOS replaces the executable bundle. Local user data in `~/Library/Application Support/com.technomind.plantarpressure/` is preserved. |
+| **iOS Mobile** | Sideload new `.ipa` via AltStore/TrollStore or update via MDM / TestFlight. | iOS Sandbox container preserves the Document and Library data directories across application binary updates. |
+
+---
+
+### 10.4 Clinical Data Schema Migration Guarantee (`CaseMigrationManager.ts`)
+
+To ensure backward compatibility when upgrading between major database versions, the system includes [`src/core/repositories/CaseMigrationManager.ts`](file:///Users/rajasekaran/Projects/plantar-pressure/src/core/repositories/CaseMigrationManager.ts):
+- Evaluates the schema version tag (`_v`) on every stored patient record during app startup.
+- Executes forward migrations (e.g. adding new anatomical subzones or orthotic material fields) automatically without data loss.
+- Performs atomic validation before committing schema changes to prevent database corruption.
+
+---
+
+### 10.5 Toolchain & Infrastructure Maintenance
+
+When upgrading core development tools over time:
+
+1. **Node.js LTS Upgrades:**
+   - Update `node-version: 22` to the newest LTS version in `.github/workflows/build-all-platforms.yml`.
+2. **Android SDK Platform Upgrades:**
+   - In `android/variables.gradle` and `.github/workflows/build-all-platforms.yml`, update `compileSdkVersion` and `targetSdkVersion` to match newer Android releases (e.g. `platforms;android-37`).
+3. **Capacitor Plugin Synchronization:**
+   - Whenever updating `@capacitor/camera` or `@capacitor/core`:
+     ```bash
+     npm install @capacitor/core@latest @capacitor/android@latest @capacitor/ios@latest
+     npm run mobile:sync
+     ```
+4. **GitHub Actions Runner Environment:**
+   - Top-level `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` ensures that third-party actions run safely without deprecation interruption as GitHub runner images evolve.
+
