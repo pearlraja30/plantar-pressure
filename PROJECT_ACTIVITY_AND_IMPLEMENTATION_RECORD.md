@@ -309,6 +309,6 @@ When upgrading core development tools over time:
      npm install @capacitor/core@latest @capacitor/android@latest @capacitor/ios@latest
      npm run mobile:sync
      ```
-4. **GitHub Actions Runner Environment:**
-   - Top-level `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` ensures that third-party actions run safely without deprecation interruption as GitHub runner images evolve.
+4. **GitHub Actions Native Node 24 Support:**
+   - All workflow steps utilize native Node 24 actions (`actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `actions/setup-java@v5`, `softprops/action-gh-release@v3`), completely eliminating the legacy Node 20 deprecation warning annotation.
 
