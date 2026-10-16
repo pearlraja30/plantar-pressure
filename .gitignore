@@ -45,3 +45,8 @@ ios/App/DerivedData/
 *.xcarchive
 *.ipa
 
+# Internal documentation files (keep locally, exclude from git repository)
+/*.md
+!/README.md
+
+

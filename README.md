@@ -4,16 +4,6 @@ Medical-grade, platform-agnostic Plantar Pressure Analysis & Orthotic Prescripti
 
 ---
 
-## 📚 Essential Engineering Manuals
-
-For comprehensive architecture and implementation details, refer to:
-* 📜 [**PROJECT ACTIVITY & IMPLEMENTATION RECORD (`PROJECT_ACTIVITY_AND_IMPLEMENTATION_RECORD.md`)**](./PROJECT_ACTIVITY_AND_IMPLEMENTATION_RECORD.md) — Complete chronological audit log of all project activities, decisions, algorithm corrections, packaging steps, and CI/CD pipelines.
-* 📖 [**DEVELOPER REFERENCE GUIDE (`DEVELOPER_REFERENCE_GUIDE.md`)**](./DEVELOPER_REFERENCE_GUIDE.md) — The complete, end-to-end technical guide covering codebase map, computer vision algorithms, biomechanical formulas, design patterns, testing batteries, and extension recipes.
-* 📐 [**ARCHITECTURE & EXTENSIBILITY MANUAL (`ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md`)**](./ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md) — Detailed specifications for Clean Architecture, SOLID patterns, schema migrations, and IWGDF 2023 diabetic ulcer rules.
-
-
----
-
 ## 📋 Core Architectural Specifications & Confirmed Requirements
 
 All 12 key engineering and clinical requirements have been officially established and implemented:
