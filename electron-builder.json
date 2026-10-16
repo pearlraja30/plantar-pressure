@@ -1,0 +1,72 @@
+{
+  "appId": "com.technomind.plantarpressure",
+  "productName": "Plantar Pressure Analysis System",
+  "copyright": "Copyright © 2026 Technomind Healthcare Systems",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName}-Windows-${version}.${ext}",
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Plantar Pressure Analysis",
+    "uninstallDisplayName": "${productName}"
+  },
+  "msi": {
+    "oneClick": true,
+    "perMachine": true,
+    "upgradeCode": "B4E17C82-9F12-4C10-9E33-0A192B48EF12"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["arm64", "x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["arm64", "x64"]
+      }
+    ],
+    "category": "public.app-category.medical-software",
+    "artifactName": "${productName}-macOS-${version}-${arch}.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "MedicalSoftware",
+    "artifactName": "${productName}-Linux-${version}.${ext}"
+  }
+}

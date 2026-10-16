@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Plantar Pressure Analysis</string>
+    <string name="title_activity_main">Plantar Pressure Analysis</string>
+    <string name="package_name">com.technomind.plantarpressure</string>
+    <string name="custom_url_scheme">com.technomind.plantarpressure</string>
+</resources>
