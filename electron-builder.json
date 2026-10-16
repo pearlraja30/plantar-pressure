@@ -6,6 +6,7 @@
     "output": "release",
     "buildResources": "build"
   },
+  "publish": null,
   "files": [
     "dist/**/*",
     "electron/**/*"
