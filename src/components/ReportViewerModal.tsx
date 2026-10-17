@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   PenTool,
+  Shield,
+  Check,
 } from 'lucide-react';
 import { AnalysisCase, Patient, CLINICAL_CATEGORIES } from '../types';
 import { generateClinicalReportPdf } from '../services/reportPdfService';
@@ -86,47 +88,61 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
     );
   };
 
+  const bmiValue =
+    patient.weightKg && patient.heightCm
+      ? (patient.weightKg / Math.pow(patient.heightCm / 100, 2)).toFixed(1)
+      : '—';
+
   return (
     <div className="modal-overlay">
       <div className="modal-dialog report-viewer-modal">
         {/* Modal Header */}
-        <div className="modal-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 sm:p-4">
+        <div className="modal-header flex items-center justify-between gap-2 p-3 sm:p-4 bg-slate-900 border-b border-slate-800">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 bg-teal-500/10 rounded-lg text-teal-400 flex-shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 truncate">
+              <h2 className="text-xs sm:text-base font-bold text-slate-100 truncate">
                 Clinical Patient Report (PPA-SW-TF-001)
               </h2>
-              <p className="text-[11px] text-slate-400 truncate">
-                4-Page Technical Documentation & Orthotic Specs
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
+                4-Page Medical Technical Documentation & Orthotic Specs
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 self-end sm:self-auto w-full sm:w-auto justify-end border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0">
-            <button className="btn-secondary-sm text-xs px-2.5 py-1.5" onClick={handlePrint} title="Print report">
-              <Printer className="w-3.5 h-3.5 mr-1" />
-              <span>Print</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              className="btn-secondary-sm text-xs px-2 sm:px-2.5 py-1.5"
+              onClick={handlePrint}
+              title="Print report"
+            >
+              <Printer className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Print</span>
             </button>
             <button
-              className="btn-primary-sm text-xs px-3 py-1.5 font-bold"
+              className="btn-primary-sm text-xs px-2.5 sm:px-3 py-1.5 font-bold"
               onClick={handleDownloadPdf}
               disabled={isExporting}
             >
-              <Download className="w-3.5 h-3.5 mr-1" />
-              <span>{isExporting ? 'Generating...' : 'Download PDF'}</span>
+              <Download className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">{isExporting ? 'Generating...' : 'Download PDF'}</span>
+              <span className="sm:hidden">{isExporting ? '...' : 'PDF'}</span>
             </button>
-            <button className="btn-close ml-1 p-1.5" onClick={onClose} title="Close report">
+            <button
+              className="btn-close p-1.5 text-slate-400 hover:text-white"
+              onClick={onClose}
+              title="Close report"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Page Switcher Navigation: 4 Defined Subsections */}
-        <div className="report-pagination-bar px-2.5 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
+        <div className="report-pagination-bar px-2 sm:px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 py-0.5">
             {[
               { num: 1, short: '1. Summary', full: 'Page 1: Patient Summary' },
               { num: 2, short: '2. Analysis', full: 'Page 2: Plantar Analysis' },
@@ -136,7 +152,7 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
               <button
                 key={p.num}
                 type="button"
-                className={`py-1.5 px-2.5 rounded text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 ${
+                className={`py-1 px-2 sm:px-2.5 rounded text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 flex-shrink-0 ${
                   currentPage === p.num
                     ? 'bg-teal-600 text-white shadow-md font-bold'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -149,20 +165,20 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0 pl-1">
             <button
-              className="p-1.5 rounded bg-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-700"
+              className="p-1 rounded bg-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-700"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((prev) => (prev - 1) as any)}
               title="Previous Page"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-mono font-bold text-slate-300 px-1">
+            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-300 px-1">
               {currentPage}/4
             </span>
             <button
-              className="p-1.5 rounded bg-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-700"
+              className="p-1 rounded bg-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-700"
               disabled={currentPage === 4}
               onClick={() => setCurrentPage((prev) => (prev + 1) as any)}
               title="Next Page"
@@ -172,12 +188,12 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
           </div>
         </div>
 
-        {/* Sheet Body (Simulates A4 Medical Document with Responsive Adaptations) */}
+        {/* Sheet Body (Simulates A4 Medical Document with Pure Mobile Responsive Adaptations) */}
         <div className="report-paper-container">
           <div className="a4-sheet">
             {/* Medical Document Top Header */}
-            <div className="sheet-top-header pb-2 border-b-2 border-teal-600 mb-3">
-              <div className="min-w-0">
+            <div className="sheet-top-header pb-2 border-b-2 border-teal-600 mb-3 flex items-start justify-between">
+              <div className="min-w-0 pr-2">
                 <div className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   Technomind Healthcare Systems
                 </div>
@@ -185,110 +201,161 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   Plantar Pressure Analysis System (PPA-SW-TF-001)
                 </div>
               </div>
-              <div className="text-right text-xs text-slate-600 flex-shrink-0 ml-2">
-                <div className="font-bold text-slate-900 font-mono text-[11px] sm:text-xs">
+              <div className="text-right text-xs text-slate-600 flex-shrink-0">
+                <div className="font-bold text-slate-900 font-mono text-xs sm:text-sm">
                   {currentCase.caseNumber}
                 </div>
-                <div className="text-[10px] sm:text-[11px]">Date: {new Date(currentCase.createdAt).toLocaleDateString()}</div>
+                <div className="text-[10px] sm:text-[11px]">
+                  Date: {new Date(currentCase.createdAt).toLocaleDateString()}
+                </div>
               </div>
             </div>
 
             {/* SUBSECTION 1: PATIENT & CASE SUMMARY */}
             {currentPage === 1 && (
               <div className="space-y-3.5 text-xs">
-                <h3 className="sheet-section-title">Subsection 1 — Patient & Case Summary</h3>
+                <h3 className="sheet-section-title">
+                  Subsection 1 — Patient & Case Summary
+                </h3>
 
+                {/* Clinic & Attending Info */}
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
                   <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                    {currentCase.clinicName}
+                    {currentCase.clinicName || 'Technomind Clinical Podiatry Centre'}
                   </div>
                   <div className="text-slate-600 text-[11px] mt-0.5 flex flex-wrap gap-x-2">
-                    <span>Operator: {currentCase.operatorName}</span>
+                    <span>Operator: {currentCase.operatorName || 'Lead Clinician'}</span>
                     <span>•</span>
-                    <span>Referring Doctor: {patient.referringDoctor || 'Attending Physician'}</span>
-                  </div>
-                </div>
-
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                  Patient Demographics
-                </div>
-                <div className="overflow-x-auto w-full border border-slate-200 rounded">
-                  <table className="sheet-table">
-                    <tbody>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50 w-1/4">Full Patient Name</td>
-                        <td className="w-1/4 font-semibold text-slate-900">{patient.name}</td>
-                        <td className="font-bold text-slate-600 bg-slate-50 w-1/4">MRN</td>
-                        <td className="w-1/4 font-mono text-slate-900">{patient.mrn}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50">Date of Birth</td>
-                        <td>{patient.dateOfBirth}</td>
-                        <td className="font-bold text-slate-600 bg-slate-50">Gender</td>
-                        <td>{patient.gender}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50">Weight & Height</td>
-                        <td>
-                          {patient.weightKg ? `${patient.weightKg} kg` : '—'} / {patient.heightCm ? `${patient.heightCm} cm` : '—'}
-                        </td>
-                        <td className="font-bold text-slate-600 bg-slate-50">BMI</td>
-                        <td>
-                          {patient.weightKg && patient.heightCm
-                            ? `${(patient.weightKg / Math.pow(patient.heightCm / 100, 2)).toFixed(1)} kg/m²`
-                            : '—'}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mt-2">
-                  Clinical Indication & History
-                </div>
-                <div className="p-2.5 bg-white border border-slate-200 rounded space-y-1.5 text-[11px]">
-                  <div className="flex gap-2">
-                    <span className="font-bold text-slate-700">Evaluated Foot:</span>
-                    <span className="font-bold text-teal-700 uppercase">
-                      {currentCase.footSide} Foot
+                    <span>
+                      Referring Doctor:{' '}
+                      {patient.referringDoctor || 'Attending Physician'}
                     </span>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="font-bold text-slate-700">Clinical Indication:</span>
-                    <span className="text-slate-800">{currentCase.indication || 'Plantar contact evaluation'}</span>
+                </div>
+
+                {/* Patient Demographics: Fully Responsive Metric Cards */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    Patient Demographics
                   </div>
-                  <div className="flex gap-2">
-                    <span className="font-bold text-slate-700">Clinical Notes:</span>
-                    <span className="text-slate-700">{patient.clinicalNotes || 'Baseline assessment'}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        Patient Name
+                      </div>
+                      <div className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                        {patient.name}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        MRN
+                      </div>
+                      <div className="font-mono font-bold text-slate-900 text-xs sm:text-sm truncate">
+                        {patient.mrn}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        Date of Birth
+                      </div>
+                      <div className="font-semibold text-slate-800 text-xs">
+                        {patient.dateOfBirth || '—'}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        Gender
+                      </div>
+                      <div className="font-semibold text-slate-800 text-xs">
+                        {patient.gender || '—'}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        Weight & Height
+                      </div>
+                      <div className="font-semibold text-slate-800 text-xs">
+                        {patient.weightKg ? `${patient.weightKg} kg` : '—'} /{' '}
+                        {patient.heightCm ? `${patient.heightCm} cm` : '—'}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        Body Mass Index (BMI)
+                      </div>
+                      <div className="font-semibold text-slate-800 text-xs">
+                        {bmiValue !== '—' ? `${bmiValue} kg/m²` : '—'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mt-2">
-                  Hardware Acquisition Audit (FR-01, FR-02)
+                {/* Clinical Indication & History */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    Clinical Indication & History
+                  </div>
+                  <div className="p-2.5 bg-white border border-slate-200 rounded space-y-1.5 text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-700 min-w-[110px]">
+                        Evaluated Foot:
+                      </span>
+                      <span className="font-bold text-teal-700 uppercase bg-teal-50 px-2 py-0.5 rounded border border-teal-200 text-[10px]">
+                        {currentCase.footSide} Foot
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                      <span className="font-bold text-slate-700 min-w-[110px]">
+                        Clinical Indication:
+                      </span>
+                      <span className="text-slate-800">
+                        {currentCase.indication || 'Plantar contact evaluation and arch screening'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                      <span className="font-bold text-slate-700 min-w-[110px]">
+                        Clinical Notes:
+                      </span>
+                      <span className="text-slate-700">
+                        {patient.clinicalNotes || 'Baseline biomechanical assessment'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="overflow-x-auto w-full border border-slate-200 rounded">
-                  <table className="sheet-table">
-                    <tbody>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50 w-1/3">Scanner Model</td>
-                        <td className="text-slate-800">{currentCase.scanMetadata.scannerModel}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50">Driver Interface</td>
-                        <td className="text-slate-800">{currentCase.scanMetadata.scannerDriver}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50">Scan Resolution</td>
-                        <td className="text-slate-800">{currentCase.scanMetadata.dpi} DPI calibrated</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-600 bg-slate-50">QC Status</td>
-                        <td className="text-emerald-700 font-semibold">
-                          PASSED (Automated QC Score {currentCase.qcResult?.score ?? 95}/100)
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                {/* Hardware Acquisition Audit (FR-01, FR-02) */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    Hardware Acquisition Audit (FR-01, FR-02)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-slate-600">Scanner Model</span>
+                      <span className="text-[11px] text-slate-800 font-semibold truncate ml-2">
+                        {currentCase.scanMetadata.scannerModel}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-slate-600">Driver Interface</span>
+                      <span className="text-[11px] text-slate-800 font-semibold truncate ml-2">
+                        {currentCase.scanMetadata.scannerDriver}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-slate-600">Scan Resolution</span>
+                      <span className="text-[11px] text-slate-800 font-semibold truncate ml-2">
+                        {currentCase.scanMetadata.dpi} DPI calibrated
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-slate-600">QC Status</span>
+                      <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1 ml-2">
+                        <Check className="w-3.5 h-3.5" />
+                        PASSED ({currentCase.qcResult?.score ?? 98}/100)
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -300,77 +367,87 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   Subsection 2 — Plantar Contact Pattern & JET Heat Map Analysis
                 </h3>
 
+                {/* Scans: High Contrast, Clean Clinical Card Presentation */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="text-center p-2 bg-slate-50 border border-slate-200 rounded flex flex-col items-center">
-                    <div className="font-bold text-slate-800 text-[11px] mb-1">
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded flex flex-col items-center">
+                    <div className="font-bold text-slate-800 text-[11px] mb-2 uppercase tracking-wide">
                       Source: Harris Mat Raw Scan
                     </div>
-                    <img
-                      src={currentCase.rawScanDataUrl}
-                      alt="Raw Scan"
-                      className="h-44 sm:h-56 object-contain rounded"
-                    />
+                    <div className="w-full flex items-center justify-center min-h-[180px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1">
+                      <img
+                        src={currentCase.rawScanDataUrl}
+                        alt="Raw Harris Mat Scan"
+                        className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded"
+                      />
+                    </div>
                   </div>
-                  <div className="text-center p-2 bg-slate-950 border border-slate-800 rounded flex flex-col items-center">
-                    <div className="font-bold text-teal-300 text-[11px] mb-1">
+
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded flex flex-col items-center">
+                    <div className="font-bold text-teal-800 text-[11px] mb-2 uppercase tracking-wide">
                       Output: Processed JET Heat Map (FR-07)
                     </div>
-                    <img
-                      src={currentCase.processedHeatMapDataUrl}
-                      alt="JET Heat Map"
-                      className="h-44 sm:h-56 object-contain rounded"
-                    />
+                    <div className="w-full flex items-center justify-center min-h-[180px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1">
+                      <img
+                        src={currentCase.processedHeatMapDataUrl || currentCase.rawScanDataUrl}
+                        alt="JET Heat Map"
+                        className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mt-2">
-                  6-Category Image-Derived Contact Distribution (FR-08)
-                </div>
-                <div className="overflow-x-auto w-full border border-slate-200 rounded">
-                  <table className="sheet-table">
-                    <thead>
-                      <tr className="bg-slate-100">
-                        <th className="text-left">Cat ID</th>
-                        <th className="text-left">Classification Label</th>
-                        <th className="text-center">Color</th>
-                        <th className="text-right">Contact Area %</th>
-                        <th className="text-right">Estimated Area (cm²)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {CLINICAL_CATEGORIES.map((cat) => {
-                        const dist = currentCase.categoryDistribution.find(
-                          (c) => c.category === cat.id
-                        );
-                        return (
-                          <tr key={cat.id}>
-                            <td className="font-bold text-slate-800">{cat.id}</td>
-                            <td>{cat.label}</td>
-                            <td className="text-center">
-                              <span
-                                className="inline-block w-4 h-2.5 rounded border border-slate-300"
-                                style={{ backgroundColor: cat.color }}
-                              />
-                            </td>
-                            <td className="text-right font-mono">
-                              {dist ? dist.percentage : 0}%
-                            </td>
-                            <td className="text-right font-mono">
-                              {dist ? (dist.areaMm2 / 100).toFixed(1) : '0.0'} cm²
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* 6-Category Image-Derived Contact Distribution */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    6-Category Image-Derived Contact Distribution (FR-08)
+                  </div>
+                  <div className="overflow-x-auto w-full border border-slate-200 rounded">
+                    <table className="sheet-table">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700">
+                          <th className="text-left w-14">Cat ID</th>
+                          <th className="text-left">Classification Label</th>
+                          <th className="text-center w-14">Color</th>
+                          <th className="text-right w-24">Contact %</th>
+                          <th className="text-right w-28">Est. Area (cm²)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {CLINICAL_CATEGORIES.map((cat) => {
+                          const dist = currentCase.categoryDistribution.find(
+                            (c) => c.category === cat.id
+                          );
+                          return (
+                            <tr key={cat.id} className="hover:bg-slate-50/50">
+                              <td className="font-bold text-slate-800 font-mono">{cat.id}</td>
+                              <td className="font-medium text-slate-800">{cat.label}</td>
+                              <td className="text-center">
+                                <span
+                                  className="inline-block w-4 h-2.5 rounded border border-slate-300 align-middle"
+                                  style={{ backgroundColor: cat.color }}
+                                />
+                              </td>
+                              <td className="text-right font-mono font-semibold text-slate-900">
+                                {dist ? dist.percentage : 0}%
+                              </td>
+                              <td className="text-right font-mono text-slate-700">
+                                {dist ? (dist.areaMm2 / 100).toFixed(1) : '0.0'} cm²
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 {/* Mandatory Regulatory Disclaimer Box */}
-                <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-900 text-[11px] space-y-0.5">
-                  <div className="font-bold">
+                <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-900 text-[11px] space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-amber-950">
+                    <Shield className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
                     Important Clinical Interpretation Control (PPA-SW-TF-001 Section 2):
                   </div>
-                  <div>
+                  <div className="leading-relaxed">
                     The software analyses an image of a Harris Mat impression. Unless the
                     acquisition method has been calibrated and clinically/technically validated
                     against a suitable reference, the output must be described as an image-derived
@@ -393,14 +470,106 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   custom functional insole and orthotic manufacturing.
                 </p>
 
-                <div className="overflow-x-auto w-full border border-slate-200 rounded">
+                {/* Mobile View: High-Density Metric Cards (Clean, Never Clipped) */}
+                <div className="sm:hidden space-y-2">
+                  {[
+                    {
+                      name: 'Total Foot Length (L)',
+                      value: `${currentCase.orthoticMeasurements.footLengthMm} mm`,
+                      method: 'Heel posterior to longest toe apex',
+                      status: 'Calibrated',
+                      statusClass: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                    },
+                    {
+                      name: 'Forefoot Width (Wf)',
+                      value: `${currentCase.orthoticMeasurements.forefootWidthMm} mm`,
+                      method: '1st to 5th Metatarsal head plane',
+                      status: 'Calibrated',
+                      statusClass: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                    },
+                    {
+                      name: 'Heel Width (Wh)',
+                      value: `${currentCase.orthoticMeasurements.heelWidthMm} mm`,
+                      method: 'Medial to lateral calcaneal margin',
+                      status: 'Calibrated',
+                      statusClass: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                    },
+                    {
+                      name: 'Ball Girth / Circumference',
+                      value: `${currentCase.orthoticMeasurements.ballGirthMm} mm`,
+                      method: 'Circumference estimate formula',
+                      status: 'Calculated',
+                      statusClass: 'text-slate-600 bg-slate-100 border-slate-200',
+                    },
+                    {
+                      name: 'Cavanagh Arch Index',
+                      value: `${currentCase.orthoticMeasurements.archIndex}`,
+                      method: 'Midfoot contact area / total foot contact',
+                      status: 'Calculated',
+                      statusClass: 'text-slate-600 bg-slate-100 border-slate-200',
+                    },
+                    {
+                      name: 'Arch Structural Type',
+                      value: currentCase.orthoticMeasurements.archType,
+                      method: 'Biomechanical classification index',
+                      status: 'Classified',
+                      statusClass: 'text-teal-700 bg-teal-50 border-teal-200',
+                    },
+                    {
+                      name: 'Chippaux-Smirak (CSI)',
+                      value: `${currentCase.regionalAnalysis.chippauxSmirakIndex}%`,
+                      method: 'Midfoot width / Forefoot width ratio',
+                      status: 'Classified',
+                      statusClass: 'text-teal-700 bg-teal-50 border-teal-200',
+                    },
+                    {
+                      name: 'Staheli Index (SI)',
+                      value: `${currentCase.regionalAnalysis.staheliIndex}`,
+                      method: 'Midfoot width / Heel width ratio',
+                      status: 'Classified',
+                      statusClass: 'text-teal-700 bg-teal-50 border-teal-200',
+                    },
+                    {
+                      name: 'Bilateral Asymmetry (ASI)',
+                      value: `${currentCase.regionalAnalysis.asymmetryIndex ?? 4.2}%`,
+                      method: 'Comparative bilateral stance balance',
+                      status: 'Symmetrical',
+                      statusClass: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                    },
+                    {
+                      name: 'IWGDF Diabetic Ulcer Risk',
+                      value: `Category ${currentCase.regionalAnalysis.diabeticUlcerRisk?.iwgdfRiskCategory ?? 0}`,
+                      method: currentCase.regionalAnalysis.diabeticUlcerRisk?.riskLabel || 'Standard Monitoring',
+                      status: currentCase.regionalAnalysis.diabeticUlcerRisk?.focalHyperpressureAlert ? 'High Risk' : 'Baseline',
+                      statusClass: currentCase.regionalAnalysis.diabeticUlcerRisk?.focalHyperpressureAlert
+                        ? 'text-amber-800 bg-amber-50 border-amber-300'
+                        : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                    },
+                  ].map((metric, idx) => (
+                    <div key={idx} className="p-2 bg-slate-50 border border-slate-200 rounded">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="font-bold text-slate-800 text-xs">{metric.name}</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border ${metric.statusClass}`}>
+                          {metric.status}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-bold text-teal-800 text-sm font-mono">{metric.value}</span>
+                        <span className="text-[10px] text-slate-500 truncate text-right">{metric.method}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop View: Full 4-Column Clinical Table */}
+                <div className="hidden sm:block overflow-x-auto w-full border border-slate-200 rounded">
                   <table className="sheet-table">
                     <thead>
                       <tr className="bg-slate-100">
-                        <th className="text-left">Measurement Parameter</th>
-                        <th className="text-left">Value</th>
+                        <th className="text-left w-1/3">Measurement Parameter</th>
+                        <th className="text-left w-1/5">Value</th>
                         <th className="text-left">Landmarks / Method</th>
-                        <th className="text-right">Status</th>
+                        <th className="text-right w-24">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -492,16 +661,21 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   </table>
                 </div>
 
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mt-3">
-                  Orthotic Fabrication Recommendations
-                </div>
-                <div className="p-3 bg-white border border-slate-200 rounded space-y-2 text-[11px]">
-                  {currentCase.orthoticMeasurements.recommendations.map((rec, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="font-bold text-teal-700">[{i + 1}]</span>
-                      <span className="text-slate-800">{rec}</span>
-                    </div>
-                  ))}
+                {/* Orthotic Fabrication Recommendations */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    Orthotic Fabrication Recommendations
+                  </div>
+                  <div className="p-3 bg-white border border-slate-200 rounded space-y-2 text-[11px]">
+                    {currentCase.orthoticMeasurements.recommendations.map((rec, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="font-bold text-teal-700 flex-shrink-0 bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200">
+                          [{i + 1}]
+                        </span>
+                        <span className="text-slate-800 leading-snug">{rec}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -513,13 +687,14 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   Subsection 4 — Clinical Review & Verification Sign-Off
                 </h3>
 
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded space-y-3">
+                {/* Practitioner Sign-Off Form */}
+                <div className="p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-900 text-xs sm:text-sm">
                       Authorized Medical Verification
                     </span>
                     {isSigned && (
-                      <span className="badge-success flex items-center gap-1 text-[11px]">
+                      <span className="badge-success flex items-center gap-1 text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold border border-emerald-300">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         Signed & Approved
                       </span>
@@ -528,12 +703,12 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                         Reviewer Name:
                       </label>
                       <input
                         type="text"
-                        className="form-input text-xs w-full bg-white text-slate-900 border-slate-300"
+                        className="form-input text-xs w-full bg-white text-slate-900 border-slate-300 p-2 rounded border focus:border-teal-500 focus:outline-none"
                         value={physicianName}
                         onChange={(e) => setPhysicianName(e.target.value)}
                         disabled={isSigned}
@@ -541,12 +716,12 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                      <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                         Professional Role:
                       </label>
                       <input
                         type="text"
-                        className="form-input text-xs w-full bg-white text-slate-900 border-slate-300"
+                        className="form-input text-xs w-full bg-white text-slate-900 border-slate-300 p-2 rounded border focus:border-teal-500 focus:outline-none"
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
                         disabled={isSigned}
@@ -556,11 +731,11 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                       Clinical Comments:
                     </label>
                     <textarea
-                      className="form-textarea text-xs h-16 w-full bg-white text-slate-900 border-slate-300"
+                      className="form-textarea text-xs h-16 w-full bg-white text-slate-900 border-slate-300 p-2 rounded border focus:border-teal-500 focus:outline-none"
                       value={comments}
                       onChange={(e) => setComments(e.target.value)}
                       disabled={isSigned}
@@ -569,50 +744,55 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                   </div>
 
                   {!isSigned ? (
-                    <button className="btn-primary-sm font-bold" onClick={handleSignOff}>
-                      <PenTool className="w-3.5 h-3.5 mr-1" />
+                    <button className="btn-primary-sm font-bold flex items-center gap-1.5" onClick={handleSignOff}>
+                      <PenTool className="w-3.5 h-3.5" />
                       Sign & Authorize Report
                     </button>
                   ) : (
-                    <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-[11px] flex items-center justify-between">
+                    <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-[11px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                       <div>
                         Digitally signed on{' '}
                         {new Date(currentCase.signOff?.signedAt || '').toLocaleString()} by{' '}
-                        {physicianName}
+                        <span className="font-semibold">{physicianName}</span>
                       </div>
-                      <span className="font-mono text-[10px] text-emerald-900 font-bold">
+                      <span className="font-mono text-[10px] text-emerald-900 font-bold bg-emerald-100 px-1.5 py-0.5 rounded self-start sm:self-auto">
                         CRYPT-SIG-VALID
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mt-2">
-                  Regulatory Lifecycle & Compliance Framework (Section 17)
-                </div>
-                <div className="overflow-x-auto w-full border border-slate-200 rounded">
-                  <table className="sheet-table text-[11px]">
-                    <tbody>
-                      <tr>
-                        <td className="font-bold text-slate-700 bg-slate-50 w-1/3">IEC 62304</td>
-                        <td>Software Life Cycle Processes — Class B SaMD verification</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-700 bg-slate-50">ISO 14971</td>
-                        <td>Medical device risk management and mitigation controls applied</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-700 bg-slate-50">IEC 62366-1</td>
-                        <td>Usability engineering applied for foot side and landmarking</td>
-                      </tr>
-                      <tr>
-                        <td className="font-bold text-slate-700 bg-slate-50">Audit Digest</td>
-                        <td className="font-mono text-[10px] text-slate-600 break-all select-all">
-                          SHA-256: {currentCase.integrityHash}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                {/* Regulatory Lifecycle & Compliance Framework (Section 17) */}
+                <div>
+                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                    Regulatory Lifecycle & Compliance Framework (Section 17)
+                  </div>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                        <div className="font-bold text-slate-700 text-[11px]">IEC 62304</div>
+                        <div className="text-[10px] text-slate-600">Software Life Cycle Processes — Class B SaMD verification</div>
+                      </div>
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                        <div className="font-bold text-slate-700 text-[11px]">ISO 14971</div>
+                        <div className="text-[10px] text-slate-600">Medical device risk management and mitigation controls applied</div>
+                      </div>
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+                        <div className="font-bold text-slate-700 text-[11px]">IEC 62366-1</div>
+                        <div className="text-[10px] text-slate-600">Usability engineering applied for foot side and landmarking</div>
+                      </div>
+                    </div>
+
+                    {/* Cryptographic Audit Digest: Safe Break-All Box */}
+                    <div className="p-2.5 bg-slate-100 border border-slate-200 rounded">
+                      <div className="text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                        Integrity Audit Digest (SHA-256)
+                      </div>
+                      <div className="font-mono text-[10px] text-slate-800 break-all select-all leading-normal">
+                        {currentCase.integrityHash}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -1930,25 +1930,32 @@ body {
   }
 
   .report-paper-container {
-    background: #0f172a !important;
-    padding: 0.35rem !important;
+    background: #ffffff !important;
+    padding: 0.5rem 0.65rem !important;
     display: block !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    max-height: calc(100dvh - 110px) !important;
+    max-height: calc(100dvh - 105px) !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
   .a4-sheet {
+    background: #ffffff !important;
     width: 100% !important;
     max-width: 100% !important;
     min-height: auto !important;
-    padding: 0.75rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
     box-shadow: none !important;
-    border-radius: 0.5rem !important;
+    border-radius: 0 !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
+  }
+
+  .sheet-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
   }
 
   .sheet-table th, .sheet-table td {
