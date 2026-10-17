@@ -1421,25 +1421,29 @@ body {
 }
 
 .report-paper-container {
-  background: #334155;
+  background: #1e293b;
   padding: 1.5rem;
   overflow-y: auto;
-  max-height: 65vh;
+  overflow-x: hidden;
+  max-height: calc(85vh - 120px);
   display: flex;
   justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .a4-sheet {
   background: #ffffff !important;
   color: #0f172a !important;
   width: 100%;
-  max-width: 680px;
+  max-width: 720px;
   min-height: 840px;
   padding: 2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  border-radius: 2px;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .sheet-top-header {
@@ -1454,20 +1458,21 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #0f172a !important;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1.5px solid #0d9488;
   padding-bottom: 0.35rem;
 }
 
 .sheet-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.35rem;
+  min-width: 100%;
 }
 
 .sheet-table th, .sheet-table td {
   padding: 0.45rem 0.6rem;
   border: 1px solid #e2e8f0;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
+  word-break: break-word;
 }
 
 .sheet-bottom-footer {
@@ -1903,10 +1908,21 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
+  .report-viewer-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    display: flex;
+    flex-direction: column;
+  }
+
   .report-pagination-bar {
     overflow-x: auto;
     white-space: nowrap;
     scrollbar-width: none;
+    padding: 0.45rem 0.75rem !important;
   }
 
   .report-pagination-bar::-webkit-scrollbar {
@@ -1914,11 +1930,30 @@ body {
   }
 
   .report-paper-container {
-    padding: 0.5rem;
+    background: #0f172a !important;
+    padding: 0.35rem !important;
+    display: block !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: calc(100dvh - 110px) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .a4-sheet {
-    padding: 1rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    padding: 0.75rem !important;
+    box-shadow: none !important;
+    border-radius: 0.5rem !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .sheet-table th, .sheet-table td {
+    padding: 0.35rem 0.45rem !important;
+    font-size: 0.69rem !important;
   }
 }
 
