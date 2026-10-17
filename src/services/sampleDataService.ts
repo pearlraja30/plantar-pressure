@@ -206,61 +206,12 @@ export const MOCK_SCANNER_DEVICES: ScannerDevice[] = [
     supportsColor: true,
     supportsDuplex: true,
   },
-  {
-    id: 'sc-sim',
-    name: 'Technomind Virtual Harris Mat Scanner Simulator',
-    interface: 'Virtual Simulation',
-    status: 'Ready',
-    maxDpi: 600,
-    supportsColor: true,
-    supportsDuplex: false,
-  },
 ];
 
 /**
- * Pre-loaded clinical patients
+ * Pre-loaded clinical patients (empty - clean clinical operation)
  */
-export const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 'pat-101',
-    mrn: 'MRN-2026-88102',
-    name: 'Robert Vance',
-    dateOfBirth: '1968-04-14',
-    gender: 'Male',
-    weightKg: 84.5,
-    heightCm: 178,
-    phone: '+1 (555) 234-8901',
-    referringDoctor: 'Dr. Michael Chen, DPM (Podiatric Surgery)',
-    clinicalNotes: 'Type II Diabetic foot evaluation. History of neuropathic callus under 1st metatarsal head. Suspected focal hyper-pressure.',
-    createdAt: '2026-10-10T09:30:00Z',
-  },
-  {
-    id: 'pat-102',
-    mrn: 'MRN-2026-44919',
-    name: 'Elena Rostova',
-    dateOfBirth: '1989-11-23',
-    gender: 'Female',
-    weightKg: 62.0,
-    heightCm: 165,
-    phone: '+1 (555) 876-5432',
-    referringDoctor: 'Dr. Sarah Jenkins, Orthotist',
-    clinicalNotes: 'Plantar Fasciitis left heel, bilateral Pes Planus (flat foot). Custom functional orthotic prescription required.',
-    createdAt: '2026-10-11T14:15:00Z',
-  },
-  {
-    id: 'pat-103',
-    mrn: 'MRN-2026-12004',
-    name: 'Marcus Sterling',
-    dateOfBirth: '1975-08-02',
-    gender: 'Male',
-    weightKg: 78.0,
-    heightCm: 182,
-    phone: '+1 (555) 345-6789',
-    referringDoctor: 'Dr. Rajiv Patel, Physiatrist',
-    clinicalNotes: 'Post-metatarsal osteotomy recovery evaluation. Assessment of lateral weight shift and forefoot balance.',
-    createdAt: '2026-10-12T10:00:00Z',
-  },
-];
+export const INITIAL_PATIENTS: Patient[] = [];
 
 /**
  * Helper to build an initial demo case

@@ -780,7 +780,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
         {/* Ingestion Mode Selector Tabs */}
         {step === 1 && (
-          <div className="grid grid-cols-3 p-1.5 sm:p-2 bg-slate-950 border-b border-slate-800 text-xs font-semibold gap-1">
+          <div className={`grid ${isMobileNative ? 'grid-cols-2' : 'grid-cols-3'} p-1.5 sm:p-2 bg-slate-950 border-b border-slate-800 text-xs font-semibold gap-1`}>
             <button
               className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'camera' ? 'active' : ''}`}
               onClick={() => {
@@ -789,18 +789,20 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               }}
             >
               <Camera className="w-4 h-4 text-teal-400" />
-              <span>Camera Capture</span>
+              <span>Live Camera Capture</span>
             </button>
-            <button
-              className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'scanner' ? 'active' : ''}`}
-              onClick={() => {
-                setInputMode('scanner');
-                stopCameraStream();
-              }}
-            >
-              <Scan className="w-4 h-4 text-teal-400" />
-              <span>Flatbed Scanner</span>
-            </button>
+            {!isMobileNative && (
+              <button
+                className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'scanner' ? 'active' : ''}`}
+                onClick={() => {
+                  setInputMode('scanner');
+                  stopCameraStream();
+                }}
+              >
+                <Scan className="w-4 h-4 text-teal-400" />
+                <span>Flatbed Scanner</span>
+              </button>
+            )}
             <button
               className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'file' ? 'active' : ''}`}
               onClick={() => {
@@ -809,7 +811,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               }}
             >
               <Upload className="w-4 h-4 text-teal-400" />
-              <span>Upload File</span>
+              <span>{isMobileNative ? 'Gallery / Photo File' : 'Upload File'}</span>
             </button>
           </div>
         )}

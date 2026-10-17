@@ -10,6 +10,7 @@ import {
   Clock,
   ArrowRight,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { Patient, AnalysisCase, FootSide } from '../types';
 import { logAuditEvent } from '../services/auditService';
@@ -22,6 +23,9 @@ interface PatientCaseViewProps {
   onSelectPatient: (patientId: string) => void;
   onSelectCase: (caseId: string) => void;
   onCreatePatient: (newPatient: Patient) => void;
+  onDeletePatient?: (patientId: string) => void;
+  onDeleteCase?: (caseId: string) => void;
+  onClearAllData?: () => void;
   onNavigateToAnalysis: () => void;
 }
 
@@ -33,6 +37,9 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
   onSelectPatient,
   onSelectCase,
   onCreatePatient,
+  onDeletePatient,
+  onDeleteCase,
+  onClearAllData,
   onNavigateToAnalysis,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,13 +113,25 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
           <span className="badge-tag">Registry</span>
         </div>
 
-        <button
-          className="btn-primary-sm"
-          onClick={() => setIsNewPatientModalOpen(true)}
-        >
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          New Patient Record
-        </button>
+        <div className="flex items-center gap-2">
+          {onClearAllData && (patients.length > 0 || cases.length > 0) && (
+            <button
+              className="btn-secondary-sm text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border-rose-900/50"
+              onClick={onClearAllData}
+              title="Delete all stored data and reset to fresh clinical state"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              <span>Clear All Data</span>
+            </button>
+          )}
+          <button
+            className="btn-primary-sm"
+            onClick={() => setIsNewPatientModalOpen(true)}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            New Patient Record
+          </button>
+        </div>
       </div>
 
       <div className="patient-grid">
@@ -197,11 +216,26 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                       <span>{selectedPatient.gender}</span>
                     </div>
                   </div>
-                  <div className="text-right text-xs">
-                    <div className="text-slate-400">Referring Physician:</div>
-                    <div className="font-semibold text-slate-200">
-                      {selectedPatient.referringDoctor}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-xs">
+                      <div className="text-slate-400">Referring Physician:</div>
+                      <div className="font-semibold text-slate-200">
+                        {selectedPatient.referringDoctor || 'Not specified'}
+                      </div>
                     </div>
+                    {onDeletePatient && (
+                      <button
+                        className="p-1.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40"
+                        onClick={() => {
+                          if (window.confirm(`Delete patient "${selectedPatient.name}" and all associated scans?`)) {
+                            onDeletePatient(selectedPatient.id);
+                          }
+                        }}
+                        title="Delete this patient"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -288,17 +322,33 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        className="btn-primary-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectCase(c.id);
-                          onNavigateToAnalysis();
-                        }}
-                      >
-                        <span>Open Workspace</span>
-                        <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-primary-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectCase(c.id);
+                            onNavigateToAnalysis();
+                          }}
+                        >
+                          <span>Open Workspace</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </button>
+                        {onDeleteCase && (
+                          <button
+                            className="p-2 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete scan record ${c.caseNumber}?`)) {
+                                onDeleteCase(c.id);
+                              }
+                            }}
+                            title="Delete this scan record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -16,23 +16,44 @@ import { processHarrisMatScan } from './services/imageProcessingService';
 import { cloudSyncService, CloudSyncStatus } from './services/cloudSyncService';
 import { logAuditEvent } from './services/auditService';
 
-export function App() {
-  // Clear any mock/demo cases stored in previous sessions
-  useEffect(() => {
-    if (!localStorage.getItem('ppa-real-mode-v1')) {
+// Synchronous hard purge of all legacy demo data from storage
+const CLEAN_STORAGE_VERSION = 'ppa_pure_clinical_v6';
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem('ppa_clean_version') !== CLEAN_STORAGE_VERSION) {
       localStorage.removeItem('ppa-patients');
       localStorage.removeItem('ppa-cases');
       localStorage.removeItem('ppa-selected-patient-id');
       localStorage.removeItem('ppa-selected-case-id');
-      localStorage.setItem('ppa-real-mode-v1', 'true');
+      localStorage.removeItem('ppa_audit_log_v1');
+      localStorage.removeItem('ppa-real-mode-v1');
+      localStorage.setItem('ppa_clean_version', CLEAN_STORAGE_VERSION);
     }
-  }, []);
+  } catch (e) {
+    console.error('Failed to run initial storage migration', e);
+  }
+}
 
-  // Persistent clinical patients (starts empty, no fake data)
+export function App() {
+  // Persistent clinical patients (guaranteed 100% clean, no fake demo records)
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem('ppa-patients');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed: Patient[] = JSON.parse(saved);
+      // Strictly reject any legacy mock/demo patient
+      return parsed.filter((p) => {
+        const n = (p.name || '').toLowerCase();
+        const id = (p.id || '').toLowerCase();
+        return (
+          !n.includes('vance') &&
+          !n.includes('rostova') &&
+          !n.includes('sterling') &&
+          !n.includes('clinical patient') &&
+          !n.includes('demo') &&
+          !id.startsWith('pat-10')
+        );
+      });
     } catch {
       return [];
     }
@@ -42,11 +63,18 @@ export function App() {
     return localStorage.getItem('ppa-selected-patient-id') || '';
   });
 
-  // Persistent clinical analysis cases (starts empty, no fake data)
+  // Persistent clinical analysis cases (guaranteed 100% clean, no fake demo cases)
   const [cases, setCases] = useState<AnalysisCase[]>(() => {
     try {
       const saved = localStorage.getItem('ppa-cases');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed: AnalysisCase[] = JSON.parse(saved);
+      // Strictly reject any legacy mock/demo case
+      return parsed.filter((c) => {
+        const id = (c.id || '').toLowerCase();
+        const num = (c.caseNumber || '').toLowerCase();
+        return !id.startsWith('case-demo') && !num.includes('demo');
+      });
     } catch {
       return [];
     }
@@ -246,6 +274,43 @@ export function App() {
     setSelectedPatientId(newPat.id);
   };
 
+  const handleDeletePatient = (patientId: string) => {
+    setPatients((prev) => prev.filter((p) => p.id !== patientId));
+    setCases((prev) => prev.filter((c) => c.patientId !== patientId));
+    if (selectedPatientId === patientId) {
+      setSelectedPatientId('');
+    }
+  };
+
+  const handleDeleteCase = (caseId: string) => {
+    setCases((prev) => prev.filter((c) => c.id !== caseId));
+    if (selectedCaseId === caseId) {
+      setSelectedCaseId('');
+    }
+  };
+
+  const handleClearAllData = () => {
+    if (
+      window.confirm(
+        'Delete all stored patients and scans? This will give you a completely clean slate for fresh scans.'
+      )
+    ) {
+      setPatients([]);
+      setCases([]);
+      setSelectedPatientId('');
+      setSelectedCaseId('');
+      localStorage.removeItem('ppa-patients');
+      localStorage.removeItem('ppa-cases');
+      localStorage.removeItem('ppa-selected-patient-id');
+      localStorage.removeItem('ppa-selected-case-id');
+      logAuditEvent(
+        'DATABASE_RESET',
+        'Clinician purged all local data for fresh clinical session.',
+        'practitioner'
+      );
+    }
+  };
+
   return (
     <div className="app-layout">
       {/* Top Clinical Header */}
@@ -303,6 +368,9 @@ export function App() {
             }}
             onSelectCase={(cid) => setSelectedCaseId(cid)}
             onCreatePatient={handleCreatePatient}
+            onDeletePatient={handleDeletePatient}
+            onDeleteCase={handleDeleteCase}
+            onClearAllData={handleClearAllData}
             onNavigateToAnalysis={() => setCurrentTab('analysis')}
           />
         )}
