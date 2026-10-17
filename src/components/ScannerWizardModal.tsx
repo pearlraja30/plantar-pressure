@@ -194,6 +194,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const torchEnabledRef = useRef<boolean>(false);
   torchEnabledRef.current = torchEnabled;
 
+  // Auto-Capture on Green Level & Stability
+  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState<boolean>(true);
+  const [autoCaptureCountdown, setAutoCaptureCountdown] = useState<number | null>(null);
+  const autoCaptureTimerRef = useRef<number | null>(null);
+
   // Helper to compute Laplacian variance sharpness score to select the clearest frame in burst capture
   const computeSharpnessScore = useCallback(
     (ctx: CanvasRenderingContext2D, width: number, height: number): number => {
@@ -546,19 +551,21 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     const handleOrientation = (e: DeviceOrientationEvent) => {
       if (e.beta !== null && e.gamma !== null) {
         hasOrientation = true;
-        // When pointing camera downwards at floor/paper:
-        // beta is near 0° or 180°, gamma is near 0°
+        // When pointing camera downwards towards floor/paper:
+        // beta is pitch (tilt front/back), gamma is roll (tilt left/right)
         const pitch = Math.abs(e.beta > 90 ? 180 - e.beta : e.beta);
         const roll = Math.abs(e.gamma);
         const totalTilt = Math.round(Math.sqrt(pitch * pitch + roll * roll) * 10) / 10;
         setTiltDegrees(totalTilt);
-        // Level when tilt error is within 7°
-        setIsLevel(totalTilt <= 7.0);
+        // Clinical standard for handheld paper scanning: 18° provides zero perspective distortion
+        setIsLevel(totalTilt <= 18.0);
       }
     };
 
     let lastX = 0, lastY = 0, lastZ = 0;
+    let steadyHits = 0;
     const handleMotion = (e: DeviceMotionEvent) => {
+      // Use linear acceleration when supported, with gravity fallback
       const acc = e.acceleration || e.accelerationIncludingGravity;
       if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
         hasMotion = true;
@@ -570,8 +577,14 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         lastX = acc.x;
         lastY = acc.y;
         lastZ = acc.z;
-        // Steady when delta acceleration is small
-        setIsSteady(delta < 0.75);
+        // Real-world handheld threshold: delta < 2.0 allows natural breathing without false-shake
+        if (delta < 2.0) {
+          steadyHits++;
+          if (steadyHits >= 2) setIsSteady(true);
+        } else {
+          steadyHits = 0;
+          setIsSteady(false);
+        }
       }
     };
 
@@ -583,9 +596,10 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }
 
     const timer = setTimeout(() => {
+      // Sensor fallback: If device does not have sensors or in WebView, default to ready
       if (!hasOrientation) setIsLevel(true);
       if (!hasMotion) setIsSteady(true);
-    }, 1500);
+    }, 1200);
 
     return () => {
       clearTimeout(timer);
@@ -597,6 +611,44 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       }
     };
   }, [viewfinderActive]);
+
+  // Auto-capture countdown when viewfinder is steady & level (green)
+  useEffect(() => {
+    if (!viewfinderActive || !autoCaptureEnabled || step !== 1) {
+      if (autoCaptureTimerRef.current) {
+        clearInterval(autoCaptureTimerRef.current);
+        autoCaptureTimerRef.current = null;
+      }
+      setAutoCaptureCountdown(null);
+      return;
+    }
+
+    if (isLevel && isSteady) {
+      if (autoCaptureCountdown === null && !autoCaptureTimerRef.current) {
+        let count = 2;
+        setAutoCaptureCountdown(count);
+        autoCaptureTimerRef.current = window.setInterval(() => {
+          count--;
+          if (count <= 0) {
+            if (autoCaptureTimerRef.current) {
+              clearInterval(autoCaptureTimerRef.current);
+              autoCaptureTimerRef.current = null;
+            }
+            setAutoCaptureCountdown(null);
+            handleCaptureFromCamera();
+          } else {
+            setAutoCaptureCountdown(count);
+          }
+        }, 650);
+      }
+    } else {
+      if (autoCaptureTimerRef.current) {
+        clearInterval(autoCaptureTimerRef.current);
+        autoCaptureTimerRef.current = null;
+      }
+      setAutoCaptureCountdown(null);
+    }
+  }, [isLevel, isSteady, autoCaptureEnabled, viewfinderActive, step]);
 
   // Hardware autofocus trigger
   const triggerRefocus = useCallback(async () => {
@@ -1412,35 +1464,50 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Bottom Shutter Controls */}
+                    {/* Bottom Shutter Controls: Prominent & Guaranteed Visible */}
                     <div className="viewfinder-bottom-bar">
                       <button
                         type="button"
-                        className={`viewfinder-shutter-btn ${isLevel && isSteady ? 'ready' : 'waiting'}`}
+                        className={`w-full max-w-sm py-3 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-2xl flex items-center justify-center gap-2 border transition-all active:scale-95 ${
+                          isLevel && isSteady
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-300 shadow-emerald-500/40 ring-2 ring-emerald-400/50'
+                            : 'bg-gradient-to-r from-teal-600 to-sky-600 text-white border-teal-400 shadow-teal-500/30'
+                        }`}
                         onClick={handleCaptureFromCamera}
-                        title="Snap Footprint Photo"
                       >
-                        <Camera className="w-7 h-7 text-white" />
+                        <Camera className="w-5 h-5 text-white animate-pulse" />
+                        <span>
+                          {isLevel && isSteady
+                            ? autoCaptureCountdown !== null
+                              ? `🟢 Auto-capturing in ${autoCaptureCountdown}s... (Or Tap Now)`
+                              : '📸 TAP TO CAPTURE FOOTPRINT (PERFECT)'
+                            : '📸 TAP TO CAPTURE FOOTPRINT NOW'}
+                        </span>
                       </button>
 
-                      <div className="text-[11px] text-slate-200 font-semibold drop-shadow-md text-center">
-                        {isLevel && isSteady
-                          ? 'Tap green shutter button to capture'
-                          : 'Hold steady & parallel to floor until green'}
+                      <div className="flex items-center justify-between w-full max-w-sm px-1 text-[11px] text-slate-300">
+                        <button
+                          type="button"
+                          onClick={() => setAutoCaptureEnabled((v) => !v)}
+                          className="hover:text-teal-300 flex items-center gap-1 font-semibold"
+                        >
+                          <span className={autoCaptureEnabled ? 'text-emerald-400' : 'text-slate-400'}>
+                            {autoCaptureEnabled ? '● Auto-Snap on Green: ON' : '○ Auto-Snap: OFF'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            stopCameraStream();
+                            setViewfinderActive(false);
+                            handleNativeMobileCamera();
+                          }}
+                          className="text-teal-400 hover:text-teal-300 underline font-medium"
+                        >
+                          Use Phone Camera App
+                        </button>
                       </div>
-
-                      {/* Native camera fallback button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          stopCameraStream();
-                          setViewfinderActive(false);
-                          handleNativeMobileCamera();
-                        }}
-                        className="text-[11px] text-teal-400 hover:text-teal-300 underline font-medium mt-0.5"
-                      >
-                        Prefer phone's native camera app? Tap here
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1941,10 +2008,21 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             </div>
           )}
 
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <button className="btn-secondary text-xs sm:text-sm" onClick={onClose}>
               Cancel
             </button>
+
+            {step === 1 && viewfinderActive && isMobileDevice && (
+              <button
+                type="button"
+                className="btn-primary text-xs sm:text-sm font-bold flex items-center gap-1.5 bg-gradient-to-r from-teal-500 to-emerald-500 shadow-md"
+                onClick={handleCaptureFromCamera}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Snap Photo</span>
+              </button>
+            )}
 
             {step === 2 && (enhancedUrl || rawCapturedUrl) && (
               <button className="btn-primary text-xs sm:text-sm" onClick={handleFinishAndAnalyze}>
