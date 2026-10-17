@@ -23,26 +23,26 @@ interface OrthoticMeasurementsViewProps {
   patient?: Patient;
   onUpdateCase: (updatedCase: AnalysisCase) => void;
   onGenerateReport: () => void;
+  onOpenScanner?: () => void;
 }
-
-const DEFAULT_FALLBACK_LANDMARKS: OrthoticLandmarks = {
-  heelCenter: { x: 370, y: 770 },
-  heelMedial: { x: 305, y: 770 },
-  heelLateral: { x: 435, y: 770 },
-  metatarsal1: { x: 285, y: 440 },
-  metatarsal5: { x: 450, y: 450 },
-  longestToe: { x: 330, y: 220 },
-  archApex: { x: 380, y: 610 },
-};
 
 export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> = ({
   currentCase,
   patient,
   onUpdateCase,
   onGenerateReport,
+  onOpenScanner,
 }) => {
   const [landmarks, setLandmarks] = useState<OrthoticLandmarks>(
-    currentCase?.landmarks || DEFAULT_FALLBACK_LANDMARKS
+    currentCase?.landmarks || {
+      longestToe: { x: 280, y: 120 },
+      metatarsal1: { x: 210, y: 320 },
+      metatarsal5: { x: 350, y: 350 },
+      archApex: { x: 240, y: 480 },
+      heelMedial: { x: 230, y: 660 },
+      heelLateral: { x: 330, y: 660 },
+      heelCenter: { x: 280, y: 690 },
+    }
   );
   const [activePin, setActivePin] = useState<keyof OrthoticLandmarks | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -61,11 +61,21 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
         <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 shadow-xl">
           <Ruler className="w-8 h-8" />
         </div>
-        <div className="max-w-md space-y-1">
-          <h2 className="text-lg font-bold text-slate-100">No Patient Case Available</h2>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-lg font-bold text-slate-100">No Patient Scan Available Yet</h2>
           <p className="text-xs text-slate-400">
-            Acquire a real foot scan in the Analysis tab to view orthotic measurements and prescription recommendations.
+            Take a real Harris Mat footprint scan using the camera or file upload to automatically generate interactive orthotic landmarks and customized insole dimensions.
           </p>
+          {onOpenScanner && (
+            <div className="pt-2">
+              <button
+                className="btn-primary-sm px-4 py-2 text-xs font-bold shadow-lg"
+                onClick={onOpenScanner}
+              >
+                📸 Launch Scanner Wizard
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -152,16 +162,9 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
   };
 
   const handleResetLandmarks = () => {
-    const defaults = {
-      heelCenter: { x: 370, y: 770 },
-      heelMedial: { x: 305, y: 770 },
-      heelLateral: { x: 435, y: 770 },
-      metatarsal1: { x: 285, y: 440 },
-      metatarsal5: { x: 450, y: 450 },
-      longestToe: { x: 330, y: 220 },
-      archApex: { x: 380, y: 610 },
-    };
-    setLandmarks(defaults);
+    if (currentCase?.landmarks) {
+      setLandmarks(currentCase.landmarks);
+    }
   };
 
   const handleSaveMeasurements = () => {

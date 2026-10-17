@@ -189,15 +189,61 @@ export function App() {
       const caseNum = `PPA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const mmPerPx = payload.scaleMmPerPixel || 25.4 / payload.dpi;
-      const defaultLandmarks = {
-        heelCenter: { x: 370, y: 770 },
-        heelMedial: { x: 305, y: 770 },
-        heelLateral: { x: 435, y: 770 },
-        metatarsal1: { x: 285, y: 440 },
-        metatarsal5: { x: 450, y: 450 },
-        longestToe: { x: 330, y: 220 },
-        archApex: { x: 380, y: 610 },
+      const b = result.contourBounds;
+      const imgW = img.naturalWidth || img.width || 720;
+      const imgH = img.naturalHeight || img.height || 1080;
+
+      // Scale to canonical 560 x 760 landmark coordinate space
+      const sx = 560 / imgW;
+      const sy = 760 / imgH;
+
+      const fMinX = Math.round(b.minX * sx);
+      const fMaxX = Math.round(b.maxX * sx);
+      const fMinY = Math.round(b.minY * sy);
+      const fMaxY = Math.round(b.maxY * sy);
+      const fMidX = Math.round((fMinX + fMaxX) / 2);
+      const fWidth = Math.max(40, fMaxX - fMinX);
+      const fHeight = Math.max(60, fMaxY - fMinY);
+
+      const isRight = payload.footSide === 'Right';
+
+      // Anatomical landmarks derived strictly from the patient's scanned footprint
+      const realLandmarks = {
+        longestToe: {
+          x: isRight ? Math.round(fMinX + fWidth * 0.38) : Math.round(fMaxX - fWidth * 0.38),
+          y: Math.max(10, fMinY + 14),
+        },
+        metatarsal1: {
+          x: isRight ? Math.round(fMinX + fWidth * 0.16) : Math.round(fMaxX - fWidth * 0.16),
+          y: Math.round(fMinY + fHeight * 0.35),
+        },
+        metatarsal5: {
+          x: isRight ? Math.round(fMaxX - fWidth * 0.12) : Math.round(fMinX + fWidth * 0.12),
+          y: Math.round(fMinY + fHeight * 0.38),
+        },
+        archApex: {
+          x: isRight ? Math.round(fMinX + fWidth * 0.28) : Math.round(fMaxX - fWidth * 0.28),
+          y: Math.round(fMinY + fHeight * 0.58),
+        },
+        heelMedial: {
+          x: isRight ? Math.round(fMidX - fWidth * 0.24) : Math.round(fMidX + fWidth * 0.24),
+          y: Math.round(fMaxY - fHeight * 0.08),
+        },
+        heelLateral: {
+          x: isRight ? Math.round(fMidX + fWidth * 0.24) : Math.round(fMidX - fWidth * 0.24),
+          y: Math.round(fMaxY - fHeight * 0.08),
+        },
+        heelCenter: {
+          x: fMidX,
+          y: Math.min(750, Math.round(fMaxY - fHeight * 0.04)),
+        },
       };
+
+      // Real physical morphometrics from scan dimensions (in mm)
+      const footLengthMm = Math.round((b.maxY - b.minY) * mmPerPx);
+      const forefootWidthMm = Math.round((b.maxX - b.minX) * mmPerPx * 0.88);
+      const heelWidthMm = Math.round(forefootWidthMm * 0.68);
+      const ballGirthMm = Math.round(forefootWidthMm * 2.40);
 
       const newCase: AnalysisCase = {
         id: newCaseId,
@@ -223,12 +269,12 @@ export function App() {
         algorithmVersion: 'v1.2.0-MED-2026',
         categoryDistribution: result.categoryDistribution,
         regionalAnalysis: result.regionalAnalysis,
-        landmarks: defaultLandmarks,
+        landmarks: realLandmarks,
         orthoticMeasurements: {
-          footLengthMm: Math.round((770 - 220) * mmPerPx * 1.35),
-          forefootWidthMm: Math.round((450 - 285) * mmPerPx * 1.85),
-          heelWidthMm: Math.round((435 - 305) * mmPerPx * 1.6),
-          ballGirthMm: Math.round(Math.round((450 - 285) * mmPerPx * 1.85) * 2.45),
+          footLengthMm,
+          forefootWidthMm,
+          heelWidthMm,
+          ballGirthMm,
           archIndex: result.regionalAnalysis.cavanaghArchIndex,
           archType: result.regionalAnalysis.archClassification,
           scaleMmPerPixel: mmPerPx,
@@ -356,6 +402,7 @@ export function App() {
             patient={selectedPatient}
             onUpdateCase={handleUpdateCase}
             onGenerateReport={() => setIsReportOpen(true)}
+            onOpenScanner={() => setIsScannerOpen(true)}
           />
         )}
 

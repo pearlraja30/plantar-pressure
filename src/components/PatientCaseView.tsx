@@ -44,6 +44,7 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'directory' | 'dossier'>('directory');
 
   // New patient state (clean defaults, no fake sample data)
   const [name, setName] = useState('');
@@ -99,6 +100,7 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
     setReferringDoctor('');
     setClinicalNotes('');
     setIsNewPatientModalOpen(false);
+    setMobileTab('dossier');
   };
 
   return (
@@ -134,9 +136,39 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
         </div>
       </div>
 
+      {/* Mobile-Only Segmented Navigation Bar */}
+      <div className="flex sm:hidden w-full px-3 pt-2">
+        <div className="flex w-full bg-slate-900 p-1 rounded-lg border border-slate-800 gap-1">
+          <button
+            type="button"
+            className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'directory'
+                ? 'bg-teal-500/25 text-teal-300 border border-teal-500/40 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            onClick={() => setMobileTab('directory')}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Patients ({patients.length})</span>
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-all truncate ${
+              mobileTab === 'dossier'
+                ? 'bg-teal-500/25 text-teal-300 border border-teal-500/40 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            onClick={() => setMobileTab('dossier')}
+          >
+            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{selectedPatient ? selectedPatient.name : 'Dossier'}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="patient-grid">
-        {/* Left column: Patient directory list */}
-        <div className="patient-list-card">
+        {/* Left column: Patient directory list (always on desktop, toggled on mobile) */}
+        <div className={`patient-list-card ${mobileTab === 'dossier' ? 'hidden sm:flex' : 'flex'}`}>
           <div className="p-3 border-b border-slate-800">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -162,17 +194,20 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                 <div
                   key={p.id}
                   className={`patient-row-item ${p.id === selectedPatient?.id ? 'active' : ''}`}
-                  onClick={() => onSelectPatient(p.id)}
+                  onClick={() => {
+                    onSelectPatient(p.id);
+                    setMobileTab('dossier');
+                  }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-100 text-sm">{p.name}</span>
-                    <span className="badge-tag-sm">{p.mrn}</span>
+                    <span className="font-semibold text-slate-100 text-sm truncate mr-2">{p.name}</span>
+                    <span className="badge-tag-sm flex-shrink-0">{p.mrn}</span>
                   </div>
                   <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
                     <span>
                       {p.gender} • {p.dateOfBirth}
                     </span>
-                    <span>{p.weightKg} kg</span>
+                    <span>{p.weightKg ? `${p.weightKg} kg` : '—'}</span>
                   </div>
                 </div>
               ))
@@ -180,8 +215,22 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
           </div>
         </div>
 
-        {/* Right column: Patient dossier & cases */}
-        <div className="patient-detail-card space-y-4">
+        {/* Right column: Patient dossier & cases (always on desktop, toggled on mobile) */}
+        <div className={`patient-detail-card space-y-4 ${mobileTab === 'directory' ? 'hidden sm:block' : 'block'}`}>
+          {/* Mobile Back Button */}
+          <div className="sm:hidden flex items-center justify-between pb-2 border-b border-slate-800">
+            <button
+              type="button"
+              className="text-xs text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1.5"
+              onClick={() => setMobileTab('directory')}
+            >
+              <span>← Back to Patients List</span>
+            </button>
+            <span className="text-[11px] text-slate-400">
+              {patientCases.length} scan(s)
+            </span>
+          </div>
+
           {!selectedPatient ? (
             <div className="flex flex-col items-center justify-center h-80 p-6 text-center text-slate-400 space-y-3">
               <User className="w-12 h-12 text-slate-600" />
@@ -203,12 +252,12 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
             <>
               {/* Patient Profile Card */}
               <div className="profile-banner">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-100 truncate">
                       {selectedPatient.name}
                     </h3>
-                    <div className="text-xs text-slate-400 flex items-center gap-2 mt-1">
+                    <div className="text-xs text-slate-400 flex items-center gap-2 mt-1 flex-wrap">
                       <span className="font-mono text-teal-400">{selectedPatient.mrn}</span>
                       <span>•</span>
                       <span>DOB: {selectedPatient.dateOfBirth}</span>
@@ -216,16 +265,16 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                       <span>{selectedPatient.gender}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-xs">
-                      <div className="text-slate-400">Referring Physician:</div>
+                  <div className="flex items-center gap-3 justify-between sm:justify-end border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
+                    <div className="text-left sm:text-right text-xs">
+                      <div className="text-slate-400 text-[11px]">Referring Physician:</div>
                       <div className="font-semibold text-slate-200">
                         {selectedPatient.referringDoctor || 'Not specified'}
                       </div>
                     </div>
                     {onDeletePatient && (
                       <button
-                        className="p-1.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40"
+                        className="p-1.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 flex-shrink-0"
                         onClick={() => {
                           if (window.confirm(`Delete patient "${selectedPatient.name}" and all associated scans?`)) {
                             onDeletePatient(selectedPatient.id);
@@ -239,39 +288,41 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-4 gap-2 text-xs">
+                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div>
                     <span className="text-slate-400">Weight:</span>
                     <span className="font-bold text-slate-200 ml-1">
-                      {selectedPatient.weightKg} kg
+                      {selectedPatient.weightKg ? `${selectedPatient.weightKg} kg` : '—'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400">Height:</span>
                     <span className="font-bold text-slate-200 ml-1">
-                      {selectedPatient.heightCm} cm
+                      {selectedPatient.heightCm ? `${selectedPatient.heightCm} cm` : '—'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400">BMI:</span>
                     <span className="font-bold text-slate-200 ml-1">
-                      {(
-                        selectedPatient.weightKg /
-                        Math.pow(selectedPatient.heightCm / 100, 2)
-                      ).toFixed(1)}
+                      {selectedPatient.weightKg && selectedPatient.heightCm
+                        ? (
+                            selectedPatient.weightKg /
+                            Math.pow(selectedPatient.heightCm / 100, 2)
+                          ).toFixed(1)
+                        : '—'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400">Phone:</span>
-                    <span className="font-mono text-slate-200 ml-1">
-                      {selectedPatient.phone}
+                    <span className="font-mono text-slate-200 ml-1 truncate">
+                      {selectedPatient.phone || '—'}
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-3 text-xs bg-slate-900/60 p-2.5 rounded border border-slate-800">
                   <span className="text-slate-400 font-semibold">Clinical Indication: </span>
-                  <span className="text-slate-300">{selectedPatient.clinicalNotes}</span>
+                  <span className="text-slate-300">{selectedPatient.clinicalNotes || 'General plantar contact evaluation'}</span>
                 </div>
               </div>
 
@@ -290,41 +341,41 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                   {patientCases.map((c) => (
                     <div
                       key={c.id}
-                      className={`case-card ${c.id === selectedCaseId ? 'selected' : ''}`}
+                      className={`case-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 ${
+                        c.id === selectedCaseId ? 'selected' : ''
+                      }`}
                       onClick={() => onSelectCase(c.id)}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto min-w-0">
                         <img
                           src={c.processedHeatMapDataUrl || c.rawScanDataUrl}
                           alt="Thumbnail"
-                          className="w-14 h-20 object-contain rounded bg-slate-900 border border-slate-700"
+                          className="w-14 h-20 object-contain rounded bg-slate-900 border border-slate-700 flex-shrink-0"
                         />
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-sm text-teal-400">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-sm text-teal-400 truncate">
                               {c.caseNumber}
                             </span>
-                            <span className="badge-tag-sm uppercase">{c.footSide} Foot</span>
-                            <span className="badge-success-sm">{c.syncStatus}</span>
+                            <span className="badge-tag-sm uppercase flex-shrink-0">{c.footSide} Foot</span>
+                            <span className="badge-success-sm flex-shrink-0">{c.syncStatus}</span>
                           </div>
-                          <div className="text-xs text-slate-300">{c.indication}</div>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
-                            <span>Scanner: {c.scanMetadata.scannerModel}</span>
+                          <div className="text-xs text-slate-300 truncate">{c.indication}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                            <span>{c.scanMetadata.scannerModel}</span>
                             <span>•</span>
                             <span>{new Date(c.createdAt).toLocaleDateString()}</span>
                             <span>•</span>
-                            <span>AI: <strong className="text-slate-200">{c.regionalAnalysis.cavanaghArchIndex}</strong> ({c.regionalAnalysis.archClassification})</span>
-                            <span>•</span>
-                            <span className="badge-warning font-mono text-[10px]">IWGDF Cat {c.regionalAnalysis.diabeticUlcerRisk?.iwgdfRiskCategory ?? 0}</span>
+                            <span>Arch: <strong className="text-slate-200">{c.regionalAnalysis.cavanaghArchIndex}</strong></span>
                             <span>•</span>
                             <span className="badge-tag-sm font-mono text-[10px]">Peak {c.regionalAnalysis.peakContactCategory}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
                         <button
-                          className="btn-primary-sm"
+                          className="btn-primary-sm flex-1 sm:flex-initial justify-center"
                           onClick={(e) => {
                             e.stopPropagation();
                             onSelectCase(c.id);
@@ -336,7 +387,7 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                         </button>
                         {onDeleteCase && (
                           <button
-                            className="p-2 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40"
+                            className="p-2 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 flex-shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (window.confirm(`Delete scan record ${c.caseNumber}?`)) {
