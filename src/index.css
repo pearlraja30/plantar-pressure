@@ -1421,13 +1421,12 @@ body {
 }
 
 .report-paper-container {
-  background: #1e293b;
+  background: #f1f5f9 !important;
   padding: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: calc(85vh - 120px);
-  display: flex;
-  justify-content: center;
+  max-height: calc(88vh - 110px);
+  display: block;
   width: 100%;
   box-sizing: border-box;
 }
@@ -1436,13 +1435,19 @@ body {
   background: #ffffff !important;
   color: #0f172a !important;
   width: 100%;
-  max-width: 720px;
-  min-height: 840px;
+  max-width: 840px;
+  min-height: auto !important;
   padding: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  border-radius: 4px;
+  margin: 0 auto;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+}
+
+.a4-sheet * {
   box-sizing: border-box;
 }
 
@@ -1466,10 +1471,27 @@ body {
   width: 100%;
   border-collapse: collapse;
   min-width: 100%;
+  background: #ffffff !important;
+  color: #0f172a !important;
 }
 
-.sheet-table th, .sheet-table td {
-  padding: 0.45rem 0.6rem;
+.sheet-table tr {
+  background: #ffffff !important;
+}
+
+.sheet-table th {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  font-weight: 700;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  font-size: 0.74rem;
+}
+
+.sheet-table td {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  padding: 0.45rem 0.65rem;
   border: 1px solid #e2e8f0;
   font-size: 0.74rem;
   word-break: break-word;

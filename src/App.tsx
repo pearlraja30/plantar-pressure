@@ -443,8 +443,10 @@ export function App() {
           isOpen={isReportOpen}
           onClose={() => setIsReportOpen(false)}
           currentCase={currentCase}
+          allCases={cases}
           patient={selectedPatient}
           onUpdateCase={handleUpdateCase}
+          onSelectCase={(cid) => setSelectedCaseId(cid)}
         />
       )}
 
