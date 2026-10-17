@@ -1090,29 +1090,30 @@ body {
 }
 
 /* Modals */
-.modal-overlay {
+.modal-overlay, .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
-  padding: 1.5rem;
+  z-index: 1000;
+  padding: 1rem;
 }
 
-.modal-dialog {
-  background: var(--bg-modal);
-  border: 1px solid var(--bg-card-border);
+.modal-dialog, .modal-container {
+  background: var(--bg-modal, #0f172a);
+  border: 1px solid var(--bg-card-border, #1e293b);
   border-radius: 0.75rem;
   width: 100%;
-  box-shadow: var(--shadow-modal);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
   display: flex;
   flex-direction: column;
-  max-height: 90vh;
+  max-height: 92vh;
+  max-height: 92dvh;
   overflow: hidden;
-  color: var(--text-main);
+  color: var(--text-main, #f8fafc);
 }
 
 .scanner-wizard-modal { max-width: 780px; }
@@ -1855,14 +1856,14 @@ body {
   }
 
   /* Modals full-screen on mobile */
-  .modal-overlay {
-    padding: 0.5rem;
+  .modal-overlay, .modal-backdrop {
+    padding: 0.25rem !important;
   }
 
-  .modal-dialog {
+  .modal-dialog, .modal-container {
     max-width: 100% !important;
-    max-height: 96vh !important;
-    max-height: 96dvh !important;
+    max-height: 98vh !important;
+    max-height: 98dvh !important;
     border-radius: 0.5rem;
   }
 
@@ -2121,7 +2122,7 @@ body {
 .smart-viewfinder-container {
   position: relative;
   width: 100%;
-  height: clamp(380px, 62vh, 520px);
+  height: clamp(420px, 68vh, 560px);
   background: #020617;
   border-radius: 0.75rem;
   overflow: hidden;
@@ -2185,13 +2186,13 @@ body {
   color: #fef3c7;
 }
 
-/* Framing Rectangle Box */
+/* Framing Rectangle Box - Proportioned to natural human foot & Harris Mat paper (~1:1.85) */
 .viewfinder-frame-box {
   position: relative;
-  width: 74%;
-  max-width: 270px;
-  height: clamp(180px, 32vh, 260px);
-  aspect-ratio: 1 / 1.35;
+  width: 76%;
+  max-width: 290px;
+  height: clamp(260px, 48vh, 390px);
+  aspect-ratio: 1 / 1.85;
   margin: auto;
   border-radius: 0.65rem;
   transition: all 0.3s ease;
@@ -2199,7 +2200,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
+  padding: 0.6rem;
 }
 
 .viewfinder-frame-box.aligned {

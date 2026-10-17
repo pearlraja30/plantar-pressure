@@ -85,6 +85,15 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
   const [isEnhanceProcessing, setIsEnhanceProcessing] = useState<boolean>(false);
+
+  // Live Diagnostic Telemetry Logs (for real-time testing validation)
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [isDebugOpen, setIsDebugOpen] = useState<boolean>(true);
+  const addDebugLog = useCallback((msg: string) => {
+    const time = new Date().toTimeString().slice(0, 8);
+    setDebugLogs((prev) => [...prev.slice(-8), `[${time}] ${msg}`]);
+    console.log(`[SCANNER-DEBUG] ${msg}`);
+  }, []);
   const [inputMode] = useState<'camera' | 'scanner' | 'file'>('camera');
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -240,6 +249,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
   // Stop camera stream cleanly and release hardware pipeline
   const stopCameraStream = useCallback(() => {
+    addDebugLog('Releasing camera tracks and video hardware pipeline');
     if (sharpnessIntervalRef.current) {
       clearInterval(sharpnessIntervalRef.current);
       sharpnessIntervalRef.current = null;
@@ -292,6 +302,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const startCameraStream = useCallback(async () => {
     stopCameraStream();
     setCameraError(null);
+    addDebugLog('Initiating camera stream pipeline...');
 
     // 1. Ensure Android / iOS runtime permission is granted
     const hasPermission = await ensureCameraPermission();
@@ -374,6 +385,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
     streamRef.current = stream;
     const track = stream.getVideoTracks()[0];
+    if (track) {
+      addDebugLog(`Camera stream acquired: ${track.label || 'Video Track'} (${idealW}x${idealH})`);
+    }
 
     if (track) {
       const caps = (track.getCapabilities ? track.getCapabilities() : {}) as any;
@@ -805,6 +819,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       await triggerRefocus();
       await new Promise((res) => setTimeout(res, 60));
 
+      addDebugLog(`Capturing snapshot: triggering autofocus...`);
       // 2. Compute exact bounding box of the framing rectangle box relative to displayed video
       let cropX = 0;
       let cropY = 0;
@@ -848,9 +863,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         const rawW = fRect.width / scale;
         const rawH = fRect.height / scale;
 
-        // Add 2% padding so foot border is never clipped
-        const padX = rawW * 0.02;
-        const padY = rawH * 0.02;
+        // Add 12% generous padding so foot border and paper margins are never clipped
+        const padX = rawW * 0.12;
+        const padY = rawH * 0.12;
 
         cropX = Math.max(0, Math.floor(rawX - padX));
         cropY = Math.max(0, Math.floor(rawY - padY));
@@ -1275,6 +1290,46 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 </div>
               </div>
 
+              {/* Live Clinical Debug & Diagnostic Telemetry HUD */}
+              <div className="p-2.5 bg-slate-950/90 border border-slate-700/80 rounded-lg text-[11px] font-mono shadow-inner space-y-1">
+                <div className="flex items-center justify-between text-teal-400 font-bold border-b border-slate-800 pb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${isCameraActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                    <span>Live Diagnostic Telemetry HUD</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                    <span>Mobile: <strong className="text-slate-200">{isMobileDevice ? 'YES' : 'NO'}</strong></span>
+                    <span>•</span>
+                    <span>Status: <strong className={isCameraActive ? 'text-emerald-400' : 'text-amber-400'}>{isCameraActive ? 'ACTIVE' : 'IDLE'}</strong></span>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsDebugOpen((v) => !v)}
+                      className="text-cyan-400 hover:text-cyan-300 underline font-semibold"
+                    >
+                      {isDebugOpen ? 'Hide' : 'Show Logs'}
+                    </button>
+                  </div>
+                </div>
+                {isDebugOpen && (
+                  <div className="space-y-0.5 text-[10px] text-cyan-300 max-h-24 overflow-y-auto pt-0.5">
+                    <div className="text-slate-400 text-[9px] flex items-center justify-between">
+                      <span>Tilt: {tiltDegrees}° ({isLevel ? 'Level ✓' : 'Tilted ⚠️'})</span>
+                      <span>Steady: {isSteady ? 'YES ✓' : 'Detecting...'}</span>
+                      <span>Light: {ambientLuminance} lx</span>
+                      <span>Torch: {torchEnabled ? 'ON' : 'OFF'}</span>
+                    </div>
+                    {debugLogs.length === 0 ? (
+                      <div className="text-slate-500 italic">Initializing camera diagnostic telemetry...</div>
+                    ) : (
+                      debugLogs.map((log, i) => (
+                        <div key={i} className="truncate">{log}</div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* 2. Acquisition Mode (Camera on Mobile vs Clean File Upload on Windows/Web) */}
               {!isMobileDevice ? (
                 /* Desktop / Web Browser Upload Dropzone Card (Windows / Mac / Desktop Web) */
@@ -1451,7 +1506,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       <div className="viewfinder-corner-br" />
 
                       <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-start">
-                        ALIGN PAPER TOP (ANTERIOR ↑)
+                        🦶 ALIGN TOES (ANTERIOR ↑)
                       </div>
 
                       <div className="flex flex-col items-center justify-center opacity-40 pointer-events-none">
@@ -1460,12 +1515,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                           {footSide.toUpperCase()} FOOT BOUNDING BOX
                         </span>
                         <span className="text-[8px] font-mono text-slate-300 tracking-normal opacity-90 mt-0.5">
-                          (Only footprint inside this box is captured)
+                          Align foot and paper inside this box
                         </span>
                       </div>
 
                       <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-end">
-                        ALIGN HEEL (POSTERIOR ↓)
+                        🦶 ALIGN HEEL (POSTERIOR ↓)
                       </div>
                     </div>
 
