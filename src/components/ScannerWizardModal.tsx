@@ -22,6 +22,7 @@ import {
   AlertCircle,
   CheckCircle,
   Sliders,
+  Crop,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -176,11 +177,21 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [draggingCorner, setDraggingCorner] = useState<keyof QuadCorners | null>(null);
   const [a4CalibResult, setA4CalibResult] = useState<PaperCalibrationResult | null>(null);
 
-  // Video & Container Refs
+  // Video, Viewfinder & Frame Box Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const viewfinderContainerRef = useRef<HTMLDivElement | null>(null);
+  const frameBoxRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const sharpnessIntervalRef = useRef<number | null>(null);
+
+  // Optical Clarity & Ambient Lighting States
+  const [ambientLuminance, setAmbientLuminance] = useState<number>(100);
+  const [autoTorchEnabled, setAutoTorchEnabled] = useState<boolean>(true);
+  const autoTorchRef = useRef<boolean>(true);
+  autoTorchRef.current = autoTorchEnabled;
+  const torchEnabledRef = useRef<boolean>(false);
+  torchEnabledRef.current = torchEnabled;
 
   // Helper to compute Laplacian variance sharpness score to select the clearest frame in burst capture
   const computeSharpnessScore = useCallback(
@@ -393,7 +404,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         console.warn('Video element play() error:', err);
       }
 
-      // Start real-time live sharpness meter (every 400ms)
+      // Start real-time live sharpness & luminance meter (every 350ms)
       const sampleCanvas = document.createElement('canvas');
       sampleCanvas.width = 160;
       sampleCanvas.height = 120;
@@ -405,11 +416,35 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             sampleCtx.drawImage(videoRef.current, 0, 0, 160, 120);
             const score = computeSharpnessScore(sampleCtx, 160, 120);
             setLiveSharpnessScore(Math.round(score * 10) / 10);
+
+            // Compute ambient luminance across sample frame
+            const imgData = sampleCtx.getImageData(0, 0, 160, 120);
+            const d = imgData.data;
+            let sumLum = 0;
+            const pxCount = d.length / 4;
+            for (let i = 0; i < d.length; i += 4) {
+              sumLum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            }
+            const avgLum = Math.round(sumLum / pxCount);
+            setAmbientLuminance(avgLum);
+
+            // Auto-flash: If lighting is dark (< 65 lx), automatically activate torch
+            if (autoTorchRef.current && avgLum < 65 && !torchEnabledRef.current) {
+              const track = streamRef.current?.getVideoTracks()[0];
+              if (track && track.applyConstraints) {
+                track.applyConstraints({
+                  advanced: [{ torch: true }] as any,
+                }).then(() => {
+                  setTorchEnabled(true);
+                  torchEnabledRef.current = true;
+                }).catch(() => {});
+              }
+            }
           } catch {
             // Ignore frame collision
           }
         }
-      }, 400);
+      }, 350);
     }
   }, [
     cameraResolution,
@@ -553,6 +588,23 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     };
   }, [viewfinderActive]);
 
+  // Hardware autofocus trigger
+  const triggerRefocus = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (track && track.applyConstraints) {
+      try {
+        const caps = track.getCapabilities?.() as any;
+        if (caps?.focusMode?.includes('continuous')) {
+          await track.applyConstraints({
+            advanced: [{ focusMode: 'continuous' }] as any,
+          });
+        }
+      } catch (e) {
+        console.warn('Refocus error:', e);
+      }
+    }
+  }, []);
+
   // Flashlight / Torch toggle using internal camera hardware
   const toggleTorch = async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -563,6 +615,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
           advanced: [{ torch: nextTorch }] as any,
         });
         setTorchEnabled(nextTorch);
+        torchEnabledRef.current = nextTorch;
       } catch (e) {
         console.warn('Torch toggle failed:', e);
       }
@@ -655,26 +708,84 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
     if (isCameraActive && videoRef.current) {
       const vid = videoRef.current;
-      const vW = vid.videoWidth || 1920;
-      const vH = vid.videoHeight || 1080;
+      const vW = vid.videoWidth || 1280;
+      const vH = vid.videoHeight || 720;
+
+      // 1. Trigger autofocus prior to snapshot to ensure sharp footprint clarity
+      await triggerRefocus();
+      await new Promise((res) => setTimeout(res, 60));
+
+      // 2. Compute exact bounding box of the framing rectangle box relative to displayed video
+      let cropX = 0;
+      let cropY = 0;
+      let cropW = vW;
+      let cropH = vH;
+
+      if (viewfinderContainerRef.current && frameBoxRef.current) {
+        const cRect = viewfinderContainerRef.current.getBoundingClientRect();
+        const fRect = frameBoxRef.current.getBoundingClientRect();
+
+        const cW = cRect.width;
+        const cH = cRect.height;
+        const cRatio = cW / cH;
+        const vRatio = vW / vH;
+
+        let scale = 1;
+        let displayedW = cW;
+        let displayedH = cH;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (cRatio > vRatio) {
+          scale = cW / vW;
+          displayedW = cW;
+          displayedH = vH * scale;
+          offsetX = 0;
+          offsetY = (cH - displayedH) / 2;
+        } else {
+          scale = cH / vH;
+          displayedW = vW * scale;
+          displayedH = cH;
+          offsetX = (cW - displayedW) / 2;
+          offsetY = 0;
+        }
+
+        const relX = (fRect.left - cRect.left) - offsetX;
+        const relY = (fRect.top - cRect.top) - offsetY;
+
+        const rawX = relX / scale;
+        const rawY = relY / scale;
+        const rawW = fRect.width / scale;
+        const rawH = fRect.height / scale;
+
+        // Add 2% padding so foot border is never clipped
+        const padX = rawW * 0.02;
+        const padY = rawH * 0.02;
+
+        cropX = Math.max(0, Math.floor(rawX - padX));
+        cropY = Math.max(0, Math.floor(rawY - padY));
+        cropW = Math.min(vW - cropX, Math.ceil(rawW + padX * 2));
+        cropH = Math.min(vH - cropY, Math.ceil(rawH + padY * 2));
+      }
+
+      // Max dimension clamp to 1400px to maintain crisp clarity without mobile V8 memory overflow
+      const MAX_DIM = 1400;
+      let targetW = cropW;
+      let targetH = cropH;
+      if (targetW > MAX_DIM || targetH > MAX_DIM) {
+        const factor = Math.min(MAX_DIM / targetW, MAX_DIM / targetH);
+        targetW = Math.round(targetW * factor);
+        targetH = Math.round(targetH * factor);
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = vW;
-      canvas.height = vH;
+      canvas.width = targetW;
+      canvas.height = targetH;
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
-      // Draw single frame with zoom and clarity filters applied
-      const drawFrameToCanvas = () => {
+      const drawCroppedFrame = () => {
         ctx.filter = `contrast(${contrastBoost}) brightness(${brightnessBoost})`;
-        if (!hwCaps.supportsHardwareZoom && cameraZoom > 1.0) {
-          // Digital crop parity: crop center matching zoom factor
-          const cropW = vW / cameraZoom;
-          const cropH = vH / cameraZoom;
-          const cropX = (vW - cropW) / 2;
-          const cropY = (vH - cropH) / 2;
-          ctx.drawImage(vid, cropX, cropY, cropW, cropH, 0, 0, vW, vH);
-        } else {
-          ctx.drawImage(vid, 0, 0, vW, vH);
-        }
+        ctx.drawImage(vid, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
         ctx.filter = 'none';
       };
 
@@ -686,10 +797,10 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
         for (let i = 0; i < frameCount; i++) {
           setBurstProgress({ current: i + 1, total: frameCount });
-          drawFrameToCanvas();
+          drawCroppedFrame();
           const sharpness = computeSharpnessScore(ctx, canvas.width, canvas.height);
           burstFrames.push({
-            dataUrl: canvas.toDataURL('image/png'),
+            dataUrl: canvas.toDataURL('image/jpeg', 0.92),
             sharpness,
           });
           if (i < frameCount - 1) {
@@ -704,11 +815,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         setIsBurstCapturing(false);
         setBurstProgress(null);
         setBurstStatusMessage(
-          `Fixed burst captured ${frameCount} frames — optimal sharpness frame selected (Laplacian score: ${best.sharpness.toFixed(1)})`
+          `Cropped foot bounding box captured (${best.sharpness.toFixed(1)} clarity score)`
         );
       } else {
-        drawFrameToCanvas();
-        capturedUrl = canvas.toDataURL('image/png');
+        drawCroppedFrame();
+        capturedUrl = canvas.toDataURL('image/jpeg', 0.92);
       }
     } else {
       setCameraError(
@@ -748,6 +859,105 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         ingestAndEnhanceImage(url, selectedDpi);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Re-run quality control & enhancement with current options
+  const reEnhanceWithCurrentOptions = async (url: string) => {
+    const img = new Image();
+    img.src = url;
+    await new Promise((res) => (img.onload = res));
+    const result = await enhancePlantarImage(img, enhancementOpts);
+    setEnhancedUrl(result.enhancedDataUrl);
+    setEnhancementMetrics(result.metrics);
+
+    // Re-run quality control
+    const qcCanvas = document.createElement('canvas');
+    qcCanvas.width = img.width;
+    qcCanvas.height = img.height;
+    const qcCtx = qcCanvas.getContext('2d')!;
+    qcCtx.drawImage(img, 0, 0);
+    const qc = performQualityControl(qcCtx, img.width, img.height, selectedDpi);
+    setQcResult(qc);
+  };
+
+  // One-click Auto-Crop Footprint to remove unnecessary room/floor background in Step 2
+  const handleAutoCropFootprint = async () => {
+    const activeUrl = activePreviewType === 'enhanced' ? enhancedUrl : rawCapturedUrl;
+    if (!activeUrl) return;
+
+    try {
+      const img = new Image();
+      img.src = activeUrl;
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = rej;
+      });
+
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(img, 0, 0);
+
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      // Sample dominant background color from the 4 corners
+      const corners = [0, (w - 1) * 4, ((h - 1) * w) * 4, ((h - 1) * w + (w - 1)) * 4];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const idx of corners) {
+        bgR += data[idx];
+        bgG += data[idx + 1];
+        bgB += data[idx + 2];
+      }
+      bgR /= 4;
+      bgG /= 4;
+      bgB /= 4;
+
+      let minX = w, maxX = 0, minY = h, maxY = 0;
+      let footPixelCount = 0;
+
+      for (let y = 0; y < h; y += 2) {
+        for (let x = 0; x < w; x += 2) {
+          const idx = (y * w + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (diff > 45 || lum < 200) {
+            footPixelCount++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (footPixelCount > 80 && maxX > minX && maxY > minY) {
+        const pad = 25;
+        const cropX = Math.max(0, minX - pad);
+        const cropY = Math.max(0, minY - pad);
+        const cropW = Math.min(w - cropX, (maxX - minX) + pad * 2);
+        const cropH = Math.min(h - cropY, (maxY - minY) + pad * 2);
+
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const cropCtx = cropCanvas.getContext('2d')!;
+        cropCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+        const croppedUrl = cropCanvas.toDataURL('image/jpeg', 0.92);
+        setRawCapturedUrl(croppedUrl);
+        await reEnhanceWithCurrentOptions(croppedUrl);
+      }
+    } catch (e) {
+      console.warn('Auto-crop footprint error:', e);
     }
   };
 
@@ -1018,7 +1228,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 </div>
               ) : viewfinderActive ? (
                 /* Mobile: Smart In-App Camera Viewfinder with Level & Stability Guidance */
-                <div className="smart-viewfinder-container shadow-2xl">
+                <div ref={viewfinderContainerRef} className="smart-viewfinder-container shadow-2xl">
                   <video
                     ref={videoRef}
                     playsInline
@@ -1029,7 +1239,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
                   {/* High-Tech Framing HUD Overlay */}
                   <div className="smart-viewfinder-hud">
-                    {/* Top Bar: Back button, Foot indicator, Torch */}
+                    {/* Top Bar: Back button, Foot indicator, Refocus & Flash Controls */}
                     <div className="viewfinder-top-bar">
                       <button
                         type="button"
@@ -1047,25 +1257,55 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                         <span>{footSide} Foot</span>
                       </div>
 
-                      {hwCaps.supportsTorch ? (
+                      <div className="flex items-center gap-1.5 pointer-events-auto">
                         <button
                           type="button"
-                          onClick={toggleTorch}
-                          className={`btn-tiny px-2.5 py-1 backdrop-blur-md font-semibold border ${
-                            torchEnabled
-                              ? 'bg-amber-500/30 text-amber-300 border-amber-400'
-                              : 'bg-slate-900/90 text-slate-300 border-slate-700'
-                          }`}
+                          onClick={triggerRefocus}
+                          className="btn-tiny px-2 py-1 bg-slate-900/90 text-cyan-300 hover:text-white border border-cyan-500/40 backdrop-blur-md font-semibold flex items-center gap-1"
+                          title="Trigger optical autofocus"
                         >
-                          ⚡ {torchEnabled ? 'Torch: ON' : 'Flash'}
+                          <Focus className="w-3 h-3 text-cyan-400" />
+                          <span>Focus</span>
                         </button>
-                      ) : (
-                        <div className="w-12" />
-                      )}
+
+                        {hwCaps.supportsTorch ? (
+                          <button
+                            type="button"
+                            onClick={toggleTorch}
+                            className={`btn-tiny px-2 py-1 backdrop-blur-md font-semibold border flex items-center gap-1 ${
+                              torchEnabled
+                                ? 'bg-amber-500/30 text-amber-300 border-amber-400'
+                                : 'bg-slate-900/90 text-slate-300 border-slate-700'
+                            }`}
+                            title="Toggle camera flash"
+                          >
+                            <Zap className="w-3 h-3 text-amber-400" />
+                            <span>{torchEnabled ? 'Flash ON' : 'Flash'}</span>
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
 
-                    {/* Status Pill Indicator: Shows Green when level & steady */}
-                    <div className="self-center">
+                    {/* Status Pill Indicators: Lighting Guidance + Alignment Green Badge */}
+                    <div className="flex flex-col items-center gap-1.5 self-center">
+                      {/* Lighting Assessment */}
+                      {ambientLuminance < 65 ? (
+                        <div className="viewfinder-pill-badge px-3 py-0.5 bg-amber-500/25 text-amber-300 border border-amber-400/70 text-[11px] shadow-md flex items-center gap-1.5">
+                          <span>🌙</span>
+                          <span>
+                            {torchEnabled
+                              ? 'Low Light Detected • Flash Active for Maximum Visibility'
+                              : 'Dark Environment Detected • Flash Recommended'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="viewfinder-pill-badge px-3 py-0.5 bg-slate-900/80 text-teal-300 border border-teal-500/30 text-[11px] flex items-center gap-1.5">
+                          <span>💡</span>
+                          <span>Optimal Illumination ({ambientLuminance} lx)</span>
+                        </div>
+                      )}
+
+                      {/* Alignment State */}
                       {isLevel && isSteady ? (
                         <div className="viewfinder-pill-badge aligned shadow-lg">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -1083,8 +1323,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       )}
                     </div>
 
-                    {/* Rectangle Bounding Box: Turns vibrant green when perfectly placed */}
-                    <div className={`viewfinder-frame-box ${isLevel && isSteady ? 'aligned' : 'unaligned'}`}>
+                    {/* Rectangle Bounding Box: ONLY content inside this box is cropped and analyzed */}
+                    <div
+                      ref={frameBoxRef}
+                      className={`viewfinder-frame-box ${isLevel && isSteady ? 'aligned' : 'unaligned'}`}
+                    >
                       <div className="viewfinder-corner-tl" />
                       <div className="viewfinder-corner-tr" />
                       <div className="viewfinder-corner-bl" />
@@ -1095,9 +1338,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       </div>
 
                       <div className="flex flex-col items-center justify-center opacity-40 pointer-events-none">
-                        <Target className="w-16 h-16 stroke-1 text-teal-300" />
-                        <span className="text-[10px] font-mono font-bold mt-1 tracking-widest text-teal-200">
-                          {footSide.toUpperCase()} FOOTPRINT
+                        <Target className="w-14 h-14 stroke-1 text-teal-300" />
+                        <span className="text-[9px] font-mono font-bold mt-1 tracking-widest text-teal-200">
+                          {footSide.toUpperCase()} FOOT BOUNDING BOX
+                        </span>
+                        <span className="text-[8px] font-mono text-slate-300 tracking-normal opacity-90 mt-0.5">
+                          (Only footprint inside this box is captured)
                         </span>
                       </div>
 
@@ -1317,15 +1563,29 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     )}
                   </div>
 
-                  {/* Rotate Control Button */}
-                  <button
-                    className="absolute top-2 right-2 btn-tiny bg-slate-900/90 text-slate-300 hover:text-teal-300 flex items-center gap-1"
-                    onClick={() => setRotationDeg((r) => (r + 90) % 360)}
-                    title="Rotate footprint 90 degrees"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Rotate</span>
-                  </button>
+                  {/* Controls: Rotate & Auto-Crop Margins */}
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 z-20">
+                    <button
+                      type="button"
+                      className="btn-tiny bg-slate-900/90 text-slate-300 hover:text-teal-300 border border-slate-700 flex items-center gap-1 shadow-md"
+                      onClick={handleAutoCropFootprint}
+                      title="Auto-crop extra room/floor margins to focus only on footprint"
+                    >
+                      <Crop className="w-3.5 h-3.5 text-teal-400" />
+                      <span className="hidden sm:inline">Auto-Crop Foot</span>
+                      <span className="sm:hidden">Crop</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-tiny bg-slate-900/90 text-slate-300 hover:text-teal-300 border border-slate-700 flex items-center gap-1 shadow-md"
+                      onClick={() => setRotationDeg((r) => (r + 90) % 360)}
+                      title="Rotate footprint 90 degrees"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Rotate</span>
+                    </button>
+                  </div>
 
                   {/* A4 4-Corner Draggable Rectification Pins */}
                   {isA4CalibrationActive && (
