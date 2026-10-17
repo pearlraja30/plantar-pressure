@@ -268,7 +268,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="mobile-menu-footer">
-              <span>Technomind Plantar Pressure System • v1.0.6</span>
+              <span>Technomind Plantar Pressure System • v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.12'}</span>
             </div>
           </div>
         </div>

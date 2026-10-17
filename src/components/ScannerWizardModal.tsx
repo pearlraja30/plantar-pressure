@@ -77,7 +77,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   onClose,
   onScanCompleted,
 }) => {
-  const isMobileNative = Capacitor.isNativePlatform();
+  const isMobileDevice =
+    Capacitor.isNativePlatform() ||
+    (typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
   const [inputMode] = useState<'camera' | 'scanner' | 'file'>('camera');
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -238,7 +243,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
   // Request runtime camera permission on mobile Android / iOS
   const ensureCameraPermission = useCallback(async (): Promise<boolean> => {
-    if (isMobileNative) {
+    if (Capacitor.isNativePlatform()) {
       setIsPermissionRequesting(true);
       try {
         const check = await CapCamera.checkPermissions();
@@ -255,7 +260,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       }
     }
     return true;
-  }, [isMobileNative]);
+  }, []);
 
   // Start camera stream with multi-device best practices & resilient fallbacks
   const startCameraStream = useCallback(async () => {
@@ -731,6 +736,21 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }
   };
 
+  // Drag & drop file ingest for desktop/web browser
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type.startsWith('image/') || /\.(png|jpe?g|webp|tiff?|bmp)$/i.test(file.name))) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        ingestAndEnhanceImage(url, selectedDpi);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Apply Custom Paper Scale Rectification
   const handleApplyA4Rectification = () => {
     const activeUrl = activePreviewType === 'enhanced' ? enhancedUrl : rawCapturedUrl;
@@ -860,7 +880,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         <div className="modal-header flex items-center justify-between p-3 sm:p-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-teal-500/10 text-teal-400">
-              <Camera className="w-5 h-5" />
+              {isMobileDevice ? <Camera className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
@@ -868,8 +888,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 <span className="badge-tag-sm">IEC 62304</span>
               </h2>
               <p className="text-[11px] text-slate-400 hidden sm:block">
-                Supports Camera Capture (Fixed Burst Multi-Frame) + File Upload • Custom Paper Scale •
-                Autofocus & Optical Clarity Engine
+                {isMobileDevice
+                  ? 'Mobile Camera Capture (Level & Stability HUD) • File Upload • Custom Paper Scale Calibration'
+                  : 'Desktop Plantar Image Upload (PNG, JPG, TIFF, BMP) • Automated Contrast & Scale Calibration'}
               </p>
             </div>
           </div>
@@ -935,9 +956,68 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Primary Smart Viewfinder or Camera Trigger */}
-              {viewfinderActive ? (
-                /* Smart In-App Camera Viewfinder with Level & Stability Guidance */
+              {/* 2. Acquisition Mode (Camera on Mobile vs Clean File Upload on Windows/Web) */}
+              {!isMobileDevice ? (
+                /* Desktop / Web Browser Upload Dropzone Card (Windows / Mac / Desktop Web) */
+                <div
+                  className={`scanner-primary-action-card highlight p-8 text-center border-2 border-dashed transition-all duration-200 cursor-pointer ${
+                    isDragOver
+                      ? 'border-teal-400 bg-teal-500/15'
+                      : 'border-slate-700 bg-slate-900/60 hover:border-teal-500/50'
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById('desktop-image-input')?.click()}
+                >
+                  <div className="flex flex-col items-center justify-center space-y-3.5">
+                    <div className="w-16 h-16 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20 shadow-inner">
+                      <Upload className="w-8 h-8" />
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100">
+                        Upload {footSide} Footprint Image File
+                      </h3>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                        Drag and drop your Harris Mat scanned image or footprint photograph directly here, or click to browse.
+                      </p>
+                      <div className="text-[11px] text-teal-400 font-mono mt-2 flex items-center justify-center gap-1.5 flex-wrap">
+                        <span className="badge-tag-sm">PNG</span>
+                        <span className="badge-tag-sm">JPG</span>
+                        <span className="badge-tag-sm">JPEG</span>
+                        <span className="badge-tag-sm">WEBP</span>
+                        <span className="badge-tag-sm">TIFF</span>
+                        <span className="badge-tag-sm">BMP</span>
+                      </div>
+                    </div>
+
+                    <input
+                      id="desktop-image-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/tiff,image/bmp,image/*"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+
+                    <button
+                      type="button"
+                      className="scanner-cta-button max-w-sm mt-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        document.getElementById('desktop-image-input')?.click();
+                      }}
+                    >
+                      <Upload className="w-5 h-5 mr-1" />
+                      Browse &amp; Upload Image File
+                    </button>
+                  </div>
+                </div>
+              ) : viewfinderActive ? (
+                /* Mobile: Smart In-App Camera Viewfinder with Level & Stability Guidance */
                 <div className="smart-viewfinder-container shadow-2xl">
                   <video
                     ref={videoRef}
@@ -1059,7 +1139,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                   </div>
                 </div>
               ) : (
-                /* Standard Choice Card */
+                /* Mobile: Standard Choice Card */
                 <div className="scanner-primary-action-card highlight">
                   <div className="action-card-header">
                     <div className="action-card-icon-box">
@@ -1524,7 +1604,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             </button>
           ) : (
             <div className="text-[11px] sm:text-xs text-slate-500">
-              <span>Select foot and tap &quot;Open Camera&quot; to capture</span>
+              <span>
+                {isMobileDevice
+                  ? 'Select foot and tap "Open Camera" to capture'
+                  : 'Select foot and upload footprint image file to analyze'}
+              </span>
             </div>
           )}
 
