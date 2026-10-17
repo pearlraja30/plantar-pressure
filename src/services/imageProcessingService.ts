@@ -500,15 +500,23 @@ export async function processHarrisMatScan(
 }> {
   const { sensitivity = 1.0, smoothRadius = 5, dpi = 300 } = options;
 
-  const width = imgElement.naturalWidth || imgElement.width;
-  const height = imgElement.naturalHeight || imgElement.height;
+  let width = imgElement.naturalWidth || imgElement.width;
+  let height = imgElement.naturalHeight || imgElement.height;
+
+  // Clamp max dimension to 1400px to protect mobile browser heap from OOM
+  const maxDim = 1400;
+  if (width > maxDim || height > maxDim) {
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
 
   // Offscreen canvas for raw image sampling
   const rawCanvas = document.createElement('canvas');
   rawCanvas.width = width;
   rawCanvas.height = height;
   const rawCtx = rawCanvas.getContext('2d', { willReadFrequently: true })!;
-  rawCtx.drawImage(imgElement, 0, 0);
+  rawCtx.drawImage(imgElement, 0, 0, width, height);
 
   // Perform QC Check
   const qcResult = performQualityControl(rawCtx, width, height, dpi);

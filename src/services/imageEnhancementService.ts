@@ -38,17 +38,25 @@ export async function enhancePlantarImage(
     contrastStrength = 1.4,
   } = options;
 
-  const width = source.width || (source as HTMLImageElement).naturalWidth;
-  const height = source.height || (source as HTMLImageElement).naturalHeight;
+  let width = source.width || (source as HTMLImageElement).naturalWidth;
+  let height = source.height || (source as HTMLImageElement).naturalHeight;
+
+  // Clamp max dimension to 1400px to prevent mobile V8 heap overflow and ANR
+  const maxDim = 1400;
+  if (width > maxDim || height > maxDim) {
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
 
   // Working canvas
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(source, 0, 0);
+  ctx.drawImage(source, 0, 0, width, height);
 
-  const originalDataUrl = canvas.toDataURL('image/png');
+  const originalDataUrl = canvas.toDataURL('image/jpeg', 0.90);
 
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
@@ -172,7 +180,7 @@ export async function enhancePlantarImage(
 
   ctx.putImageData(imgData, 0, 0);
 
-  const enhancedDataUrl = canvas.toDataURL('image/png');
+  const enhancedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
   const contrastGainPct = Math.round(
     ((enhancedContrastSum - initialContrastSum) / Math.max(1, initialContrastSum)) * 100

@@ -42,20 +42,22 @@ import {
   EnhancementOptions,
 } from '../services/imageEnhancementService';
 
+export interface CompletedScanItem {
+  dataUrl: string;
+  dpi: number;
+  scannerModel: string;
+  scannerDriver: string;
+  colorMode: 'Grayscale' | 'RGB';
+  orientationDeg: number;
+  footSide: FootSide;
+  qcResult: QualityControlResult;
+  scaleMmPerPixel?: number;
+}
+
 interface ScannerWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanCompleted: (payload: {
-    dataUrl: string;
-    dpi: number;
-    scannerModel: string;
-    scannerDriver: string;
-    colorMode: 'Grayscale' | 'RGB';
-    orientationDeg: number;
-    footSide: FootSide;
-    qcResult: QualityControlResult;
-    scaleMmPerPixel?: number;
-  }) => void;
+  onScanCompleted: (payloads: CompletedScanItem | CompletedScanItem[]) => void;
 }
 
 interface CameraHardwareCapabilities {
@@ -76,11 +78,14 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   onScanCompleted,
 }) => {
   const isMobileNative = Capacitor.isNativePlatform();
-  const [inputMode, setInputMode] = useState<'camera' | 'scanner' | 'file'>('camera');
+  const [inputMode] = useState<'camera' | 'scanner' | 'file'>('camera');
   const [step, setStep] = useState<1 | 2>(1);
 
+  // Bilateral multi-foot scan accumulation
+  const [completedScans, setCompletedScans] = useState<CompletedScanItem[]>([]);
+
   // Scanner state
-  const [selectedScanner, setSelectedScanner] = useState<ScannerDevice>(MOCK_SCANNER_DEVICES[0]);
+  const [selectedScanner] = useState<ScannerDevice>(MOCK_SCANNER_DEVICES[0]);
   const [selectedDpi] = useState<number>(300);
   const [colorMode, setColorMode] = useState<'Grayscale' | 'RGB'>('Grayscale');
   const [footSide, setFootSide] = useState<FootSide>('Right');
@@ -409,7 +414,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const handleNativeMobileCamera = async () => {
     try {
       const photo = await CapCamera.getPhoto({
-        quality: 100,
+        quality: 90,
+        width: 1200,
+        height: 1600,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -440,10 +447,13 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }
   };
 
-  // Initialize Cameras & Device Orientation
   useEffect(() => {
     if (!isOpen) {
       stopCameraStream();
+      setCompletedScans([]);
+      setRawCapturedUrl(null);
+      setEnhancedUrl(null);
+      setStep(1);
       return;
     }
 
@@ -482,31 +492,60 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
   // Process and automatically enhance any ingested image
   const ingestAndEnhanceImage = async (rawUrl: string, dpi: number) => {
-    setRawCapturedUrl(rawUrl);
-    setStep(2);
+    try {
+      const img = new Image();
+      img.src = rawUrl;
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = rej;
+      });
 
-    const img = new Image();
-    img.src = rawUrl;
-    await new Promise((res) => (img.onload = res));
+      // Clamp max dimension to 1400px to prevent mobile V8 memory overflow
+      let targetW = img.naturalWidth || img.width;
+      let targetH = img.naturalHeight || img.height;
+      const maxDim = 1400;
+      let normalizedUrl = rawUrl;
 
-    // Automatically run clinical enhancement pipeline
-    const result = await enhancePlantarImage(img, enhancementOpts);
-    setEnhancedUrl(result.enhancedDataUrl);
-    setEnhancementMetrics(result.metrics);
-    setActivePreviewType('enhanced');
+      if (targetW > maxDim || targetH > maxDim) {
+        const scale = maxDim / Math.max(targetW, targetH);
+        targetW = Math.round(targetW * scale);
+        targetH = Math.round(targetH * scale);
+        const normCanvas = document.createElement('canvas');
+        normCanvas.width = targetW;
+        normCanvas.height = targetH;
+        const normCtx = normCanvas.getContext('2d')!;
+        normCtx.drawImage(img, 0, 0, targetW, targetH);
+        normalizedUrl = normCanvas.toDataURL('image/jpeg', 0.90);
+      }
 
-    // Run Quality Control on enhanced output
-    const c = document.createElement('canvas');
-    c.width = img.width;
-    c.height = img.height;
-    const ctx = c.getContext('2d', { willReadFrequently: true })!;
-    const enhancedImg = new Image();
-    enhancedImg.src = result.enhancedDataUrl;
-    await new Promise((res) => (enhancedImg.onload = res));
-    ctx.drawImage(enhancedImg, 0, 0);
+      setRawCapturedUrl(normalizedUrl);
+      setStep(2);
 
-    const qc = performQualityControl(ctx, c.width, c.height, dpi);
-    setQcResult(qc);
+      const scaledImg = new Image();
+      scaledImg.src = normalizedUrl;
+      await new Promise((res) => (scaledImg.onload = res));
+
+      // Automatically run clinical enhancement pipeline
+      const result = await enhancePlantarImage(scaledImg, enhancementOpts);
+      setEnhancedUrl(result.enhancedDataUrl);
+      setEnhancementMetrics(result.metrics);
+      setActivePreviewType('enhanced');
+
+      // Run Quality Control on enhanced output
+      const c = document.createElement('canvas');
+      c.width = scaledImg.width;
+      c.height = scaledImg.height;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      const enhancedImg = new Image();
+      enhancedImg.src = result.enhancedDataUrl;
+      await new Promise((res) => (enhancedImg.onload = res));
+      ctx.drawImage(enhancedImg, 0, 0);
+
+      const qc = performQualityControl(ctx, c.width, c.height, dpi);
+      setQcResult(qc);
+    } catch (err) {
+      console.error('Error during image ingestion:', err);
+    }
   };
 
   // Re-run enhancement if options toggle
@@ -666,13 +705,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }
   };
 
-  const handleFinishAndAnalyze = () => {
+  const handleCaptureContralateralFoot = () => {
     const finalUrl = enhancedUrl || rawCapturedUrl;
     if (!finalUrl || !qcResult) return;
 
     const scaleMm = a4CalibResult ? a4CalibResult.scaleMmPerPixel : 25.4 / selectedDpi;
-
-    onScanCompleted({
+    const currentScan: CompletedScanItem = {
       dataUrl: finalUrl,
       dpi: selectedDpi,
       scannerModel:
@@ -687,7 +725,46 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       footSide,
       qcResult,
       scaleMmPerPixel: scaleMm,
-    });
+    };
+
+    setCompletedScans((prev) => [...prev.filter((s) => s.footSide !== footSide), currentScan]);
+
+    const otherSide: FootSide = footSide === 'Right' ? 'Left' : 'Right';
+    setFootSide(otherSide);
+    setRawCapturedUrl(null);
+    setEnhancedUrl(null);
+    setQcResult(null);
+    setA4CalibResult(null);
+    setStep(1);
+  };
+
+  const handleFinishAndAnalyze = () => {
+    const finalUrl = enhancedUrl || rawCapturedUrl;
+    if (!finalUrl || !qcResult) return;
+
+    const scaleMm = a4CalibResult ? a4CalibResult.scaleMmPerPixel : 25.4 / selectedDpi;
+
+    const currentScan: CompletedScanItem = {
+      dataUrl: finalUrl,
+      dpi: selectedDpi,
+      scannerModel:
+        inputMode === 'camera'
+          ? isCameraActive
+            ? `High-Res Optical Camera (${cameraResolution.toUpperCase()})`
+            : 'Phone Camera Sensor'
+          : selectedScanner.name,
+      scannerDriver: 'Enhanced Clinical Optical Homography Engine',
+      colorMode,
+      orientationDeg: rotationDeg,
+      footSide,
+      qcResult,
+      scaleMmPerPixel: scaleMm,
+    };
+
+    const allScans = [...completedScans.filter((s) => s.footSide !== footSide), currentScan];
+
+    onScanCompleted(allScans);
+    setCompletedScans([]);
     onClose();
   };
 
@@ -738,6 +815,17 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 className="hidden"
                 onChange={handleFileUpload}
               />
+
+              {/* Contralateral Foot Acquisition Notice */}
+              {completedScans.length > 0 && (
+                <div className="p-2.5 bg-emerald-950/50 border border-emerald-600/60 rounded-lg text-emerald-300 text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    {completedScans.map((s) => `${s.footSide} Foot`).join(', ')} Stored!
+                  </span>
+                  <span className="text-[11px] text-emerald-200">Now capturing {footSide} Foot</span>
+                </div>
+              )}
 
               {/* 1. Foot Side Selection */}
               <div>
@@ -1164,6 +1252,79 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* Bilateral Foot Capture Decision Card */}
+                  {(() => {
+                    const otherSide: FootSide = footSide === 'Right' ? 'Left' : 'Right';
+                    const hasOtherCaptured = completedScans.some((s) => s.footSide === otherSide);
+
+                    if (!hasOtherCaptured) {
+                      return (
+                        <div className="p-3 bg-gradient-to-r from-teal-950/60 to-sky-950/60 border border-teal-700/60 rounded-lg space-y-2.5 shadow-md">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+                              ✓
+                            </div>
+                            <div>
+                              <div className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                                <span>{footSide} Foot Impression Acquired</span>
+                                <span className="badge-tag-sm text-teal-300">Ready</span>
+                              </div>
+                              <p className="text-[11px] text-slate-300 mt-0.5">
+                                Would you like to capture the <strong>{otherSide} Foot</strong> as well for a paired bilateral comparison, or proceed directly to analysis?
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <button
+                              type="button"
+                              className="btn-primary text-xs py-2.5 justify-center flex items-center gap-1.5 font-bold shadow-md bg-gradient-to-r from-teal-500 to-sky-500"
+                              onClick={handleCaptureContralateralFoot}
+                            >
+                              <span className="text-base">🦶</span>
+                              <span>Capture Other Foot ({otherSide})</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary text-xs py-2.5 justify-center flex items-center gap-1.5 font-semibold"
+                              onClick={handleFinishAndAnalyze}
+                            >
+                              <FileCheck className="w-4 h-4 text-slate-300" />
+                              <span>Analyze {footSide} Foot Only</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-3 bg-gradient-to-r from-emerald-950/60 to-teal-950/60 border border-emerald-600/60 rounded-lg space-y-2 shadow-md">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-sm shrink-0">
+                              ✓✓
+                            </div>
+                            <div>
+                              <div className="text-xs sm:text-sm font-bold text-emerald-200">
+                                Both Feet Captured (Right &amp; Left Foot)
+                              </div>
+                              <div className="text-[11px] text-slate-300">
+                                Complete bilateral dataset ready for paired anatomical analysis and symmetry assessment.
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn-primary w-full text-xs sm:text-sm py-2.5 justify-center flex items-center gap-1.5 font-bold shadow-lg bg-gradient-to-r from-emerald-500 to-teal-500"
+                            onClick={handleFinishAndAnalyze}
+                          >
+                            <FileCheck className="w-4 h-4" />
+                            <span>Start Complete Bilateral Analysis (Both Feet)</span>
+                          </button>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             </div>
@@ -1190,7 +1351,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             {step === 2 && (enhancedUrl || rawCapturedUrl) && (
               <button className="btn-primary text-xs sm:text-sm" onClick={handleFinishAndAnalyze}>
                 <FileCheck className="w-4 h-4 mr-1.5" />
-                Analyze Plantar Impression
+                {completedScans.length > 0 ? 'Analyze Both Feet' : `Analyze ${footSide} Foot`}
               </button>
             )}
           </div>
