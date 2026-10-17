@@ -16,8 +16,8 @@ import { AnalysisCase, Patient, CLINICAL_CATEGORIES, ClinicalCategory } from '..
 import { processHarrisMatScan } from '../services/imageProcessingService';
 
 interface AnalysisWorkspaceProps {
-  currentCase: AnalysisCase;
-  patient: Patient;
+  currentCase?: AnalysisCase;
+  patient?: Patient;
   patientCases?: AnalysisCase[];
   onSelectCase?: (caseId: string) => void;
   onOpenScanner?: () => void;
@@ -48,22 +48,6 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   const [smoothRadius, setSmoothRadius] = useState(5);
   const [isReprocessing, setIsReprocessing] = useState(false);
 
-  // Bilateral stance linking under same patient
-  const contralateralSide = currentCase.footSide === 'Left' ? 'Right' : 'Left';
-  const contralateralCase = patientCases?.find((c) => c.footSide === contralateralSide);
-  const leftCase = currentCase.footSide === 'Left' ? currentCase : contralateralCase;
-  const rightCase = currentCase.footSide === 'Right' ? currentCase : contralateralCase;
-
-  let computedASI = currentCase.regionalAnalysis.asymmetryIndex ?? 4.2;
-  if (leftCase && rightCase) {
-    const areaL = leftCase.regionalAnalysis.contactAreaCm2;
-    const areaR = rightCase.regionalAnalysis.contactAreaCm2;
-    const meanArea = (areaL + areaR) / 2;
-    if (meanArea > 0) {
-      computedASI = Number(((Math.abs(areaL - areaR) / meanArea) * 100).toFixed(1));
-    }
-  }
-
   // Interactive Inspector Probe
   const [probeData, setProbeData] = useState<{
     x: number;
@@ -82,6 +66,46 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Return clean empty clinical workspace if no scan is loaded
+  if (!currentCase || !patient) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+        <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 shadow-xl">
+          <Activity className="w-10 h-10" />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-xl font-bold text-slate-100">Ready for Real Clinical Scan</h2>
+          <p className="text-xs text-slate-400">
+            All sample and demo data have been cleared. Launch the Scanner Wizard to capture a live photo of your patient's Harris Mat footprint or upload a scan file.
+          </p>
+        </div>
+        <button
+          className="btn-primary text-sm font-bold px-6 py-3 shadow-lg flex items-center gap-2"
+          onClick={onOpenScanner}
+        >
+          <Activity className="w-5 h-5" />
+          <span>Launch Scanner Wizard</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Bilateral stance linking under same patient
+  const contralateralSide = currentCase.footSide === 'Left' ? 'Right' : 'Left';
+  const contralateralCase = patientCases?.find((c) => c.footSide === contralateralSide);
+  const leftCase = currentCase.footSide === 'Left' ? currentCase : contralateralCase;
+  const rightCase = currentCase.footSide === 'Right' ? currentCase : contralateralCase;
+
+  let computedASI = currentCase.regionalAnalysis.asymmetryIndex ?? 4.2;
+  if (leftCase && rightCase) {
+    const areaL = leftCase.regionalAnalysis.contactAreaCm2;
+    const areaR = rightCase.regionalAnalysis.contactAreaCm2;
+    const meanArea = (areaL + areaR) / 2;
+    if (meanArea > 0) {
+      computedASI = Number(((Math.abs(areaL - areaR) / meanArea) * 100).toFixed(1));
+    }
+  }
 
   // Trigger reprocessing if algorithm knobs change
   const handleReprocess = async () => {

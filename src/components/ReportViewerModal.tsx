@@ -33,16 +33,15 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
   const [currentPage, setCurrentPage] = useState<1 | 2 | 3 | 4>(1);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Digital Sign-Off Form State
+  // Digital Sign-Off Form State (clean defaults, no fake sample clinician data)
   const [physicianName, setPhysicianName] = useState(
-    currentCase.signOff?.physicianName || 'Dr. Michael Chen, DPM, FACFAS'
+    currentCase.signOff?.physicianName || currentCase.operatorName || ''
   );
   const [role, setRole] = useState(
-    currentCase.signOff?.role || 'Consultant Podiatric Surgeon'
+    currentCase.signOff?.role || 'Attending Practitioner'
   );
   const [comments, setComments] = useState(
-    currentCase.signOff?.comments ||
-      'Plantar contact pattern verified. Category C6 peak contact at 1st metatarsal head requires offloading orthotic. Approved for manufacturing.'
+    currentCase.signOff?.comments || ''
   );
   const [isSigned, setIsSigned] = useState(!!currentCase.signOff);
 

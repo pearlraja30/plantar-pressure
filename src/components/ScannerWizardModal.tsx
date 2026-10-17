@@ -25,7 +25,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ScannerDevice, QualityControlResult, FootSide } from '../types';
-import { MOCK_SCANNER_DEVICES, generateHarrisMatFootprint } from '../services/sampleDataService';
+import { MOCK_SCANNER_DEVICES } from '../services/sampleDataService';
 import { performQualityControl } from '../services/imageProcessingService';
 import {
   warpCustomPerspective,
@@ -83,7 +83,6 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [selectedDpi] = useState<number>(300);
   const [colorMode, setColorMode] = useState<'Grayscale' | 'RGB'>('Grayscale');
   const [footSide, setFootSide] = useState<FootSide>('Right');
-  const [simPattern, setSimPattern] = useState<'normal' | 'high_pressure' | 'flat_foot'>('high_pressure');
 
   // Camera Settings
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
@@ -652,34 +651,19 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         capturedUrl = canvas.toDataURL('image/png');
       }
     } else {
-      // Fallback simulation footprint if camera is not connected
-      capturedUrl = generateHarrisMatFootprint(
-        footSide === 'Bilateral' ? 'Right' : footSide,
-        simPattern,
-        720,
-        1080
+      setCameraError(
+        'Camera stream is not active. Please tap "Launch Native Phone Camera" above or switch to "Upload File".'
       );
-      if (burstMode !== 'single') {
-        const count = burstMode === 'burst5' ? 5 : 3;
-        setBurstStatusMessage(
-          `Fixed burst multi-frame capture (${count} frames acquired) — optimal sharpness frame selected.`
-        );
-      }
+      return;
     }
 
     stopCameraStream();
     ingestAndEnhanceImage(capturedUrl, selectedDpi);
   };
 
-  // Ingest from Scanner
+  // Ingest from Scanner: switch to file tab to ingest scan from scanner software
   const handleAcquireFromScanner = () => {
-    const dataUrl = generateHarrisMatFootprint(
-      footSide === 'Bilateral' ? 'Right' : footSide,
-      simPattern,
-      720,
-      1080
-    );
-    ingestAndEnhanceImage(dataUrl, selectedDpi);
+    setInputMode('file');
   };
 
   // Ingest from File Upload
@@ -836,8 +820,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             <div>
               {inputMode === 'camera' && (
                 <div className="space-y-3">
-                  {/* Camera Controls Bar - Responsive Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {/* Camera Controls Bar - Clean 3-Column Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <div>
                       <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
                         Camera Feed
@@ -884,21 +868,6 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       >
                         <option value="Right">Right Foot</option>
                         <option value="Left">Left Foot</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
-                        Test Footprint
-                      </label>
-                      <select
-                        className="form-select w-full text-xs"
-                        value={simPattern}
-                        onChange={(e) => setSimPattern(e.target.value as any)}
-                      >
-                        <option value="high_pressure">High Pressure (Diabetic)</option>
-                        <option value="normal">Normal Reference</option>
-                        <option value="flat_foot">Flat Foot (Pes Planus)</option>
                       </select>
                     </div>
                   </div>

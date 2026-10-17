@@ -491,9 +491,9 @@ export async function generateClinicalReportPdf(
   doc.text('Authorized Clinician Approval', margin + 6, curY + 9);
 
   const sign = analysisCase.signOff || {
-    physicianName: 'Dr. Michael Chen, DPM, FACFAS',
-    role: 'Consultant Podiatric Surgeon',
-    comments: 'Plantar contact pattern verified. Category C6 peak contact at 1st metatarsal head requires offloading orthotic. Approved for manufacturing.',
+    physicianName: analysisCase.operatorName || 'Pending Clinician Review',
+    role: 'Attending Practitioner',
+    comments: 'Quantitative Harris Mat plantar pressure analysis. Pending digital clinician verification.',
     signedAt: new Date().toISOString(),
   };
 

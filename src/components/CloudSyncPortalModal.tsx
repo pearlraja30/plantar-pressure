@@ -18,7 +18,7 @@ interface CloudSyncPortalModalProps {
   isOpen: boolean;
   onClose: () => void;
   cloudStatus: CloudSyncStatus;
-  currentCase: AnalysisCase;
+  currentCase?: AnalysisCase;
   onSyncTriggered: () => void;
 }
 
@@ -40,6 +40,7 @@ export const CloudSyncPortalModal: React.FC<CloudSyncPortalModalProps> = ({
   };
 
   const handleManualSync = async () => {
+    if (!currentCase) return;
     setIsSimulatingSync(true);
     setSyncFeedback(null);
     try {
@@ -126,30 +127,36 @@ export const CloudSyncPortalModal: React.FC<CloudSyncPortalModalProps> = ({
               the queue uploads automatically without data loss.
             </div>
 
-            <div className="pt-2 border-t border-slate-700 flex justify-between items-center">
-              <div className="text-xs">
-                <span className="text-slate-400">Current Case Status: </span>
-                <span className="font-bold text-teal-400 uppercase">
-                  {currentCase.syncStatus}
-                </span>
-                {currentCase.cloudSyncId && (
-                  <span className="text-[11px] text-slate-500 font-mono ml-2">
-                    ({currentCase.cloudSyncId})
+            {currentCase ? (
+              <div className="pt-2 border-t border-slate-700 flex justify-between items-center">
+                <div className="text-xs">
+                  <span className="text-slate-400">Current Case Status: </span>
+                  <span className="font-bold text-teal-400 uppercase">
+                    {currentCase.syncStatus}
                   </span>
-                )}
-              </div>
+                  {currentCase.cloudSyncId && (
+                    <span className="text-[11px] text-slate-500 font-mono ml-2">
+                      ({currentCase.cloudSyncId})
+                    </span>
+                  )}
+                </div>
 
-              <button
-                className="btn-primary-sm"
-                onClick={handleManualSync}
-                disabled={isSimulatingSync}
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 mr-1 ${isSimulatingSync ? 'animate-spin' : ''}`}
-                />
-                {isSimulatingSync ? 'Syncing...' : 'Sync Current Case'}
-              </button>
-            </div>
+                <button
+                  className="btn-primary-sm"
+                  onClick={handleManualSync}
+                  disabled={isSimulatingSync}
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 mr-1 ${isSimulatingSync ? 'animate-spin' : ''}`}
+                  />
+                  {isSimulatingSync ? 'Syncing...' : 'Sync Current Case'}
+                </button>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-700 text-xs text-slate-500 italic">
+                No active scan case selected. Capture a footprint scan in the Analysis tab to sync records.
+              </div>
+            )}
 
             {syncFeedback && (
               <div className="p-2.5 bg-teal-950/40 border border-teal-800/50 rounded text-xs text-teal-300">
@@ -167,9 +174,11 @@ export const CloudSyncPortalModal: React.FC<CloudSyncPortalModalProps> = ({
             <div className="text-[11px] text-slate-400 space-y-1">
               <div>• Transport: TLS 1.3 with AES-256-GCM authenticated encryption.</div>
               <div>• Role-Based Access Control: Clinician / Orthotist / Auditor token verification.</div>
-              <div className="font-mono text-[10px] text-slate-500 break-all">
-                • Current Case Digest: {currentCase.integrityHash}
-              </div>
+              {currentCase?.integrityHash && (
+                <div className="font-mono text-[10px] text-slate-500 break-all">
+                  • Current Case Digest: {currentCase.integrityHash}
+                </div>
+              )}
             </div>
           </div>
         </div>

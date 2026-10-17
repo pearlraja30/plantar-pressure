@@ -12,22 +12,72 @@ import { RegulatoryVerificationModal } from './components/RegulatoryVerification
 import { CaseMigrationManager } from './core/repositories/CaseMigrationManager';
 
 import { Patient, AnalysisCase, FootSide, QualityControlResult } from './types';
-import {
-  INITIAL_PATIENTS,
-  createDemoCase,
-  createBilateralDemoCases,
-} from './services/sampleDataService';
 import { processHarrisMatScan } from './services/imageProcessingService';
 import { cloudSyncService, CloudSyncStatus } from './services/cloudSyncService';
 import { logAuditEvent } from './services/auditService';
 
 export function App() {
-  const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(INITIAL_PATIENTS[0].id);
+  // Clear any mock/demo cases stored in previous sessions
+  useEffect(() => {
+    if (!localStorage.getItem('ppa-real-mode-v1')) {
+      localStorage.removeItem('ppa-patients');
+      localStorage.removeItem('ppa-cases');
+      localStorage.removeItem('ppa-selected-patient-id');
+      localStorage.removeItem('ppa-selected-case-id');
+      localStorage.setItem('ppa-real-mode-v1', 'true');
+    }
+  }, []);
 
-  const [cases, setCases] = useState<AnalysisCase[]>([]);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  // Persistent clinical patients (starts empty, no fake data)
+  const [patients, setPatients] = useState<Patient[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa-patients');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => {
+    return localStorage.getItem('ppa-selected-patient-id') || '';
+  });
+
+  // Persistent clinical analysis cases (starts empty, no fake data)
+  const [cases, setCases] = useState<AnalysisCase[]>(() => {
+    try {
+      const saved = localStorage.getItem('ppa-cases');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [selectedCaseId, setSelectedCaseId] = useState<string>(() => {
+    return localStorage.getItem('ppa-selected-case-id') || '';
+  });
+
   const [currentTab, setCurrentTab] = useState<'analysis' | 'orthotics' | 'patients'>('analysis');
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('ppa-patients', JSON.stringify(patients));
+  }, [patients]);
+
+  useEffect(() => {
+    if (selectedPatientId) {
+      localStorage.setItem('ppa-selected-patient-id', selectedPatientId);
+    }
+  }, [selectedPatientId]);
+
+  useEffect(() => {
+    localStorage.setItem('ppa-cases', JSON.stringify(cases));
+  }, [cases]);
+
+  useEffect(() => {
+    if (selectedCaseId) {
+      localStorage.setItem('ppa-selected-case-id', selectedCaseId);
+    }
+  }, [selectedCaseId]);
 
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -55,24 +105,14 @@ export function App() {
   // Cloud Sync state
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>(cloudSyncService.getStatus());
 
-  // Initialize bilateral linked demo cases on mount
-  useEffect(() => {
-    async function init() {
-      const bilateralCases = await createBilateralDemoCases(INITIAL_PATIENTS[0]);
-      setCases(bilateralCases);
-      setSelectedCaseId(bilateralCases[0].id);
-    }
-    init();
-  }, []);
-
   const refreshCloudStatus = () => {
     setCloudStatus(cloudSyncService.getStatus());
   };
 
   const selectedPatient =
-    patients.find((p) => p.id === selectedPatientId) || patients[0];
+    patients.find((p) => p.id === selectedPatientId) || (patients.length > 0 ? patients[0] : undefined);
   const currentCase =
-    cases.find((c) => c.id === selectedCaseId) || cases[0];
+    cases.find((c) => c.id === selectedCaseId) || (cases.length > 0 ? cases[0] : undefined);
 
   // Callback when scanner completes a scan (FR-02, FR-04)
   const handleScanCompleted = async (payload: {
@@ -98,6 +138,27 @@ export function App() {
     const newCaseId = 'case-' + Math.random().toString(36).substring(2, 9);
     const caseNum = `PPA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Ensure a patient exists to link the scan to
+    let targetPatient = selectedPatient;
+    if (!targetPatient) {
+      const patNumber = patients.length + 1;
+      targetPatient = {
+        id: 'pat-' + Math.random().toString(36).substring(2, 9),
+        mrn: `MRN-${Math.floor(10000 + Math.random() * 90000)}`,
+        name: `Patient #${patNumber}`,
+        dateOfBirth: new Date().toISOString().slice(0, 10),
+        gender: 'Other',
+        weightKg: 0,
+        heightCm: 0,
+        phone: '',
+        referringDoctor: '',
+        clinicalNotes: 'Plantar contact evaluation',
+        createdAt: new Date().toISOString(),
+      };
+      setPatients((prev) => [targetPatient!, ...prev]);
+      setSelectedPatientId(targetPatient.id);
+    }
+
     const mmPerPx = payload.scaleMmPerPixel || 25.4 / payload.dpi;
     const defaultLandmarks = {
       heelCenter: { x: 370, y: 770 },
@@ -112,12 +173,12 @@ export function App() {
     const newCase: AnalysisCase = {
       id: newCaseId,
       caseNumber: caseNum,
-      patientId: selectedPatient.id,
+      patientId: targetPatient.id,
       footSide: payload.footSide,
-      indication: selectedPatient.clinicalNotes || 'Plantar contact evaluation',
+      indication: targetPatient.clinicalNotes || 'Plantar contact evaluation',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      operatorName: 'Clinical Technician (R. Rajalakshmi)',
+      operatorName: 'Clinical Practitioner',
       clinicName: 'Technomind Podiatric Biomechanics Center',
       rawScanDataUrl: payload.dataUrl,
       processedHeatMapDataUrl: result.processedDataUrl,
@@ -205,53 +266,45 @@ export function App() {
 
       {/* Main Clinical Workstation Viewports */}
       <main className="main-content">
-        {currentCase && selectedPatient ? (
-          <>
-            {currentTab === 'analysis' && (
-              <AnalysisWorkspace
-                currentCase={currentCase}
-                patient={selectedPatient}
-                patientCases={cases.filter((c) => c.patientId === selectedPatient.id)}
-                onSelectCase={(cid) => setSelectedCaseId(cid)}
-                onOpenScanner={() => setIsScannerOpen(true)}
-                onUpdateCase={handleUpdateCase}
-                onNavigateToOrthotics={() => setCurrentTab('orthotics')}
-                onGenerateReport={() => setIsReportOpen(true)}
-              />
-            )}
+        {currentTab === 'analysis' && (
+          <AnalysisWorkspace
+            currentCase={currentCase}
+            patient={selectedPatient}
+            patientCases={selectedPatient ? cases.filter((c) => c.patientId === selectedPatient.id) : []}
+            onSelectCase={(cid) => setSelectedCaseId(cid)}
+            onOpenScanner={() => setIsScannerOpen(true)}
+            onUpdateCase={handleUpdateCase}
+            onNavigateToOrthotics={() => setCurrentTab('orthotics')}
+            onGenerateReport={() => setIsReportOpen(true)}
+          />
+        )}
 
-            {currentTab === 'orthotics' && (
-              <OrthoticMeasurementsView
-                currentCase={currentCase}
-                patient={selectedPatient}
-                onUpdateCase={handleUpdateCase}
-                onGenerateReport={() => setIsReportOpen(true)}
-              />
-            )}
+        {currentTab === 'orthotics' && (
+          <OrthoticMeasurementsView
+            currentCase={currentCase}
+            patient={selectedPatient}
+            onUpdateCase={handleUpdateCase}
+            onGenerateReport={() => setIsReportOpen(true)}
+          />
+        )}
 
-            {currentTab === 'patients' && (
-              <PatientCaseView
-                patients={patients}
-                cases={cases}
-                selectedPatientId={selectedPatientId}
-                selectedCaseId={selectedCaseId}
-                onSelectPatient={(pid) => {
-                  setSelectedPatientId(pid);
-                  const patCases = cases.filter((c) => c.patientId === pid);
-                  if (patCases.length > 0) {
-                    setSelectedCaseId(patCases[0].id);
-                  }
-                }}
-                onSelectCase={(cid) => setSelectedCaseId(cid)}
-                onCreatePatient={handleCreatePatient}
-                onNavigateToAnalysis={() => setCurrentTab('analysis')}
-              />
-            )}
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            Initializing Clinical Biomechanical Engine...
-          </div>
+        {currentTab === 'patients' && (
+          <PatientCaseView
+            patients={patients}
+            cases={cases}
+            selectedPatientId={selectedPatientId}
+            selectedCaseId={selectedCaseId}
+            onSelectPatient={(pid) => {
+              setSelectedPatientId(pid);
+              const patCases = cases.filter((c) => c.patientId === pid);
+              if (patCases.length > 0) {
+                setSelectedCaseId(patCases[0].id);
+              }
+            }}
+            onSelectCase={(cid) => setSelectedCaseId(cid)}
+            onCreatePatient={handleCreatePatient}
+            onNavigateToAnalysis={() => setCurrentTab('analysis')}
+          />
         )}
       </main>
 
@@ -275,15 +328,13 @@ export function App() {
       )}
 
       {/* 3. Cloud Sync Portal (FR-12, FR-13) */}
-      {currentCase && (
-        <CloudSyncPortalModal
-          isOpen={isCloudOpen}
-          onClose={() => setIsCloudOpen(false)}
-          cloudStatus={cloudStatus}
-          currentCase={currentCase}
-          onSyncTriggered={refreshCloudStatus}
-        />
-      )}
+      <CloudSyncPortalModal
+        isOpen={isCloudOpen}
+        onClose={() => setIsCloudOpen(false)}
+        cloudStatus={cloudStatus}
+        currentCase={currentCase}
+        onSyncTriggered={refreshCloudStatus}
+      />
 
       {/* 4. Audit Trail Modal (FR-14) */}
       <AuditTrailModal

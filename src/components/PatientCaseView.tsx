@@ -38,16 +38,16 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
 
-  // New patient state
+  // New patient state (clean defaults, no fake sample data)
   const [name, setName] = useState('');
   const [mrn, setMrn] = useState('');
-  const [dob, setDob] = useState('1985-05-15');
+  const [dob, setDob] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
-  const [weightKg, setWeightKg] = useState(75);
-  const [heightCm, setHeightCm] = useState(175);
-  const [phone, setPhone] = useState('+1 (555) 000-0000');
-  const [referringDoctor, setReferringDoctor] = useState('Dr. Michael Chen, DPM');
-  const [clinicalNotes, setClinicalNotes] = useState('Plantar contact evaluation.');
+  const [weightKg, setWeightKg] = useState<number | ''>('');
+  const [heightCm, setHeightCm] = useState<number | ''>('');
+  const [phone, setPhone] = useState('');
+  const [referringDoctor, setReferringDoctor] = useState('');
+  const [clinicalNotes, setClinicalNotes] = useState('');
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
   const patientCases = cases.filter((c) => c.patientId === selectedPatient?.id);
@@ -66,13 +66,13 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
       id: 'pat-' + Math.random().toString(36).substring(2, 9),
       mrn: mrn.trim() || `MRN-${Math.floor(10000 + Math.random() * 90000)}`,
       name: name.trim(),
-      dateOfBirth: dob,
+      dateOfBirth: dob || new Date().toISOString().slice(0, 10),
       gender,
-      weightKg: Number(weightKg),
-      heightCm: Number(heightCm),
-      phone,
-      referringDoctor,
-      clinicalNotes,
+      weightKg: Number(weightKg) || 0,
+      heightCm: Number(heightCm) || 0,
+      phone: phone.trim(),
+      referringDoctor: referringDoctor.trim(),
+      clinicalNotes: clinicalNotes.trim(),
       createdAt: new Date().toISOString(),
     };
 
@@ -80,8 +80,17 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
     logAuditEvent(
       'PATIENT_RECORD_CREATED',
       `Registered patient ${newPat.name} (${newPat.mrn})`,
-      'tech-rajalakshmi'
+      'practitioner'
     );
+    // Reset form
+    setName('');
+    setMrn('');
+    setDob('');
+    setWeightKg('');
+    setHeightCm('');
+    setPhone('');
+    setReferringDoctor('');
+    setClinicalNotes('');
     setIsNewPatientModalOpen(false);
   };
 
@@ -123,30 +132,55 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
           </div>
 
           <div className="patient-items-scroll">
-            {filteredPatients.map((p) => (
-              <div
-                key={p.id}
-                className={`patient-row-item ${p.id === selectedPatient?.id ? 'active' : ''}`}
-                onClick={() => onSelectPatient(p.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-100 text-sm">{p.name}</span>
-                  <span className="badge-tag-sm">{p.mrn}</span>
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-                  <span>
-                    {p.gender} • {p.dateOfBirth}
-                  </span>
-                  <span>{p.weightKg} kg</span>
-                </div>
+            {filteredPatients.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500">
+                {patients.length === 0
+                  ? 'No patient records found. Click "New Patient Record" above to register.'
+                  : 'No patients matching your search.'}
               </div>
-            ))}
+            ) : (
+              filteredPatients.map((p) => (
+                <div
+                  key={p.id}
+                  className={`patient-row-item ${p.id === selectedPatient?.id ? 'active' : ''}`}
+                  onClick={() => onSelectPatient(p.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-100 text-sm">{p.name}</span>
+                    <span className="badge-tag-sm">{p.mrn}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                    <span>
+                      {p.gender} • {p.dateOfBirth}
+                    </span>
+                    <span>{p.weightKg} kg</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         {/* Right column: Patient dossier & cases */}
         <div className="patient-detail-card space-y-4">
-          {selectedPatient && (
+          {!selectedPatient ? (
+            <div className="flex flex-col items-center justify-center h-80 p-6 text-center text-slate-400 space-y-3">
+              <User className="w-12 h-12 text-slate-600" />
+              <div>
+                <div className="font-bold text-slate-200">No Patient Record Active</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Click below to create your first clinical patient dossier.
+                </div>
+              </div>
+              <button
+                className="btn-primary-sm"
+                onClick={() => setIsNewPatientModalOpen(true)}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Register New Patient
+              </button>
+            </div>
+          ) : (
             <>
               {/* Patient Profile Card */}
               <div className="profile-banner">
@@ -373,6 +407,7 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                   className="form-input"
                   value={referringDoctor}
                   onChange={(e) => setReferringDoctor(e.target.value)}
+                  placeholder="e.g. Dr. Jane Smith, DPM"
                 />
               </div>
 
@@ -382,6 +417,7 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                   className="form-textarea h-20"
                   value={clinicalNotes}
                   onChange={(e) => setClinicalNotes(e.target.value)}
+                  placeholder="e.g. Bilateral plantar pain, diabetic foot ulcer screening, high arch assessment..."
                 />
               </div>
 

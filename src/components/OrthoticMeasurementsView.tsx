@@ -19,11 +19,21 @@ import { logAuditEvent } from '../services/auditService';
 import { orthoticRuleEngine } from '../core/rules/OrthoticRuleEngine';
 
 interface OrthoticMeasurementsViewProps {
-  currentCase: AnalysisCase;
-  patient: Patient;
+  currentCase?: AnalysisCase;
+  patient?: Patient;
   onUpdateCase: (updatedCase: AnalysisCase) => void;
   onGenerateReport: () => void;
 }
+
+const DEFAULT_FALLBACK_LANDMARKS: OrthoticLandmarks = {
+  heelCenter: { x: 370, y: 770 },
+  heelMedial: { x: 305, y: 770 },
+  heelLateral: { x: 435, y: 770 },
+  metatarsal1: { x: 285, y: 440 },
+  metatarsal5: { x: 450, y: 450 },
+  longestToe: { x: 330, y: 220 },
+  archApex: { x: 380, y: 610 },
+};
 
 export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> = ({
   currentCase,
@@ -31,11 +41,35 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
   onUpdateCase,
   onGenerateReport,
 }) => {
-  const [landmarks, setLandmarks] = useState<OrthoticLandmarks>(currentCase.landmarks);
+  const [landmarks, setLandmarks] = useState<OrthoticLandmarks>(
+    currentCase?.landmarks || DEFAULT_FALLBACK_LANDMARKS
+  );
   const [activePin, setActivePin] = useState<keyof OrthoticLandmarks | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
-
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync landmarks whenever active case changes
+  React.useEffect(() => {
+    if (currentCase?.landmarks) {
+      setLandmarks(currentCase.landmarks);
+    }
+  }, [currentCase?.id, currentCase?.landmarks]);
+
+  if (!currentCase || !patient) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 shadow-xl">
+          <Ruler className="w-8 h-8" />
+        </div>
+        <div className="max-w-md space-y-1">
+          <h2 className="text-lg font-bold text-slate-100">No Patient Case Available</h2>
+          <p className="text-xs text-slate-400">
+            Acquire a real foot scan in the Analysis tab to view orthotic measurements and prescription recommendations.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Calibration scale
   const scale = currentCase.orthoticMeasurements.scaleMmPerPixel;

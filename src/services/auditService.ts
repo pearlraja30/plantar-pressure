@@ -17,7 +17,7 @@ export function getAuditEvents(): AuditEvent[] {
 export function logAuditEvent(
   action: string,
   details: string,
-  userId: string = 'clinician-dr-chen',
+  userId: string = 'practitioner',
   caseId?: string
 ): AuditEvent {
   const events = getAuditEvents();
@@ -43,49 +43,12 @@ export function logAuditEvent(
 function getInitialDefaultAuditLogs(): AuditEvent[] {
   return [
     {
-      id: 'aud-001',
-      timestamp: '2026-10-12T11:42:18Z',
-      userId: 'tech-rajalakshmi',
-      caseId: 'case-demo-001',
-      action: 'SCAN_ACQUISITION_COMPLETED',
-      details: 'Acquired Harris Mat 300 DPI scan via Epson V39 II (TWAIN interface). Image QC Passed (Score 92).',
-      algorithmVersion: 'v1.2.0-MED-2026',
-    },
-    {
-      id: 'aud-002',
-      timestamp: '2026-10-12T11:43:05Z',
-      userId: 'tech-rajalakshmi',
-      caseId: 'case-demo-001',
-      action: 'JET_HEATMAP_GENERATED',
-      details: 'Computed 6-category contact classification. Peak contact identified under 1st Metatarsal head.',
-      algorithmVersion: 'v1.2.0-MED-2026',
-    },
-    {
-      id: 'aud-003',
-      timestamp: '2026-10-12T11:44:20Z',
-      userId: 'tech-rajalakshmi',
-      caseId: 'case-demo-001',
-      action: 'ORTHOTIC_LANDMARKS_VERIFIED',
-      details: 'Foot length 265mm, Forefoot width 96mm, Heel width 68mm, Cavanagh Arch Index 0.185 (Pes Cavus).',
-      algorithmVersion: 'v1.2.0-MED-2026',
-    },
-    {
-      id: 'aud-004',
-      timestamp: '2026-10-12T12:30:00Z',
-      userId: 'dr-michael-chen',
-      caseId: 'case-demo-001',
-      action: 'CLINICAL_SIGN_OFF',
-      details: 'Physician approved report and prescribed custom offloading insole with 1st metatarsal relief.',
-      algorithmVersion: 'v1.2.0-MED-2026',
-    },
-    {
-      id: 'aud-005',
-      timestamp: '2026-10-12T12:35:10Z',
-      userId: 'system-cloud-sync',
-      caseId: 'case-demo-001',
-      action: 'CLOUD_SYNC_SUCCESSFUL',
-      details: 'Encrypted payload synced to Technomind Cloud Gateway. Hash verified.',
-      algorithmVersion: 'v1.2.0-MED-2026',
+      id: 'aud-init',
+      timestamp: new Date().toISOString(),
+      userId: 'system',
+      action: 'SYSTEM_INITIALIZED',
+      details: 'Plantar Pressure Analysis System ready for clinical scan acquisition.',
+      algorithmVersion: CURRENT_ALGORITHM_VERSION,
     },
   ];
 }
