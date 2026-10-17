@@ -3,12 +3,14 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.technomind.plantarpressure"
     compileSdk = rootProject.ext.compileSdkVersion
+    def appVersionCode = (System.getenv("GITHUB_RUN_NUMBER") ? (System.getenv("GITHUB_RUN_NUMBER").toInteger() + 100) : 100)
+
     defaultConfig {
         applicationId "com.technomind.plantarpressure"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName "1.0.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +18,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    signingConfigs {
+        permanentSign {
+            storeFile file('plantar.keystore')
+            storePassword 'plantar123'
+            keyAlias 'plantar'
+            keyPassword 'plantar123'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.permanentSign
+        }
         release {
+            signingConfig signingConfigs.permanentSign
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
