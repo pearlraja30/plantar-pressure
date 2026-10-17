@@ -1925,3 +1925,193 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ========================================================
+   CLEAN & STRAIGHTFORWARD SCANNER WIZARD SYSTEM
+   ======================================================== */
+.scanner-container-clean {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.scanner-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+/* Foot Side Selection Cards */
+.foot-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.foot-choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1.5px solid var(--bg-card-border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.foot-choice-btn:hover {
+  border-color: var(--primary-teal);
+  background: var(--bg-card-hover);
+}
+
+.foot-choice-btn.selected {
+  border-color: var(--primary-teal);
+  background: rgba(2, 132, 199, 0.08);
+  box-shadow: 0 0 0 1px var(--primary-teal);
+}
+
+.foot-choice-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Primary Action Cards */
+.scanner-primary-action-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1.5px solid var(--bg-card-border);
+  border-radius: 0.65rem;
+  box-shadow: var(--shadow-sm);
+  gap: 0.75rem;
+}
+
+.scanner-primary-action-card.highlight {
+  border-color: var(--primary-teal);
+  background: linear-gradient(180deg, rgba(2, 132, 199, 0.04) 0%, rgba(2, 132, 199, 0.01) 100%);
+}
+
+.action-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.action-card-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 0.5rem;
+  background: rgba(2, 132, 199, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-teal);
+  flex-shrink: 0;
+}
+
+.action-card-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.action-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.action-card-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.scanner-cta-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--primary-teal) 0%, #0369a1 100%);
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px var(--teal-glow);
+  transition: all 0.2s ease;
+}
+
+.scanner-cta-button:hover, .scanner-cta-button:active {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px var(--teal-glow);
+}
+
+.scanner-secondary-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  border: 1px solid var(--bg-card-border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scanner-secondary-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--primary-teal);
+}
+
+/* Collapsible Settings Accordion */
+.scanner-accordion-box {
+  border: 1px solid var(--bg-card-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--bg-surface-subtle);
+}
+
+.scanner-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.scanner-accordion-header:hover {
+  color: var(--text-main);
+}
+
+.scanner-accordion-body {
+  padding: 0.85rem;
+  border-top: 1px solid var(--bg-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg-card);
+}
+
