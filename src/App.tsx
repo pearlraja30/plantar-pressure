@@ -176,7 +176,10 @@ export function App() {
       // Process image through pipeline
       const img = new Image();
       img.src = payload.dataUrl;
-      await new Promise((resolve) => (img.onload = resolve));
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
 
       const result = await processHarrisMatScan(img, payload.footSide, {
         dpi: payload.dpi,
