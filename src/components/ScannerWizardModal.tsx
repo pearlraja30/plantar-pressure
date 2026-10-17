@@ -140,7 +140,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [rotationDeg, setRotationDeg] = useState(0);
   const [qcResult, setQcResult] = useState<QualityControlResult | null>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
-  const [viewfinderActive, setViewfinderActive] = useState<boolean>(false);
+  const [viewfinderActive, setViewfinderActive] = useState<boolean>(() => isMobileDevice);
   const [isLevel, setIsLevel] = useState<boolean>(true);
   const [isSteady, setIsSteady] = useState<boolean>(true);
   const [tiltDegrees, setTiltDegrees] = useState<number>(0);
@@ -516,6 +516,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       setEnhancedUrl(null);
       setStep(1);
       return;
+    }
+
+    // Launch Wizard directly into camera mode on mobile devices (Android / iOS)
+    if (isMobileDevice) {
+      setViewfinderActive(true);
     }
 
     if (navigator.mediaDevices?.enumerateDevices) {
@@ -1496,17 +1501,27 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                           </span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            stopCameraStream();
-                            setViewfinderActive(false);
-                            handleNativeMobileCamera();
-                          }}
-                          className="text-teal-400 hover:text-teal-300 underline font-medium"
-                        >
-                          Use Phone Camera App
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              stopCameraStream();
+                              setViewfinderActive(false);
+                              handleNativeMobileCamera();
+                            }}
+                            className="text-teal-400 hover:text-teal-300 underline font-medium"
+                          >
+                            Native App
+                          </button>
+                          <span className="text-slate-600">•</span>
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('scanner-gallery-input')?.click()}
+                            className="text-slate-300 hover:text-white underline font-medium"
+                          >
+                            Upload File
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
