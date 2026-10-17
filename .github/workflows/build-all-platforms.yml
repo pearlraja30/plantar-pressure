@@ -140,13 +140,13 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Stage Android APK
         run: |
           mkdir -p dist-android
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist-android/Plantar-Pressure-Analysis-System-1.0.0.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist-android/plantar-pressure.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist-android/Plantar-Pressure-Analysis-System-1.0.0.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist-android/plantar-pressure.apk
           ls -lh dist-android/
 
       - name: Upload Android APK Installer

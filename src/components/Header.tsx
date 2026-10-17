@@ -8,11 +8,12 @@ import {
   FileText,
   Layers,
   Laptop,
-  Smartphone,
-  Globe,
   Sun,
   Moon,
   MoreVertical,
+  X,
+  Database,
+  Cpu,
 } from 'lucide-react';
 import { CloudSyncStatus } from '../services/cloudSyncService';
 
@@ -49,43 +50,67 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="header-container">
-      {/* Brand & Technical Title */}
-      <div className="header-brand">
-        <div className="logo-badge">
-          <Activity className="w-5 h-5 text-teal-400" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="brand-title">Technomind</span>
-            <span className="brand-subtitle">HEALTHCARE</span>
-            <span className="badge-tag hidden sm:inline">PPA-SW-TF-001</span>
+      {/* Top Header Row (Brand on Left, Mobile Quick Actions on Right) */}
+      <div className="header-top-row">
+        <div className="header-brand">
+          <div className="logo-badge" title="Clinical Footwear & Podiatry Diagnostic Engine">
+            <Activity className="w-5 h-5 text-teal-400" />
           </div>
-          <h1 className="header-title hidden md:block">Plantar Pressure Analysis System</h1>
+          <div className="brand-text-container">
+            <div className="brand-title-row">
+              <span className="brand-title">Technomind</span>
+              <span className="brand-subtitle">HEALTHCARE</span>
+              <span className="badge-tag desktop-only">PPA-SW-TF-001</span>
+            </div>
+            <h1 className="header-title desktop-only">Plantar Pressure Analysis System</h1>
+          </div>
+        </div>
+
+        {/* Mobile-Only Top Actions: Theme Toggle + Menu */}
+        <div className="mobile-header-quick-actions mobile-only">
+          <button
+            className="btn-theme-toggle-compact"
+            onClick={onToggleTheme}
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {theme === 'light' ? (
+              <Moon className="w-4 h-4 text-slate-700" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-400" />
+            )}
+          </button>
+
+          <button
+            className={`btn-icon mobile-menu-btn ${isToolsOpen ? 'active' : ''}`}
+            onClick={() => setIsToolsOpen((prev) => !prev)}
+            title="Clinical Tools & Diagnostic Menus"
+          >
+            {isToolsOpen ? <X className="w-4 h-4" /> : <MoreVertical className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
-      {/* Navigation Workspaces (Clean 3-Tab Responsive Grid on Mobile) */}
+      {/* Navigation Workspaces (Clean 3-Tab Segmented Control) */}
       <nav className="header-nav">
         <button
           className={`nav-btn ${currentTab === 'analysis' ? 'active' : ''}`}
           onClick={() => onTabChange('analysis')}
         >
-          <Layers className="w-4 h-4 mr-1.5 inline flex-shrink-0" />
-          <span className="hidden sm:inline">Plantar </span>
+          <Layers className="nav-btn-icon" />
           <span>Analysis</span>
         </button>
         <button
           className={`nav-btn ${currentTab === 'orthotics' ? 'active' : ''}`}
           onClick={() => onTabChange('orthotics')}
         >
-          <Activity className="w-4 h-4 mr-1.5 inline flex-shrink-0" />
+          <Activity className="nav-btn-icon" />
           <span>Orthotics</span>
         </button>
         <button
           className={`nav-btn ${currentTab === 'patients' ? 'active' : ''}`}
           onClick={() => onTabChange('patients')}
         >
-          <FileText className="w-4 h-4 mr-1.5 inline flex-shrink-0" />
+          <FileText className="nav-btn-icon" />
           <span>Patients</span>
         </button>
       </nav>
@@ -94,13 +119,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="header-actions">
         {/* Scanner Wizard CTA (Primary Highlight) */}
         <button className="btn-scanner" onClick={onOpenScanner} title="Acquire Harris Mat scan (FR-02)">
-          <Scan className="w-4 h-4 mr-1.5 flex-shrink-0" />
-          <span>Scan</span>
+          <Scan className="w-4 h-4" />
+          <span>Scan Wizard</span>
         </button>
 
         {/* Generate Report */}
         <button className="btn-secondary" onClick={onOpenReport} title="Generate Clinical 4-Page Report (Appendix A)">
-          <FileText className="w-4 h-4 mr-1 flex-shrink-0" />
+          <FileText className="w-4 h-4" />
           <span>Report</span>
         </button>
 
@@ -120,8 +145,8 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </button>
 
-        {/* Desktop-Only Tools (Audit / Architecture / V&V) */}
-        <div className="hidden lg:flex items-center gap-1.5">
+        {/* Desktop-Only Tools (Audit / Architecture / V&V / Desktop Theme) */}
+        <div className="desktop-tools">
           <button className="btn-icon" onClick={onOpenAudit} title="Audit Trail (FR-14)">
             <ShieldCheck className="w-4 h-4 text-slate-300" />
           </button>
@@ -131,11 +156,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenArchitecture}
             title="Cross-Platform Deployment Architecture (Desktop / Web / Mobile)"
           >
-            <div className="flex items-center gap-1">
-              <Laptop className="w-3.5 h-3.5" />
-              <Globe className="w-3.5 h-3.5" />
-              <Smartphone className="w-3.5 h-3.5" />
-            </div>
+            <Laptop className="w-3.5 h-3.5" />
             <span>Architecture</span>
           </button>
 
@@ -147,77 +168,111 @@ export const Header: React.FC<HeaderProps> = ({
             <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
             <span>V&V Battery</span>
           </button>
-        </div>
 
-        {/* Theme Toggle (Clinical Light / Diagnostic Dark) */}
-        <button
-          className="btn-theme-toggle"
-          onClick={onToggleTheme}
-          title={
-            theme === 'light'
-              ? 'Switch to Diagnostic Dark (Radiology / Low-Glare Mode)'
-              : 'Switch to Clinical Light (Hospital Consultation Studio)'
-          }
-        >
-          {theme === 'light' ? (
-            <>
-              <Moon className="w-3.5 h-3.5 text-slate-700" />
-              <span className="hidden sm:inline">Dark</span>
-            </>
-          ) : (
-            <>
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Light</span>
-            </>
-          )}
-        </button>
-
-        {/* Mobile Tools Dropdown Menu */}
-        <div className="relative lg:hidden">
           <button
-            className="btn-icon text-slate-300 hover:text-white"
-            onClick={() => setIsToolsOpen((prev) => !prev)}
-            title="More System & Verification Tools"
+            className="btn-theme-toggle"
+            onClick={onToggleTheme}
+            title={
+              theme === 'light'
+                ? 'Switch to Diagnostic Dark (Radiology / Low-Glare Mode)'
+                : 'Switch to Clinical Light (Hospital Consultation Studio)'
+            }
           >
-            <MoreVertical className="w-4 h-4" />
+            {theme === 'light' ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-slate-700" />
+                <span>Dark</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Light</span>
+              </>
+            )}
           </button>
+        </div>
+      </div>
 
-          {isToolsOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-1.5 z-50 text-xs flex flex-col gap-1 animate-fade-in">
+      {/* Mobile Tools Modal / Drawer Popover */}
+      {isToolsOpen && (
+        <div className="mobile-menu-backdrop" onClick={() => setIsToolsOpen(false)}>
+          <div className="mobile-menu-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-menu-header">
+              <span className="mobile-menu-title">Clinical System Tools</span>
               <button
-                className="w-full text-left px-2.5 py-2 hover:bg-slate-800 rounded text-slate-200 flex items-center gap-2"
+                className="btn-icon mobile-menu-close"
+                onClick={() => setIsToolsOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mobile-menu-body">
+              <button
+                className="mobile-menu-item"
+                onClick={() => {
+                  setIsToolsOpen(false);
+                  onOpenCloud();
+                }}
+              >
+                <Database className="w-4 h-4 text-emerald-400" />
+                <div className="mobile-menu-item-text">
+                  <span className="item-label">Cloud Synchronization</span>
+                  <span className="item-desc">
+                    {cloudStatus.isOnline ? 'Online (Connected)' : 'Offline (Local storage)'}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                className="mobile-menu-item"
                 onClick={() => {
                   setIsToolsOpen(false);
                   onOpenAudit();
                 }}
               >
                 <ShieldCheck className="w-4 h-4 text-teal-400" />
-                <span>Audit Trail (FR-14)</span>
+                <div className="mobile-menu-item-text">
+                  <span className="item-label">Regulatory Audit Trail</span>
+                  <span className="item-desc">FR-14 FDA/CE compliance log</span>
+                </div>
               </button>
+
               <button
-                className="w-full text-left px-2.5 py-2 hover:bg-slate-800 rounded text-slate-200 flex items-center gap-2"
+                className="mobile-menu-item"
                 onClick={() => {
                   setIsToolsOpen(false);
                   onOpenArchitecture();
                 }}
               >
                 <Laptop className="w-4 h-4 text-cyan-400" />
-                <span>System Architecture</span>
+                <div className="mobile-menu-item-text">
+                  <span className="item-label">System Architecture</span>
+                  <span className="item-desc">Desktop, Mobile & Web pipeline</span>
+                </div>
               </button>
+
               <button
-                className="w-full text-left px-2.5 py-2 hover:bg-slate-800 rounded text-slate-200 flex items-center gap-2"
+                className="mobile-menu-item"
                 onClick={() => {
                   setIsToolsOpen(false);
                   onOpenVerification();
                 }}
               >
-                <Activity className="w-4 h-4 text-amber-400" />
-                <span>V&V Test Battery</span>
+                <Cpu className="w-4 h-4 text-amber-400" />
+                <div className="mobile-menu-item-text">
+                  <span className="item-label">V&V Automated Battery</span>
+                  <span className="item-desc">Algorithm verification VT-01 to VT-13</span>
+                </div>
               </button>
             </div>
-          )}
+
+            <div className="mobile-menu-footer">
+              <span>Technomind Plantar Pressure System • v1.0.6</span>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 };

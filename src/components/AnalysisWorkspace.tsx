@@ -5,6 +5,7 @@ import {
   Eye,
   Info,
   Activity,
+  Scan,
   CheckCircle2,
   AlertTriangle,
   ZoomIn,
@@ -70,21 +71,21 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
   // Return clean empty clinical workspace if no scan is loaded
   if (!currentCase || !patient) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 shadow-xl">
-          <Activity className="w-10 h-10" />
+      <div className="empty-clinical-state">
+        <div className="empty-state-icon-box">
+          <Activity className="w-8 h-8" />
         </div>
-        <div className="max-w-md space-y-2">
-          <h2 className="text-xl font-bold text-slate-100">Ready for Real Clinical Scan</h2>
-          <p className="text-xs text-slate-400">
-            All sample and demo data have been cleared. Launch the Scanner Wizard to capture a live photo of your patient's Harris Mat footprint or upload a scan file.
+        <div className="empty-state-text-wrap">
+          <h2 className="empty-state-title">Ready for Real Clinical Scan</h2>
+          <p className="empty-state-desc">
+            All sample data cleared. Launch the Scanner Wizard to capture a live photo of your patient's Harris Mat footprint or upload a scan file.
           </p>
         </div>
         <button
-          className="btn-primary text-sm font-bold px-6 py-3 shadow-lg flex items-center gap-2"
+          className="empty-state-btn"
           onClick={onOpenScanner}
         >
-          <Activity className="w-5 h-5" />
+          <Scan className="w-5 h-5 mr-1" />
           <span>Launch Scanner Wizard</span>
         </button>
       </div>
