@@ -133,6 +133,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [rotationDeg, setRotationDeg] = useState(0);
   const [qcResult, setQcResult] = useState<QualityControlResult | null>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
+  const [viewfinderActive, setViewfinderActive] = useState<boolean>(false);
+  const [isLevel, setIsLevel] = useState<boolean>(true);
+  const [isSteady, setIsSteady] = useState<boolean>(true);
+  const [tiltDegrees, setTiltDegrees] = useState<number>(0);
+  const [torchEnabled, setTorchEnabled] = useState<boolean>(false);
   const [isLiveWebcamActive, setIsLiveWebcamActive] = useState<boolean>(false);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -451,6 +456,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     if (!isOpen) {
       stopCameraStream();
       setCompletedScans([]);
+      setViewfinderActive(false);
       setRawCapturedUrl(null);
       setEnhancedUrl(null);
       setStep(1);
@@ -480,13 +486,91 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     };
   }, [isOpen, selectedCameraId, stopCameraStream]);
 
+  // Live Gyroscope Level & Accelerometer Shake/Motion Detection for Smart Viewfinder
   useEffect(() => {
-    if (isOpen && isLiveWebcamActive && step === 1) {
+    if (!viewfinderActive) return;
+
+    let hasOrientation = false;
+    let hasMotion = false;
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (e.beta !== null && e.gamma !== null) {
+        hasOrientation = true;
+        // When pointing camera downwards at floor/paper:
+        // beta is near 0° or 180°, gamma is near 0°
+        const pitch = Math.abs(e.beta > 90 ? 180 - e.beta : e.beta);
+        const roll = Math.abs(e.gamma);
+        const totalTilt = Math.round(Math.sqrt(pitch * pitch + roll * roll) * 10) / 10;
+        setTiltDegrees(totalTilt);
+        // Level when tilt error is within 7°
+        setIsLevel(totalTilt <= 7.0);
+      }
+    };
+
+    let lastX = 0, lastY = 0, lastZ = 0;
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const acc = e.acceleration || e.accelerationIncludingGravity;
+      if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
+        hasMotion = true;
+        const delta = Math.sqrt(
+          Math.pow(acc.x - lastX, 2) +
+          Math.pow(acc.y - lastY, 2) +
+          Math.pow(acc.z - lastZ, 2)
+        );
+        lastX = acc.x;
+        lastY = acc.y;
+        lastZ = acc.z;
+        // Steady when delta acceleration is small
+        setIsSteady(delta < 0.75);
+      }
+    };
+
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', handleOrientation);
+    }
+    if (window.DeviceMotionEvent) {
+      window.addEventListener('devicemotion', handleMotion);
+    }
+
+    const timer = setTimeout(() => {
+      if (!hasOrientation) setIsLevel(true);
+      if (!hasMotion) setIsSteady(true);
+    }, 1500);
+
+    return () => {
+      clearTimeout(timer);
+      if (window.DeviceOrientationEvent) {
+        window.removeEventListener('deviceorientation', handleOrientation);
+      }
+      if (window.DeviceMotionEvent) {
+        window.removeEventListener('devicemotion', handleMotion);
+      }
+    };
+  }, [viewfinderActive]);
+
+  // Flashlight / Torch toggle using internal camera hardware
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (track && hwCaps.supportsTorch && track.applyConstraints) {
+      const nextTorch = !torchEnabled;
+      try {
+        await track.applyConstraints({
+          advanced: [{ torch: nextTorch }] as any,
+        });
+        setTorchEnabled(nextTorch);
+      } catch (e) {
+        console.warn('Torch toggle failed:', e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && viewfinderActive && step === 1) {
       startCameraStream();
     } else {
       stopCameraStream();
     }
-  }, [isOpen, startCameraStream, stopCameraStream, step, isLiveWebcamActive]);
+  }, [isOpen, startCameraStream, stopCameraStream, step, viewfinderActive]);
 
   if (!isOpen) return null;
 
@@ -629,6 +713,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }
 
     stopCameraStream();
+    setViewfinderActive(false);
     ingestAndEnhanceImage(capturedUrl, selectedDpi);
   };
 
@@ -850,71 +935,171 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Direct Camera & Upload Primary Action */}
-              <div className="scanner-primary-action-card highlight">
-                <div className="action-card-header">
-                  <div className="action-card-icon-box">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <div className="action-card-text">
-                    <span className="action-card-title">Footprint Camera Capture</span>
-                    <span className="action-card-subtitle">
-                      Direct optical capture with automatic shadow removal and high ink contrast boost
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="scanner-cta-button"
-                  onClick={handleCameraClick}
-                >
-                  <Camera className="w-5 h-5 mr-1" />
-                  Open Camera &amp; Take Photo
-                </button>
-
-                <button
-                  type="button"
-                  className="scanner-secondary-btn"
-                  onClick={() => document.getElementById('scanner-gallery-input')?.click()}
-                >
-                  <Upload className="w-4 h-4 mr-1 text-slate-400" />
-                  Choose Image from Files / Gallery
-                </button>
-              </div>
-
-              {/* Optional Live Webcam View (Desktop browsers or when active) */}
-              {isLiveWebcamActive && (
-                <div className="relative bg-slate-950 rounded-lg overflow-hidden border border-teal-500/40 p-2 flex flex-col items-center">
+              {/* 2. Primary Smart Viewfinder or Camera Trigger */}
+              {viewfinderActive ? (
+                /* Smart In-App Camera Viewfinder with Level & Stability Guidance */
+                <div className="smart-viewfinder-container shadow-2xl">
                   <video
                     ref={videoRef}
                     playsInline
                     muted
-                    className="w-full max-h-72 object-contain rounded bg-black"
+                    autoPlay
+                    className="smart-viewfinder-video"
                   />
-                  <div className="flex items-center justify-between w-full mt-2 gap-2">
-                    <span className="text-xs text-slate-400">
-                      {isCameraActive ? '● Camera sensor active' : 'Connecting sensor...'}
-                    </span>
-                    <div className="flex gap-2">
+
+                  {/* High-Tech Framing HUD Overlay */}
+                  <div className="smart-viewfinder-hud">
+                    {/* Top Bar: Back button, Foot indicator, Torch */}
+                    <div className="viewfinder-top-bar">
                       <button
                         type="button"
-                        className="btn-secondary text-xs"
                         onClick={() => {
                           stopCameraStream();
-                          setIsLiveWebcamActive(false);
+                          setViewfinderActive(false);
                         }}
+                        className="btn-tiny bg-slate-900/90 text-white backdrop-blur-md px-3 py-1 font-semibold flex items-center gap-1 border border-slate-700"
                       >
-                        Close Live Feed
+                        ← Back
                       </button>
+
+                      <div className="viewfinder-pill-badge px-3 py-1 bg-slate-900/90 text-teal-300 font-bold border border-teal-500/40 backdrop-blur-md">
+                        <span>🦶</span>
+                        <span>{footSide} Foot</span>
+                      </div>
+
+                      {hwCaps.supportsTorch ? (
+                        <button
+                          type="button"
+                          onClick={toggleTorch}
+                          className={`btn-tiny px-2.5 py-1 backdrop-blur-md font-semibold border ${
+                            torchEnabled
+                              ? 'bg-amber-500/30 text-amber-300 border-amber-400'
+                              : 'bg-slate-900/90 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          ⚡ {torchEnabled ? 'Torch: ON' : 'Flash'}
+                        </button>
+                      ) : (
+                        <div className="w-12" />
+                      )}
+                    </div>
+
+                    {/* Status Pill Indicator: Shows Green when level & steady */}
+                    <div className="self-center">
+                      {isLevel && isSteady ? (
+                        <div className="viewfinder-pill-badge aligned shadow-lg">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                          <span>✓ PERFECT ALIGNMENT • READY TO CAPTURE</span>
+                        </div>
+                      ) : (
+                        <div className="viewfinder-pill-badge unaligned shadow-md">
+                          <span>⚠️</span>
+                          <span>
+                            {!isLevel
+                              ? `Tilt phone parallel to paper (${tiltDegrees}° tilt)`
+                              : 'Hold phone steady (motion detected)'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rectangle Bounding Box: Turns vibrant green when perfectly placed */}
+                    <div className={`viewfinder-frame-box ${isLevel && isSteady ? 'aligned' : 'unaligned'}`}>
+                      <div className="viewfinder-corner-tl" />
+                      <div className="viewfinder-corner-tr" />
+                      <div className="viewfinder-corner-bl" />
+                      <div className="viewfinder-corner-br" />
+
+                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-start">
+                        ALIGN PAPER TOP (ANTERIOR ↑)
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center opacity-40 pointer-events-none">
+                        <Target className="w-16 h-16 stroke-1 text-teal-300" />
+                        <span className="text-[10px] font-mono font-bold mt-1 tracking-widest text-teal-200">
+                          {footSide.toUpperCase()} FOOTPRINT
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-end">
+                        ALIGN HEEL (POSTERIOR ↓)
+                      </div>
+                    </div>
+
+                    {/* Bottom Shutter Controls */}
+                    <div className="viewfinder-bottom-bar">
                       <button
                         type="button"
-                        className="btn-primary text-xs"
+                        className={`viewfinder-shutter-btn ${isLevel && isSteady ? 'ready' : 'waiting'}`}
                         onClick={handleCaptureFromCamera}
+                        title="Snap Footprint Photo"
                       >
-                        Snap Frame
+                        <Camera className="w-7 h-7 text-white" />
+                      </button>
+
+                      <div className="text-[11px] text-slate-200 font-semibold drop-shadow-md text-center">
+                        {isLevel && isSteady
+                          ? 'Tap green shutter button to capture'
+                          : 'Hold steady & parallel to floor until green'}
+                      </div>
+
+                      {/* Native camera fallback button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopCameraStream();
+                          setViewfinderActive(false);
+                          handleNativeMobileCamera();
+                        }}
+                        className="text-[11px] text-teal-400 hover:text-teal-300 underline font-medium mt-0.5"
+                      >
+                        Prefer phone's native camera app? Tap here
                       </button>
                     </div>
+                  </div>
+                </div>
+              ) : (
+                /* Standard Choice Card */
+                <div className="scanner-primary-action-card highlight">
+                  <div className="action-card-header">
+                    <div className="action-card-icon-box">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <div className="action-card-text">
+                      <span className="action-card-title">Footprint Camera Capture</span>
+                      <span className="action-card-subtitle">
+                        Smart framing rectangle with real-time level &amp; stability guidance
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="scanner-cta-button"
+                    onClick={() => setViewfinderActive(true)}
+                  >
+                    <Camera className="w-5 h-5 mr-1" />
+                    Open Live Camera Viewfinder
+                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      className="scanner-secondary-btn"
+                      onClick={handleNativeMobileCamera}
+                    >
+                      <Smartphone className="w-4 h-4 mr-1 text-teal-400" />
+                      Launch Native System Camera
+                    </button>
+
+                    <button
+                      type="button"
+                      className="scanner-secondary-btn"
+                      onClick={() => document.getElementById('scanner-gallery-input')?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-1 text-slate-400" />
+                      Choose Image from Files
+                    </button>
                   </div>
                 </div>
               )}
