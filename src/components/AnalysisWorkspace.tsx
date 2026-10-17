@@ -134,11 +134,10 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
     }
   };
 
-  // Interactive Inspector on hover
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relX = (e.clientX - rect.left) / rect.width;
-    const relY = (e.clientY - rect.top) / rect.height;
+  // Interactive Inspector on hover and mobile touch
+  const handleInspectPointer = (clientX: number, clientY: number, currentTarget: HTMLElement) => {
+    const rect = currentTarget.getBoundingClientRect();
+    const relY = (clientY - rect.top) / rect.height;
 
     // Estimate anatomical zone based on normalized height (0 at top toes, 1 at bottom heel)
     let region = 'Forefoot';
@@ -159,13 +158,23 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
     }
 
     setProbeData({
-      x: Math.round(e.clientX - rect.left),
-      y: Math.round(e.clientY - rect.top),
+      x: Math.round(clientX - rect.left),
+      y: Math.round(clientY - rect.top),
       category: cat,
       densityVal: density,
       regionName: region,
       visible: true,
     });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    handleInspectPointer(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 0) {
+      handleInspectPointer(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget);
+    }
   };
 
   const handleMouseLeave = () => {
@@ -260,6 +269,9 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
             className="viewport-canvas-wrapper"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchMove}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseLeave}
           >
             {/* 1. SIDE-BY-SIDE MODE */}
             {viewMode === 'side-by-side' && (

@@ -101,9 +101,21 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.touch-none {
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* App Layout */
@@ -1513,22 +1525,33 @@ body {
     width: 100%;
     display: flex;
     justify-content: center;
+    align-items: center;
   }
 
   .footprint-render-img {
-    width: 240px;
-    height: 420px;
+    max-width: 100%;
+    width: auto;
+    max-height: 48vh;
+    object-fit: contain;
+    aspect-ratio: 2 / 3;
   }
 
   .viewport-canvas-wrapper {
-    min-height: 420px;
+    min-height: 380px;
     padding: 0.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .landmark-surface-wrapper {
     width: 100% !important;
     max-width: 360px;
-    height: 520px !important;
+    aspect-ratio: 560 / 760;
+    height: auto !important;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* Modals full-screen on mobile */
@@ -1539,18 +1562,23 @@ body {
   .modal-dialog {
     max-width: 100% !important;
     max-height: 96vh !important;
+    max-height: 96dvh !important;
     border-radius: 0.5rem;
   }
 
   .modal-body {
     padding: 1rem !important;
     max-height: calc(96vh - 120px) !important;
+    max-height: calc(96dvh - 120px) !important;
   }
 
   .scanner-wizard-modal .grid-cols-4,
-  .scanner-wizard-modal .grid-cols-3,
+  .scanner-wizard-modal .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .scanner-wizard-modal .grid-cols-2 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .report-pagination-bar {
@@ -1585,7 +1613,15 @@ body {
     font-size: 0.7rem;
   }
   .footprint-render-img {
-    width: 190px;
-    height: 340px;
+    max-width: 100%;
+    width: auto;
+    max-height: 38vh;
+    object-fit: contain;
+  }
+  .landmark-surface-wrapper {
+    max-width: 300px;
+  }
+  .scanner-wizard-modal .grid-cols-4 {
+    grid-template-columns: 1fr !important;
   }
 }

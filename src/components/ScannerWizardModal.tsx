@@ -712,12 +712,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     };
   };
 
-  // Draggable A4 Corners
-  const handleMouseMoveA4 = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Draggable A4 Corners (Mouse & Mobile Touch Support)
+  const updateA4CornerCoords = (clientX: number, clientY: number) => {
     if (!draggingCorner || !previewContainerRef.current) return;
     const rect = previewContainerRef.current.getBoundingClientRect();
-    const x = Math.max(10, Math.min(rect.width - 10, e.clientX - rect.left));
-    const y = Math.max(10, Math.min(rect.height - 10, e.clientY - rect.top));
+    const x = Math.max(10, Math.min(rect.width - 10, clientX - rect.left));
+    const y = Math.max(10, Math.min(rect.height - 10, clientY - rect.top));
 
     const scaleX = 720 / rect.width;
     const scaleY = 1080 / rect.height;
@@ -726,6 +726,16 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       ...prev,
       [draggingCorner]: { x: Math.round(x * scaleX), y: Math.round(y * scaleY) },
     }));
+  };
+
+  const handleMouseMoveA4 = (e: React.MouseEvent<HTMLDivElement>) => {
+    updateA4CornerCoords(e.clientX, e.clientY);
+  };
+
+  const handleTouchMoveA4 = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 0) {
+      updateA4CornerCoords(e.touches[0].clientX, e.touches[0].clientY);
+    }
   };
 
   const handleFinishAndAnalyze = () => {
@@ -1341,9 +1351,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 {/* Visualizer with Before/After Toggle & A4 Pins */}
                 <div
                   ref={previewContainerRef}
-                  className="relative bg-slate-950 p-2 rounded-lg border border-slate-800 h-80 flex items-center justify-center overflow-hidden"
+                  className="relative bg-slate-950 p-2 rounded-lg border border-slate-800 h-80 flex items-center justify-center overflow-hidden touch-none"
                   onMouseMove={handleMouseMoveA4}
                   onMouseUp={() => setDraggingCorner(null)}
+                  onTouchMove={handleTouchMoveA4}
+                  onTouchEnd={() => setDraggingCorner(null)}
                 >
                   <img
                     src={activePreviewType === 'enhanced' ? enhancedUrl || rawCapturedUrl! : rawCapturedUrl!}
@@ -1386,12 +1398,13 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       {(['tl', 'tr', 'br', 'bl'] as (keyof QuadCorners)[]).map((cornerKey) => (
                         <div
                           key={cornerKey}
-                          className="absolute w-5 h-5 bg-teal-400 rounded-full border-2 border-white shadow-lg cursor-grab -translate-x-1/2 -translate-y-1/2"
+                          className="absolute w-5 h-5 bg-teal-400 rounded-full border-2 border-white shadow-lg cursor-grab -translate-x-1/2 -translate-y-1/2 touch-none"
                           style={{
                             left: `${(a4Corners[cornerKey].x / 720) * 100}%`,
                             top: `${(a4Corners[cornerKey].y / 1080) * 100}%`,
                           }}
                           onMouseDown={() => setDraggingCorner(cornerKey)}
+                          onTouchStart={() => setDraggingCorner(cornerKey)}
                         >
                           <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] bg-slate-900 text-teal-300 font-bold px-1 rounded">
                             {cornerKey.toUpperCase()}

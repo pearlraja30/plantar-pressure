@@ -120,17 +120,31 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
       ? liveRecommendations
       : currentCase.orthoticMeasurements.recommendations;
 
-  // Handle dragging pin on canvas
-  const handleContainerMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Handle dragging pin on canvas (Mouse & Touch for Mobile Devices)
+  const updatePinCoordinates = (clientX: number, clientY: number) => {
     if (!activePin || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(10, Math.min(rect.width - 10, e.clientX - rect.left));
-    const y = Math.max(10, Math.min(rect.height - 10, e.clientY - rect.top));
+    const relX = Math.max(0.02, Math.min(0.98, (clientX - rect.left) / rect.width));
+    const relY = Math.max(0.02, Math.min(0.98, (clientY - rect.top) / rect.height));
+
+    // Internal canonical coordinate space is 560 x 760
+    const x = Math.round(relX * 560);
+    const y = Math.round(relY * 760);
 
     setLandmarks((prev) => ({
       ...prev,
-      [activePin]: { x: Math.round(x), y: Math.round(y) },
+      [activePin]: { x, y },
     }));
+  };
+
+  const handleContainerMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    updatePinCoordinates(e.clientX, e.clientY);
+  };
+
+  const handleContainerTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 0) {
+      updatePinCoordinates(e.touches[0].clientX, e.touches[0].clientY);
+    }
   };
 
   const handleMouseUp = () => {
@@ -184,7 +198,7 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
     logAuditEvent(
       'ORTHOTIC_LANDMARKS_UPDATED',
       `Updated landmarks: Length=${liveDims.footLengthMm}mm, Forefoot=${liveDims.forefootWidthMm}mm, Heel=${liveDims.heelWidthMm}mm`,
-      'clinician-dr-chen',
+      'practitioner',
       currentCase.id
     );
 
@@ -197,21 +211,23 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
       className="orthotics-workspace-container"
       onMouseMove={handleContainerMouseMove}
       onMouseUp={handleMouseUp}
+      onTouchMove={handleContainerTouchMove}
+      onTouchEnd={handleMouseUp}
     >
       {/* Top Banner */}
       <div className="workspace-subbar">
         <div className="flex items-center gap-2">
           <Ruler className="w-4 h-4 text-teal-400" />
           <h2 className="text-sm font-bold text-slate-100">
-            Orthotic Design Landmarking & Dimensional Analysis (FR-10)
+            Orthotic Landmarking & Sizing (FR-10)
           </h2>
-          <span className="badge-tag">Page 3 Technical File</span>
+          <span className="badge-tag">ISO 13485</span>
         </div>
 
         <div className="flex items-center gap-2">
           <button className="btn-secondary-sm" onClick={handleResetLandmarks}>
             <RotateCcw className="w-3.5 h-3.5 mr-1" />
-            Auto-Detect Landmarks
+            Auto-Detect
           </button>
           <button className="btn-primary-sm" onClick={handleSaveMeasurements}>
             <Save className="w-3.5 h-3.5 mr-1" />
@@ -242,7 +258,6 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
           <div
             ref={containerRef}
             className="landmark-surface-wrapper"
-            style={{ width: '560px', height: '760px', margin: '0 auto' }}
           >
             {/* Background Footprint Image */}
             <img
@@ -251,8 +266,8 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
               className="landmark-bg-img"
             />
 
-            {/* SVG Geometric Measurement Vectors */}
-            <svg className="landmark-svg-layer">
+            {/* SVG Geometric Measurement Vectors with responsive viewBox */}
+            <svg className="landmark-svg-layer" viewBox="0 0 560 760">
               {/* Length Line (Heel Center to Longest Toe) */}
               <line
                 x1={landmarks.heelCenter.x}
@@ -260,7 +275,7 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
                 x2={landmarks.longestToe.x}
                 y2={landmarks.longestToe.y}
                 stroke="#06b6d4"
-                strokeWidth="2"
+                strokeWidth="2.5"
                 strokeDasharray="4 4"
               />
 
@@ -271,7 +286,7 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
                 x2={landmarks.metatarsal5.x}
                 y2={landmarks.metatarsal5.y}
                 stroke="#eab308"
-                strokeWidth="2"
+                strokeWidth="2.5"
               />
 
               {/* Heel Width Line */}
@@ -281,16 +296,20 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
                 x2={landmarks.heelLateral.x}
                 y2={landmarks.heelLateral.y}
                 stroke="#ec4899"
-                strokeWidth="2"
+                strokeWidth="2.5"
               />
             </svg>
 
-            {/* Draggable Pins */}
+            {/* Draggable Pins (Responsive Percentage Placement with Mouse & Touch Listeners) */}
             {/* 1. Longest Toe */}
             <div
               className={`landmark-pin cyan ${activePin === 'longestToe' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.longestToe.x}px`, top: `${landmarks.longestToe.y}px` }}
+              style={{
+                left: `${(landmarks.longestToe.x / 560) * 100}%`,
+                top: `${(landmarks.longestToe.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('longestToe')}
+              onTouchStart={() => setActivePin('longestToe')}
             >
               <div className="pin-tooltip">Longest Toe</div>
             </div>
@@ -298,8 +317,12 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
             {/* 2. Metatarsal 1 */}
             <div
               className={`landmark-pin yellow ${activePin === 'metatarsal1' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.metatarsal1.x}px`, top: `${landmarks.metatarsal1.y}px` }}
+              style={{
+                left: `${(landmarks.metatarsal1.x / 560) * 100}%`,
+                top: `${(landmarks.metatarsal1.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('metatarsal1')}
+              onTouchStart={() => setActivePin('metatarsal1')}
             >
               <div className="pin-tooltip">1st Met Head</div>
             </div>
@@ -307,8 +330,12 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
             {/* 3. Metatarsal 5 */}
             <div
               className={`landmark-pin yellow ${activePin === 'metatarsal5' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.metatarsal5.x}px`, top: `${landmarks.metatarsal5.y}px` }}
+              style={{
+                left: `${(landmarks.metatarsal5.x / 560) * 100}%`,
+                top: `${(landmarks.metatarsal5.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('metatarsal5')}
+              onTouchStart={() => setActivePin('metatarsal5')}
             >
               <div className="pin-tooltip">5th Met Head</div>
             </div>
@@ -316,8 +343,12 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
             {/* 4. Heel Center */}
             <div
               className={`landmark-pin teal ${activePin === 'heelCenter' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.heelCenter.x}px`, top: `${landmarks.heelCenter.y}px` }}
+              style={{
+                left: `${(landmarks.heelCenter.x / 560) * 100}%`,
+                top: `${(landmarks.heelCenter.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('heelCenter')}
+              onTouchStart={() => setActivePin('heelCenter')}
             >
               <div className="pin-tooltip">Heel Center</div>
             </div>
@@ -325,8 +356,12 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
             {/* 5. Heel Medial */}
             <div
               className={`landmark-pin pink ${activePin === 'heelMedial' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.heelMedial.x}px`, top: `${landmarks.heelMedial.y}px` }}
+              style={{
+                left: `${(landmarks.heelMedial.x / 560) * 100}%`,
+                top: `${(landmarks.heelMedial.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('heelMedial')}
+              onTouchStart={() => setActivePin('heelMedial')}
             >
               <div className="pin-tooltip">Heel Medial</div>
             </div>
@@ -334,8 +369,12 @@ export const OrthoticMeasurementsView: React.FC<OrthoticMeasurementsViewProps> =
             {/* 6. Heel Lateral */}
             <div
               className={`landmark-pin pink ${activePin === 'heelLateral' ? 'dragging' : ''}`}
-              style={{ left: `${landmarks.heelLateral.x}px`, top: `${landmarks.heelLateral.y}px` }}
+              style={{
+                left: `${(landmarks.heelLateral.x / 560) * 100}%`,
+                top: `${(landmarks.heelLateral.y / 760) * 100}%`,
+              }}
               onMouseDown={() => setActivePin('heelLateral')}
+              onTouchStart={() => setActivePin('heelLateral')}
             >
               <div className="pin-tooltip">Heel Lateral</div>
             </div>
