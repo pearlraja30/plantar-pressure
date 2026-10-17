@@ -19,6 +19,8 @@ import {
   ZapOff,
   Sun,
   Smartphone,
+  AlertCircle,
+  CheckCircle,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -72,6 +74,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   onClose,
   onScanCompleted,
 }) => {
+  const isMobileNative = Capacitor.isNativePlatform();
   const [inputMode, setInputMode] = useState<'camera' | 'scanner' | 'file'>('camera');
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -91,6 +94,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [brightnessBoost, setBrightnessBoost] = useState<number>(1.05);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isPermissionRequesting, setIsPermissionRequesting] = useState<boolean>(false);
 
   // Camera Hardware Capabilities
   const [hwCaps, setHwCaps] = useState<CameraHardwareCapabilities>({
@@ -116,7 +121,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
   // Live Screen Alignment HUD State
   const [showAlignmentGuides, setShowAlignmentGuides] = useState<boolean>(true);
-  const [tiltAngle, setTiltAngle] = useState<{ pitch: number; roll: number }>({ pitch: 0.4, roll: -0.2 });
+  const [tiltAngle, setTiltAngle] = useState<{ pitch: number; roll: number }>({ pitch: 0.0, roll: 0.0 });
   const [isLevel, setIsLevel] = useState<boolean>(true);
 
   // Acquired & Enhanced Image State
@@ -222,23 +227,58 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     setIsTorchOn(false);
   }, []);
 
-  // Start camera stream with multi-device best practices
+  // Request runtime camera permission on mobile Android / iOS
+  const ensureCameraPermission = useCallback(async (): Promise<boolean> => {
+    if (isMobileNative) {
+      setIsPermissionRequesting(true);
+      try {
+        const check = await CapCamera.checkPermissions();
+        if (check.camera === 'granted') {
+          setIsPermissionRequesting(false);
+          return true;
+        }
+        const req = await CapCamera.requestPermissions({ permissions: ['camera'] });
+        setIsPermissionRequesting(false);
+        return req.camera === 'granted';
+      } catch (e) {
+        console.warn('Error checking Capacitor camera permissions:', e);
+        setIsPermissionRequesting(false);
+      }
+    }
+    return true;
+  }, [isMobileNative]);
+
+  // Start camera stream with multi-device best practices & resilient fallbacks
   const startCameraStream = useCallback(async () => {
     stopCameraStream();
-    if (!navigator.mediaDevices?.getUserMedia) return;
+    setCameraError(null);
 
-    try {
-      const targetW = cameraResolution === '4k' ? 3840 : 1920;
-      const targetH = cameraResolution === '4k' ? 2160 : 1080;
+    // 1. Ensure Android / iOS runtime permission is granted
+    const hasPermission = await ensureCameraPermission();
+    if (!hasPermission) {
+      setCameraError('Camera permission is required to stream or capture Harris Mat footprints.');
+      setIsCameraActive(false);
+      return;
+    }
 
-      // Primary modern clinical capture constraints:
-      // Request continuous autofocus, auto exposure, auto white-balance, zero downscale
-      const primaryConstraints: MediaStreamConstraints = {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('WebRTC camera streaming is not supported on this device. Use the Native Camera button.');
+      setIsCameraActive(false);
+      return;
+    }
+
+    const idealW = cameraResolution === '4k' ? 3840 : 1920;
+    const idealH = cameraResolution === '4k' ? 2160 : 1080;
+
+    // Ordered fallback constraints from high-fidelity clinical to universal mobile
+    const constraintCandidates: MediaStreamConstraints[] = [
+      // Candidate 1: Selected Device or Environment camera with continuous autofocus
+      {
         video: {
           deviceId: selectedCameraId ? { ideal: selectedCameraId } : undefined,
-          width: { ideal: targetW, min: 1280 },
-          height: { ideal: targetH, min: 720 },
           facingMode: selectedCameraId ? undefined : { ideal: 'environment' },
+          width: { ideal: idealW },
+          height: { ideal: idealH },
           advanced: [
             { focusMode: 'continuous' },
             { exposureMode: 'continuous' },
@@ -246,88 +286,124 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
           ] as any,
         },
         audio: false,
-      };
+      },
+      // Candidate 2: Environment camera without advanced constraints (universal mobile)
+      {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: idealW },
+          height: { ideal: idealH },
+        },
+        audio: false,
+      },
+      // Candidate 3: Basic Environment camera
+      {
+        video: {
+          facingMode: 'environment',
+        },
+        audio: false,
+      },
+      // Candidate 4: Any available video stream
+      {
+        video: true,
+        audio: false,
+      },
+    ];
 
-      let stream: MediaStream;
+    let stream: MediaStream | null = null;
+    let lastError: any = null;
+
+    for (const candidate of constraintCandidates) {
       try {
-        stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
-      } catch {
-        // Fallback to standard constraints for strict or legacy webcams
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: selectedCameraId ? { ideal: selectedCameraId } : undefined,
-            width: { ideal: targetW },
-            height: { ideal: targetH },
-            facingMode: selectedCameraId ? undefined : { ideal: 'environment' },
-          },
-          audio: false,
-        });
+        stream = await navigator.mediaDevices.getUserMedia(candidate);
+        if (stream) break;
+      } catch (err: any) {
+        lastError = err;
       }
+    }
 
-      streamRef.current = stream;
-      const track = stream.getVideoTracks()[0];
+    if (!stream) {
+      console.warn('All getUserMedia attempts failed:', lastError);
+      setCameraError(
+        lastError?.message ||
+          'Could not start live camera feed. Please check app permissions or launch the Native Phone Camera.'
+      );
+      setIsCameraActive(false);
+      return;
+    }
 
-      if (track) {
-        const caps = (track.getCapabilities ? track.getCapabilities() : {}) as any;
-        const sets = (track.getSettings ? track.getSettings() : {}) as any;
+    streamRef.current = stream;
+    const track = stream.getVideoTracks()[0];
 
-        const zoomCaps = caps.zoom as { min?: number; max?: number; step?: number } | undefined;
-        const supportsHardwareZoom = !!zoomCaps;
-        const supportsTorch = !!caps.torch;
-        const focusModes: string[] = Array.isArray(caps.focusMode) ? caps.focusMode : [];
-        const supportsContinuousFocus = focusModes.includes('continuous');
+    if (track) {
+      const caps = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+      const sets = (track.getSettings ? track.getSettings() : {}) as any;
 
-        setHwCaps({
-          supportsTorch,
-          supportsHardwareZoom,
-          minZoom: zoomCaps?.min ?? 1.0,
-          maxZoom: zoomCaps?.max ?? 4.0,
-          stepZoom: zoomCaps?.step ?? 0.1,
-          supportsContinuousFocus,
-          focusModes,
-          actualWidth: sets.width ?? targetW,
-          actualHeight: sets.height ?? targetH,
-        });
+      const zoomCaps = caps.zoom as { min?: number; max?: number; step?: number } | undefined;
+      const supportsHardwareZoom = !!zoomCaps;
+      const supportsTorch = !!caps.torch;
+      const focusModes: string[] = Array.isArray(caps.focusMode) ? caps.focusMode : [];
+      const supportsContinuousFocus = focusModes.includes('continuous');
 
-        // Ensure continuous autofocus is locked on if supported
-        if (supportsContinuousFocus && track.applyConstraints) {
-          try {
-            await track.applyConstraints({
-              advanced: [{ focusMode: 'continuous' }] as any,
-            });
-          } catch {
-            // non-fatal
-          }
+      setHwCaps({
+        supportsTorch,
+        supportsHardwareZoom,
+        minZoom: zoomCaps?.min ?? 1.0,
+        maxZoom: zoomCaps?.max ?? 4.0,
+        stepZoom: zoomCaps?.step ?? 0.1,
+        supportsContinuousFocus,
+        focusModes,
+        actualWidth: sets.width ?? idealW,
+        actualHeight: sets.height ?? idealH,
+      });
+
+      // Ensure continuous autofocus is locked on if supported
+      if (supportsContinuousFocus && track.applyConstraints) {
+        try {
+          await track.applyConstraints({
+            advanced: [{ focusMode: 'continuous' }] as any,
+          });
+        } catch {
+          // non-fatal
         }
       }
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-        setIsCameraActive(true);
-
-        // Start real-time live sharpness meter (every 400ms)
-        const sampleCanvas = document.createElement('canvas');
-        sampleCanvas.width = 160;
-        sampleCanvas.height = 120;
-        const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
-
-        sharpnessIntervalRef.current = window.setInterval(() => {
-          if (videoRef.current && sampleCtx && videoRef.current.readyState >= 2) {
-            try {
-              sampleCtx.drawImage(videoRef.current, 0, 0, 160, 120);
-              const score = computeSharpnessScore(sampleCtx, 160, 120);
-              setLiveSharpnessScore(Math.round(score * 10) / 10);
-            } catch {
-              // Ignore cross-origin or busy frame
-            }
-          }
-        }, 400);
-      }
-    } catch {
-      setIsCameraActive(false);
     }
-  }, [cameraResolution, selectedCameraId, stopCameraStream, computeSharpnessScore]);
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      try {
+        await videoRef.current.play();
+        setIsCameraActive(true);
+        setCameraError(null);
+      } catch (err) {
+        console.warn('Video element play() error:', err);
+      }
+
+      // Start real-time live sharpness meter (every 400ms)
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 160;
+      sampleCanvas.height = 120;
+      const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+      sharpnessIntervalRef.current = window.setInterval(() => {
+        if (videoRef.current && sampleCtx && videoRef.current.readyState >= 2) {
+          try {
+            sampleCtx.drawImage(videoRef.current, 0, 0, 160, 120);
+            const score = computeSharpnessScore(sampleCtx, 160, 120);
+            setLiveSharpnessScore(Math.round(score * 10) / 10);
+          } catch {
+            // Ignore frame collision
+          }
+        }
+      }, 400);
+    }
+  }, [
+    cameraResolution,
+    selectedCameraId,
+    stopCameraStream,
+    computeSharpnessScore,
+    ensureCameraPermission,
+  ]);
 
   // Optical Zoom handler (hardware lens zoom + digital crop fallback)
   const handleZoomChange = async (newZoom: number) => {
@@ -395,6 +471,26 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     }, 1400);
   };
 
+  // Launch Native Android / iOS System Camera App
+  const handleNativeMobileCamera = async () => {
+    try {
+      const photo = await CapCamera.getPhoto({
+        quality: 100,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        correctOrientation: true,
+        saveToGallery: false,
+      });
+      if (photo.dataUrl) {
+        stopCameraStream();
+        ingestAndEnhanceImage(photo.dataUrl, selectedDpi);
+      }
+    } catch (err) {
+      console.warn('Native camera capture dismissed or unavailable:', err);
+    }
+  };
+
   // Initialize Cameras & Device Orientation
   useEffect(() => {
     if (!isOpen) {
@@ -413,7 +509,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               d.label.toLowerCase().includes('environment') ||
               d.label.toLowerCase().includes('rear')
           );
-          setSelectedCameraId(backCam ? backCam.deviceId : videoDevs[0].deviceId);
+          if (backCam) {
+            setSelectedCameraId(backCam.deviceId);
+          }
         }
       });
     }
@@ -424,7 +522,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         const p = Math.round(e.beta * 10) / 10;
         const r = Math.round(e.gamma * 10) / 10;
         setTiltAngle({ pitch: p, roll: r });
-        setIsLevel(Math.abs(p) < 2.5 && Math.abs(r) < 2.5);
+        // Level when pointing directly down: beta ~ 0, gamma ~ 0
+        setIsLevel(Math.abs(p) < 3.5 && Math.abs(r) < 3.5);
       }
     };
 
@@ -553,6 +652,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         capturedUrl = canvas.toDataURL('image/png');
       }
     } else {
+      // Fallback simulation footprint if camera is not connected
       capturedUrl = generateHarrisMatFootprint(
         footSide === 'Bilateral' ? 'Right' : footSide,
         simPattern,
@@ -569,24 +669,6 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
     stopCameraStream();
     ingestAndEnhanceImage(capturedUrl, selectedDpi);
-  };
-
-  // Launch Native Mobile Camera via Capacitor
-  const handleNativeMobileCamera = async () => {
-    try {
-      const photo = await CapCamera.getPhoto({
-        quality: 100,
-        allowEditing: false,
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Camera,
-      });
-      if (photo.dataUrl) {
-        stopCameraStream();
-        ingestAndEnhanceImage(photo.dataUrl, selectedDpi);
-      }
-    } catch (err) {
-      console.warn('Native camera capture dismissed or unavailable:', err);
-    }
   };
 
   // Ingest from Scanner
@@ -673,7 +755,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
       dpi: selectedDpi,
       scannerModel:
         inputMode === 'camera'
-          ? `High-Res Optical Camera (${cameraResolution.toUpperCase()})`
+          ? isCameraActive
+            ? `High-Res Optical Camera (${cameraResolution.toUpperCase()})`
+            : 'Phone Camera Sensor'
           : selectedScanner.name,
       scannerDriver: 'Enhanced Clinical Optical Homography Engine',
       colorMode,
@@ -686,20 +770,20 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop z-50 flex items-center justify-center p-4">
-      <div className="modal-container w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+    <div className="modal-backdrop z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="modal-container w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
         {/* Header */}
-        <div className="modal-header flex items-center justify-between p-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
+        <div className="modal-header flex items-center justify-between p-3 sm:p-4 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-teal-500/10 text-teal-400">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
                 Plantar Impression Acquisition & Optical Calibration
                 <span className="badge-tag-sm">IEC 62304</span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] text-slate-400 hidden sm:block">
                 Supports Camera Capture (Fixed Burst Multi-Frame) + File Upload • Custom Paper Scale •
                 Autofocus & Optical Clarity Engine
               </p>
@@ -712,7 +796,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
         {/* Ingestion Mode Selector Tabs */}
         {step === 1 && (
-          <div className="grid grid-cols-3 p-2 bg-slate-950 border-b border-slate-800 text-xs font-semibold gap-1">
+          <div className="grid grid-cols-3 p-1.5 sm:p-2 bg-slate-950 border-b border-slate-800 text-xs font-semibold gap-1">
             <button
               className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'camera' ? 'active' : ''}`}
               onClick={() => {
@@ -721,7 +805,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               }}
             >
               <Camera className="w-4 h-4 text-teal-400" />
-              <span>Camera Capture (Fixed Burst)</span>
+              <span>Camera Capture</span>
             </button>
             <button
               className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'scanner' ? 'active' : ''}`}
@@ -731,7 +815,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               }}
             >
               <Scan className="w-4 h-4 text-teal-400" />
-              <span>Flatbed Scanner (TWAIN/WIA)</span>
+              <span>Flatbed Scanner</span>
             </button>
             <button
               className={`btn-toggle-option flex items-center justify-center gap-1.5 ${inputMode === 'file' ? 'active' : ''}`}
@@ -741,19 +825,19 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
               }}
             >
               <Upload className="w-4 h-4 text-teal-400" />
-              <span>Upload Harris Mat Scan</span>
+              <span>Upload File</span>
             </button>
           </div>
         )}
 
-        <div className="modal-body p-5 space-y-4 overflow-y-auto">
+        <div className="modal-body p-3 sm:p-5 space-y-3 sm:space-y-4 overflow-y-auto">
           {/* STEP 1: CAPTURE WITH LIVE ALIGNMENT & FOCUS HUD */}
           {step === 1 && (
             <div>
               {inputMode === 'camera' && (
                 <div className="space-y-3">
-                  {/* Camera Controls Bar */}
-                  <div className="grid grid-cols-4 gap-2 text-xs">
+                  {/* Camera Controls Bar - Responsive Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div>
                       <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
                         Camera Feed
@@ -770,7 +854,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                             </option>
                           ))
                         ) : (
-                          <option value="">High-Precision Clinical Sensor</option>
+                          <option value="">Rear Optical Sensor</option>
                         )}
                       </select>
                     </div>
@@ -784,7 +868,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                         value={cameraResolution}
                         onChange={(e) => setCameraResolution(e.target.value as any)}
                       >
-                        <option value="1080p">1080p Full HD (1920×1080)</option>
+                        <option value="1080p">1080p Full HD</option>
                         <option value="4k">4K UHD (3840×2160)</option>
                       </select>
                     </div>
@@ -812,7 +896,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                         value={simPattern}
                         onChange={(e) => setSimPattern(e.target.value as any)}
                       >
-                        <option value="high_pressure">High Pressure (Diabetic Risk)</option>
+                        <option value="high_pressure">High Pressure (Diabetic)</option>
                         <option value="normal">Normal Reference</option>
                         <option value="flat_foot">Flat Foot (Pes Planus)</option>
                       </select>
@@ -821,7 +905,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
                   {/* Paper Scale & Burst Capture Bar */}
                   <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 space-y-2 text-xs">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-[11px] text-slate-400 font-semibold mb-1 flex items-center justify-between">
                           <span>Paper Size & Scale Calibration</span>
@@ -854,7 +938,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                                 placeholder="W"
                                 value={paperWidthMm}
                                 onChange={(e) => setPaperWidthMm(Math.max(50, Number(e.target.value)))}
-                                className="form-input w-16 text-center text-xs py-1"
+                                className="form-input w-14 text-center text-xs py-1"
                                 title="Paper Width (mm)"
                               />
                               <span className="text-slate-500">×</span>
@@ -863,7 +947,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                                 placeholder="H"
                                 value={paperHeightMm}
                                 onChange={(e) => setPaperHeightMm(Math.max(50, Number(e.target.value)))}
-                                className="form-input w-16 text-center text-xs py-1"
+                                className="form-input w-14 text-center text-xs py-1"
                                 title="Paper Height (mm)"
                               />
                               <span className="text-slate-400 text-[10px]">mm</span>
@@ -892,7 +976,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     {/* FOCUS, CLARITY, TORCH & OPTICAL ZOOM TOOLBAR */}
                     <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-800 gap-2">
                       {/* Zoom Slider */}
-                      <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                      <div className="flex items-center gap-2 flex-1 min-w-[180px]">
                         <span className="text-slate-400 flex items-center gap-1 font-semibold text-[11px]">
                           <ZoomIn className="w-3.5 h-3.5 text-teal-400" />
                           Zoom:
@@ -917,7 +1001,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       </div>
 
                       {/* Optical Focus & Clarity Controls */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {/* Refocus Sensor Button */}
                         <button
                           className="btn-tiny flex items-center gap-1 text-slate-300 hover:text-teal-300"
@@ -984,19 +1068,19 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                           <Grid className="w-3.5 h-3.5 mr-1" />
                           {showAlignmentGuides ? 'HUD: On' : 'HUD: Off'}
                         </button>
-
-                        {/* Native Phone Camera Option on Mobile */}
-                        {Capacitor.isNativePlatform() && (
-                          <button
-                            className="btn-tiny flex items-center gap-1 text-cyan-300 border-cyan-500/40 bg-cyan-950/40"
-                            onClick={handleNativeMobileCamera}
-                          >
-                            <Smartphone className="w-3.5 h-3.5" />
-                            <span>System 48MP Camera</span>
-                          </button>
-                        )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Primary Native Mobile Camera Launcher Button (Prominent on Phone Screens) */}
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-primary w-full py-2.5 justify-center flex items-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 shadow-lg text-sm font-bold"
+                      onClick={handleNativeMobileCamera}
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Launch Native Phone Camera (High-Res 48MP Photo)</span>
+                    </button>
                   </div>
 
                   {/* Burst capture status banner */}
@@ -1012,11 +1096,36 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     </div>
                   )}
 
-                  {/* CAMERA VIEWFINDER WITH LIVE ALIGNMENT & FOCUS HUD */}
+                  {/* Camera Error / Permission Notice */}
+                  {cameraError && (
+                    <div className="p-3 bg-amber-950/40 border border-amber-800/70 rounded-lg text-xs text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                        <span>{cameraError}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-tiny bg-teal-600 hover:bg-teal-500 text-white font-bold px-2 py-1"
+                          onClick={() => startCameraStream()}
+                          disabled={isPermissionRequesting}
+                        >
+                          {isPermissionRequesting ? 'Requesting...' : 'Grant & Retry Stream'}
+                        </button>
+                        <button
+                          className="btn-tiny bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-2 py-1"
+                          onClick={handleNativeMobileCamera}
+                        >
+                          Use Native Camera
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAMERA VIEWFINDER WITH RESPONSIVE ALIGNMENT & FOCUS HUD */}
                   <div
                     ref={previewContainerRef}
                     onClick={handleTriggerAutofocus}
-                    className="relative rounded-lg overflow-hidden bg-slate-950 border border-slate-800 h-80 flex items-center justify-center cursor-crosshair select-none"
+                    className="relative rounded-lg overflow-hidden bg-slate-950 border border-slate-800 min-h-[340px] sm:h-96 flex items-center justify-center cursor-crosshair select-none"
                     title="Tap anywhere in viewfinder to trigger autofocus"
                   >
                     {isBurstCapturing && (
@@ -1044,20 +1153,40 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                         }}
                       />
                     ) : (
-                      <img
-                        src={generateHarrisMatFootprint(
-                          footSide === 'Bilateral' ? 'Right' : footSide,
-                          simPattern,
-                          720,
-                          1080
-                        )}
-                        alt="Simulated Stream"
-                        className="h-64 object-contain rounded pointer-events-none"
-                        style={{
-                          transform: `scale(${cameraZoom})`,
-                          filter: `contrast(${contrastBoost}) brightness(${brightnessBoost})`,
-                        }}
-                      />
+                      <div className="flex flex-col items-center justify-center p-6 text-center max-w-md space-y-3 z-10">
+                        <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 shadow-xl">
+                          <Camera className="w-8 h-8" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-200">
+                            Live Stream Waiting for Camera Permission
+                          </div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            Click below to launch your phone's native camera or enable live stream permissions.
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 justify-center pt-1">
+                          <button
+                            className="btn-primary text-xs font-bold px-3 py-1.5 flex items-center gap-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNativeMobileCamera();
+                            }}
+                          >
+                            <Smartphone className="w-4 h-4" />
+                            <span>Launch Native Camera</span>
+                          </button>
+                          <button
+                            className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startCameraStream();
+                            }}
+                          >
+                            <span>Enable Live Feed</span>
+                          </button>
+                        </div>
+                      </div>
                     )}
 
                     {/* TAP-TO-FOCUS VISUAL RETICLE */}
@@ -1085,22 +1214,22 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     {/* LIVE SCREEN ALIGNMENT & CLARITY OVERLAYS */}
                     {showAlignmentGuides && (
                       <>
-                        {/* 1. Live Spirit Level / Tilt Angle Badge */}
-                        <div className="absolute top-3 left-3 bg-slate-900/85 backdrop-blur border border-slate-700 p-1.5 rounded flex items-center gap-2 text-[11px] shadow-lg pointer-events-none">
-                          <Compass className={`w-4 h-4 ${isLevel ? 'text-emerald-400' : 'text-amber-400'}`} />
+                        {/* 1. Live Spirit Level / Tilt Angle Badge (Top-Left) */}
+                        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-slate-900/90 backdrop-blur border border-slate-700 px-2 py-1 rounded flex items-center gap-1.5 text-[10px] sm:text-[11px] shadow-lg pointer-events-none z-20">
+                          <Compass className={`w-3.5 h-3.5 ${isLevel ? 'text-emerald-400' : 'text-amber-400'}`} />
                           <div>
                             <span className={`font-bold ${isLevel ? 'text-emerald-400' : 'text-amber-400'}`}>
-                              {isLevel ? 'LEVEL: ALIGNED' : 'CAMERA TILTED'}
+                              {isLevel ? 'LEVEL: FLAT' : 'TILTED'}
                             </span>
-                            <span className="text-slate-400 text-[10px] ml-1.5 font-mono">
+                            <span className="text-slate-400 text-[10px] ml-1 font-mono">
                               ({tiltAngle.pitch}°, {tiltAngle.roll}°)
                             </span>
                           </div>
                         </div>
 
-                        {/* 2. Live Clarity & Sharpness Score Meter */}
+                        {/* 2. Live Clarity & Sharpness Score Meter (Top-Right) */}
                         {isCameraActive && (
-                          <div className="absolute top-3 right-3 bg-slate-900/85 backdrop-blur border border-slate-700 p-1.5 rounded flex items-center gap-2 text-[11px] shadow-lg pointer-events-none">
+                          <div className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-slate-900/90 backdrop-blur border border-slate-700 px-2 py-1 rounded flex items-center gap-1.5 text-[10px] sm:text-[11px] shadow-lg pointer-events-none z-20">
                             <Focus
                               className={`w-3.5 h-3.5 ${liveSharpnessScore >= 45 ? 'text-emerald-400' : 'text-amber-400'}`}
                             />
@@ -1108,9 +1237,9 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                               <span
                                 className={`font-bold ${liveSharpnessScore >= 45 ? 'text-emerald-400' : 'text-amber-400'}`}
                               >
-                                {liveSharpnessScore >= 45 ? 'CLARITY: SHARP' : 'FOCUSING / BLURRY'}
+                                {liveSharpnessScore >= 45 ? 'SHARP' : 'FOCUSING'}
                               </span>
-                              <span className="text-slate-400 text-[10px] ml-1.5 font-mono">
+                              <span className="text-slate-400 text-[10px] ml-1 font-mono">
                                 ({liveSharpnessScore.toFixed(1)})
                               </span>
                             </div>
@@ -1119,50 +1248,59 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
                         {/* 3. Center Bullseye Crosshairs */}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="relative w-16 h-16 border border-teal-400/40 rounded-full flex items-center justify-center">
+                          <div className="relative w-14 h-14 border border-teal-400/40 rounded-full flex items-center justify-center">
                             <div className="w-2 h-2 bg-teal-400/80 rounded-full" />
                             <div className="absolute w-full h-[1px] bg-teal-400/30" />
                             <div className="absolute h-full w-[1px] bg-teal-400/30" />
                           </div>
                         </div>
 
-                        {/* 4. Custom Paper Framing Boundary Box */}
-                        <div className="absolute inset-6 border-2 border-teal-400/60 rounded pointer-events-none flex flex-col justify-between p-2 shadow-inner">
-                          <div className="flex justify-between items-center text-[10px] font-mono text-teal-300 bg-slate-900/80 px-2 py-0.5 rounded w-max">
+                        {/* 4. Custom Paper Proportional Framing Boundary Box */}
+                        <div
+                          className="absolute pointer-events-none border-2 border-teal-400/70 rounded flex flex-col justify-between p-2 shadow-inner"
+                          style={{
+                            aspectRatio: `${paperWidthMm} / ${paperHeightMm}`,
+                            maxHeight: '84%',
+                            maxWidth: '78%',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                          }}
+                        >
+                          <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono text-teal-300 bg-slate-900/85 px-1.5 py-0.5 rounded w-max mx-auto shadow">
                             <span>
-                              Framing Guide: {paperWidthMm} × {paperHeightMm} mm (Scale:{' '}
-                              {(paperHeightMm / paperWidthMm).toFixed(2)})
+                              {paperPreset === 'custom' ? 'Custom Paper' : PAPER_PRESETS[paperPreset].name} ({paperWidthMm} × {paperHeightMm} mm)
                             </span>
                           </div>
 
                           {/* Foot Positioning Silhouette Outline */}
-                          <div className="mx-auto my-auto opacity-20 border-2 border-dashed border-teal-200 rounded-[40px] w-28 h-52 flex flex-col justify-between p-2 text-center text-[10px] text-teal-200">
+                          <div className="mx-auto my-auto opacity-25 border-2 border-dashed border-teal-200 rounded-[35px] w-24 h-44 sm:w-28 sm:h-52 flex flex-col justify-between p-2 text-center text-[9px] text-teal-200 font-bold">
                             <span>TOES (ANTERIOR)</span>
+                            <span className="text-[8px] opacity-75">FOOTPRINT CENTER</span>
                             <span>HEEL (POSTERIOR)</span>
                           </div>
 
-                          <div className="text-center text-[10px] text-teal-300 bg-slate-900/80 px-2 py-0.5 rounded w-max mx-auto">
-                            Tap viewfinder to refocus • Hold camera flat over{' '}
-                            {paperPreset === 'custom' ? 'Custom Paper' : PAPER_PRESETS[paperPreset].name}
+                          <div className="text-center text-[9px] text-teal-300 bg-slate-900/85 px-1.5 py-0.5 rounded w-max mx-auto shadow">
+                            Fit paper sheet edges inside green frame
                           </div>
                         </div>
                       </>
                     )}
 
-                    {/* Snap Photo Trigger */}
+                    {/* Snap Photo Trigger Button */}
                     <button
-                      className="absolute bottom-3 right-4 btn-scanner shadow-2xl flex items-center gap-1.5"
+                      className="absolute bottom-3 right-3 sm:right-4 btn-scanner shadow-2xl flex items-center gap-1.5 z-20 text-xs sm:text-sm font-bold"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleCaptureFromCamera();
                       }}
                       disabled={isBurstCapturing}
                     >
-                      <Camera className="w-4 h-4 mr-1.5" />
+                      <Camera className="w-4 h-4 mr-1" />
                       <span>
                         {burstMode === 'single'
-                          ? 'Capture & Auto-Enhance'
-                          : `Fixed Burst (${burstMode === 'burst5' ? 5 : 3} Frames) & Select Sharpest`}
+                          ? 'Snap & Enhance'
+                          : `Fixed Burst (${burstMode === 'burst5' ? 5 : 3}F)`}
                       </span>
                     </button>
                   </div>
@@ -1457,27 +1595,33 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="modal-footer p-4 border-t border-slate-800 flex items-center justify-between">
+        <div className="modal-footer p-3 sm:p-4 border-t border-slate-800 flex items-center justify-between">
           {step > 1 ? (
-            <button className="btn-secondary" onClick={() => setStep(1)}>
+            <button className="btn-secondary text-xs sm:text-sm" onClick={() => setStep(1)}>
               Back to Capture
             </button>
           ) : (
-            <div className="text-xs text-slate-500">
-              {hwCaps.actualWidth} × {hwCaps.actualHeight} •{' '}
-              {hwCaps.supportsContinuousFocus ? 'Continuous Autofocus Active' : 'Standard Focus'}
+            <div className="text-[11px] sm:text-xs text-slate-500">
+              {isCameraActive ? (
+                <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                  <CheckCircle className="w-3 h-3" />
+                  Live Sensor Active ({hwCaps.actualWidth}×{hwCaps.actualHeight})
+                </span>
+              ) : (
+                <span>Camera Ready • Tap "Launch Native Phone Camera" or "Snap"</span>
+              )}
             </div>
           )}
 
           <div className="ml-auto flex gap-2">
-            <button className="btn-secondary" onClick={onClose}>
+            <button className="btn-secondary text-xs sm:text-sm" onClick={onClose}>
               Cancel
             </button>
 
             {step === 2 && (enhancedUrl || rawCapturedUrl) && (
-              <button className="btn-primary" onClick={handleFinishAndAnalyze}>
+              <button className="btn-primary text-xs sm:text-sm" onClick={handleFinishAndAnalyze}>
                 <FileCheck className="w-4 h-4 mr-1.5" />
-                Analyze Enhanced Plantar Impression
+                Analyze Plantar Impression
               </button>
             )}
           </div>
