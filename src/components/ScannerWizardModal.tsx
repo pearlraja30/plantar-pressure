@@ -176,6 +176,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [burstProgress, setBurstProgress] = useState<{ current: number; total: number } | null>(null);
   const [burstStatusMessage, setBurstStatusMessage] = useState<string | null>(null);
 
+  // Document Scanner Mode & Pitch/Roll Holding States
+  const [framingMode, setFramingMode] = useState<'full-page' | 'footprint'>('full-page');
+  const [pitchDeg, setPitchDeg] = useState<number>(0);
+  const [rollDeg, setRollDeg] = useState<number>(0);
+
   // Rectification Corners
   const [isA4CalibrationActive, setIsA4CalibrationActive] = useState<boolean>(false);
   const [a4Corners, setA4Corners] = useState<QuadCorners>({
@@ -574,6 +579,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         // beta is pitch (tilt front/back), gamma is roll (tilt left/right)
         const pitch = Math.abs(e.beta > 90 ? 180 - e.beta : e.beta);
         const roll = Math.abs(e.gamma);
+        setPitchDeg(Math.round(pitch * 10) / 10);
+        setRollDeg(Math.round(roll * 10) / 10);
         const totalTilt = Math.round(Math.sqrt(pitch * pitch + roll * roll) * 10) / 10;
         setTiltDegrees(totalTilt);
         // Clinical standard for handheld paper scanning: 18° provides zero perspective distortion
@@ -863,9 +870,10 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         const rawW = fRect.width / scale;
         const rawH = fRect.height / scale;
 
-        // Add 12% generous padding so foot border and paper margins are never clipped
-        const padX = rawW * 0.12;
-        const padY = rawH * 0.12;
+        // Add generous safety overscan padding so foot border, sheet edges, and paper margins are never clipped
+        const padFactor = framingMode === 'full-page' ? 0.20 : 0.12;
+        const padX = rawW * padFactor;
+        const padY = rawH * padFactor;
 
         cropX = Math.max(0, Math.floor(rawX - padX));
         cropY = Math.max(0, Math.floor(rawY - padY));
@@ -873,8 +881,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         cropH = Math.min(vH - cropY, Math.ceil(rawH + padY * 2));
       }
 
-      // Max dimension clamp to 1400px to maintain crisp clarity without mobile V8 memory overflow
-      const MAX_DIM = 1400;
+      // Max dimension clamp to 1600px to maintain crisp document scanner clarity without mobile V8 memory overflow
+      const MAX_DIM = 1600;
       let targetW = cropW;
       let targetH = cropH;
       if (targetW > MAX_DIM || targetH > MAX_DIM) {
@@ -1495,32 +1503,78 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                       )}
                     </div>
 
-                    {/* Rectangle Bounding Box: ONLY content inside this box is cropped and analyzed */}
+                    {/* Scanner Framing Mode Switcher: Full Document Page (A4/Mat) vs Footprint Focus */}
+                    <div className="flex items-center justify-center gap-1.5 my-1 z-20 pointer-events-auto">
+                      <button
+                        type="button"
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all shadow-md ${
+                          framingMode === 'full-page'
+                            ? 'bg-teal-500 text-white ring-2 ring-teal-400/50'
+                            : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800'
+                        }`}
+                        onClick={() => setFramingMode('full-page')}
+                      >
+                        <span>📄 Full Page Scanner (A4/Mat)</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 transition-all shadow-md ${
+                          framingMode === 'footprint'
+                            ? 'bg-teal-500 text-white ring-2 ring-teal-400/50'
+                            : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800'
+                        }`}
+                        onClick={() => setFramingMode('footprint')}
+                      >
+                        <span>🦶 Footprint Focus</span>
+                      </button>
+                    </div>
+
+                    {/* Framing Box: Full Page Document Scanner or Footprint Focus */}
                     <div
                       ref={frameBoxRef}
-                      className={`viewfinder-frame-box ${isLevel && isSteady ? 'aligned' : 'unaligned'}`}
+                      className={`viewfinder-frame-box ${framingMode} ${isLevel && isSteady ? 'aligned' : 'unaligned'}`}
                     >
                       <div className="viewfinder-corner-tl" />
                       <div className="viewfinder-corner-tr" />
                       <div className="viewfinder-corner-bl" />
                       <div className="viewfinder-corner-br" />
 
-                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-start">
-                        🦶 ALIGN TOES (ANTERIOR ↑)
+                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-start text-center w-full">
+                        {framingMode === 'full-page'
+                          ? '📄 FIT COMPLETE HARRIS MAT PAPER SHEET HERE'
+                          : `🦶 ALIGN ${footSide.toUpperCase()} TOES (ANTERIOR ↑)`}
                       </div>
 
-                      <div className="flex flex-col items-center justify-center opacity-40 pointer-events-none">
-                        <Target className="w-14 h-14 stroke-1 text-teal-300" />
-                        <span className="text-[9px] font-mono font-bold mt-1 tracking-widest text-teal-200">
-                          {footSide.toUpperCase()} FOOT BOUNDING BOX
-                        </span>
-                        <span className="text-[8px] font-mono text-slate-300 tracking-normal opacity-90 mt-0.5">
-                          Align foot and paper inside this box
-                        </span>
+                      {/* Real-Time Dual-Axis Artificial Horizon Bubble Level HUD */}
+                      <div className="viewfinder-level-hud my-auto">
+                        <div className={`viewfinder-bubble-ring ${isLevel && isSteady ? 'aligned' : ''}`}>
+                          <div className="viewfinder-bubble-crosshair-h" />
+                          <div className="viewfinder-bubble-crosshair-v" />
+                          <div className={`viewfinder-bubble-center ${isLevel && isSteady ? 'aligned' : ''}`} />
+                          <div
+                            className={`viewfinder-bubble-dot ${isLevel && isSteady ? 'aligned' : ''}`}
+                            style={{
+                              transform: `translate(${Math.max(-17, Math.min(17, (rollDeg / 15) * 17))}px, ${Math.max(-17, Math.min(17, (pitchDeg / 15) * 17))}px)`,
+                            }}
+                          />
+                        </div>
+                        <div className="viewfinder-bubble-text mt-1.5">
+                          {isLevel && isSteady ? (
+                            <span className="text-emerald-400 font-bold">🟢 LEVEL &amp; STEADY ({tiltDegrees}°)</span>
+                          ) : pitchDeg > 14 ? (
+                            <span className="text-amber-300">TILT PHONE FLAT FORWARD</span>
+                          ) : rollDeg > 14 ? (
+                            <span className="text-amber-300">TILT PHONE LEVEL HORIZONTAL</span>
+                          ) : (
+                            <span className="text-amber-300">HOLD PHONE STEADY ({tiltDegrees}°)</span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-end">
-                        🦶 ALIGN HEEL (POSTERIOR ↓)
+                      <div className="text-[10px] font-mono tracking-wider font-semibold opacity-90 self-end text-center w-full">
+                        {framingMode === 'full-page'
+                          ? '✨ FULL DOCUMENT EDGE PRESERVATION • ZERO CUTOFF'
+                          : `🦶 ALIGN ${footSide.toUpperCase()} HEEL (POSTERIOR ↓)`}
                       </div>
                     </div>
 
