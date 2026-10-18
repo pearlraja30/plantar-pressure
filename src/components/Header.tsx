@@ -66,8 +66,23 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Mobile-Only Top Actions: Theme Toggle + Menu */}
+        {/* Mobile-Only Top Actions: Cloud Sync Status + Theme Toggle + Menu */}
         <div className="mobile-header-quick-actions mobile-only">
+          <button
+            className={`btn-icon-status ${cloudStatus.isOnline ? 'online' : 'offline'}`}
+            onClick={onOpenCloud}
+            title={cloudStatus.isOnline ? 'Cloud Sync Online (FR-12)' : 'Cloud Offline (Queued)'}
+          >
+            {cloudStatus.isOnline ? (
+              <Cloud className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <CloudOff className="w-4 h-4 text-amber-400" />
+            )}
+            {cloudStatus.pendingQueueCount > 0 && (
+              <span className="queue-pill">{cloudStatus.pendingQueueCount}</span>
+            )}
+          </button>
+
           <button
             className="btn-theme-toggle-compact"
             onClick={onToggleTheme}
@@ -90,8 +105,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Workspaces (Clean 3-Tab Segmented Control) */}
-      <nav className="header-nav">
+      {/* Navigation Workspaces (Clean 3-Tab Segmented Control - Desktop Only) */}
+      <nav className="header-nav desktop-only">
         <button
           className={`nav-btn ${currentTab === 'analysis' ? 'active' : ''}`}
           onClick={() => onTabChange('analysis')}
@@ -115,8 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </nav>
 
-      {/* Action Toolbar */}
-      <div className="header-actions">
+      {/* Action Toolbar (Desktop Only) */}
+      <div className="header-actions desktop-only">
         {/* Scanner Wizard CTA (Primary Highlight) */}
         <button className="btn-scanner" onClick={onOpenScanner} title="Acquire Harris Mat scan (FR-02)">
           <Scan className="w-4 h-4" />

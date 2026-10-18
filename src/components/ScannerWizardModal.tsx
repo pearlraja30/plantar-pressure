@@ -109,7 +109,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   // Camera Settings
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
-  const [cameraResolution, setCameraResolution] = useState<'1080p' | '4k'>('1080p');
+  const [cameraResolution, setCameraResolution] = useState<'1080p' | '4k'>('4k');
   const [cameraZoom, setCameraZoom] = useState<number>(1.0);
   const [contrastBoost, setContrastBoost] = useState<number>(1.25);
   const [brightnessBoost, setBrightnessBoost] = useState<number>(1.05);
@@ -489,13 +489,12 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   ]);
 
 
-  // Launch Native Android / iOS System Camera App
+  // Launch Native Android / iOS System Camera App (Full Sensor Resolution & 100% Quality)
   const handleNativeMobileCamera = async () => {
     try {
+      addDebugLog('Launching Native Phone Camera at maximum sensor resolution...');
       const photo = await CapCamera.getPhoto({
-        quality: 90,
-        width: 1200,
-        height: 1600,
+        quality: 100,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -730,10 +729,10 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         img.onerror = rej;
       });
 
-      // Clamp max dimension to 1400px to prevent mobile V8 memory overflow
+      // Document scanner high-definition resolution preservation (up to 2400px)
       let targetW = img.naturalWidth || img.width;
       let targetH = img.naturalHeight || img.height;
-      const maxDim = 1400;
+      const maxDim = 2400;
       let normalizedUrl = rawUrl;
 
       if (targetW > maxDim || targetH > maxDim) {
@@ -744,8 +743,10 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         normCanvas.width = targetW;
         normCanvas.height = targetH;
         const normCtx = normCanvas.getContext('2d')!;
+        normCtx.imageSmoothingEnabled = true;
+        normCtx.imageSmoothingQuality = 'high';
         normCtx.drawImage(img, 0, 0, targetW, targetH);
-        normalizedUrl = normCanvas.toDataURL('image/jpeg', 0.90);
+        normalizedUrl = normCanvas.toDataURL('image/jpeg', 0.98);
       }
 
       setRawCapturedUrl(normalizedUrl);
@@ -813,21 +814,22 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     setEnhancementMetrics(result.metrics);
   };
 
-  // Fixed burst multi-frame capture from camera with zoom & filter parity
+  // High-Resolution Document Scanner Still & Burst Capture with Exact Alignment
   const handleCaptureFromCamera = async () => {
-    let capturedUrl: string;
+    let capturedUrl: string = '';
 
     if (isCameraActive && videoRef.current) {
       const vid = videoRef.current;
-      const vW = vid.videoWidth || 1280;
-      const vH = vid.videoHeight || 720;
+      const vW = vid.videoWidth || 1920;
+      const vH = vid.videoHeight || 1080;
 
       // 1. Trigger autofocus prior to snapshot to ensure sharp footprint clarity
       await triggerRefocus();
-      await new Promise((res) => setTimeout(res, 60));
+      await new Promise((res) => setTimeout(res, 80));
 
-      addDebugLog(`Capturing snapshot: triggering autofocus...`);
-      // 2. Compute exact bounding box of the framing rectangle box relative to displayed video
+      addDebugLog(`Capturing document scan from video sensor (${vW}x${vH})...`);
+
+      // 2. Compute exact bounding box of the framing rectangle box relative to displayed video (object-fit: cover)
       let cropX = 0;
       let cropY = 0;
       let cropW = vW;
@@ -839,28 +841,13 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
         const cW = cRect.width;
         const cH = cRect.height;
-        const cRatio = cW / cH;
-        const vRatio = vW / vH;
 
-        let scale = 1;
-        let displayedW = cW;
-        let displayedH = cH;
-        let offsetX = 0;
-        let offsetY = 0;
-
-        if (cRatio > vRatio) {
-          scale = cW / vW;
-          displayedW = cW;
-          displayedH = vH * scale;
-          offsetX = 0;
-          offsetY = (cH - displayedH) / 2;
-        } else {
-          scale = cH / vH;
-          displayedW = vW * scale;
-          displayedH = cH;
-          offsetX = (cW - displayedW) / 2;
-          offsetY = 0;
-        }
+        // Exact CSS object-fit: cover scale & centering offsets
+        const scale = Math.max(cW / vW, cH / vH);
+        const displayedW = vW * scale;
+        const displayedH = vH * scale;
+        const offsetX = (cW - displayedW) / 2;
+        const offsetY = (cH - displayedH) / 2;
 
         const relX = (fRect.left - cRect.left) - offsetX;
         const relY = (fRect.top - cRect.top) - offsetY;
@@ -870,8 +857,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         const rawW = fRect.width / scale;
         const rawH = fRect.height / scale;
 
-        // Add generous safety overscan padding so foot border, sheet edges, and paper margins are never clipped
-        const padFactor = framingMode === 'full-page' ? 0.20 : 0.12;
+        // Generous safety overscan padding so foot borders, paper margins, and calibration markers are never clipped
+        const padFactor = framingMode === 'full-page' ? 0.16 : 0.10;
         const padX = rawW * padFactor;
         const padY = rawH * padFactor;
 
@@ -881,8 +868,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         cropH = Math.min(vH - cropY, Math.ceil(rawH + padY * 2));
       }
 
-      // Max dimension clamp to 1600px to maintain crisp document scanner clarity without mobile V8 memory overflow
-      const MAX_DIM = 1600;
+      // Max dimension clamp up to 2400px for crisp clinical document scanning
+      const MAX_DIM = 2400;
       let targetW = cropW;
       let targetH = cropH;
       if (targetW > MAX_DIM || targetH > MAX_DIM) {
@@ -891,48 +878,103 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         targetH = Math.round(targetH * factor);
       }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      // 3. Attempt W3C ImageCapture API for native hardware still photo (Android Chromium / WebViews)
+      const track = streamRef.current?.getVideoTracks()[0];
+      let nativeStillSuccess = false;
 
-      const drawCroppedFrame = () => {
-        ctx.filter = `contrast(${contrastBoost}) brightness(${brightnessBoost})`;
-        ctx.drawImage(vid, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
-        ctx.filter = 'none';
-      };
-
-      const frameCount = burstMode === 'burst5' ? 5 : burstMode === 'burst3' ? 3 : 1;
-
-      if (frameCount > 1) {
-        setIsBurstCapturing(true);
-        const burstFrames: { dataUrl: string; sharpness: number }[] = [];
-
-        for (let i = 0; i < frameCount; i++) {
-          setBurstProgress({ current: i + 1, total: frameCount });
-          drawCroppedFrame();
-          const sharpness = computeSharpnessScore(ctx, canvas.width, canvas.height);
-          burstFrames.push({
-            dataUrl: canvas.toDataURL('image/jpeg', 0.92),
-            sharpness,
+      if (track && typeof (window as any).ImageCapture === 'function') {
+        try {
+          addDebugLog('Triggering native hardware sensor still via ImageCapture API...');
+          const imageCapture = new (window as any).ImageCapture(track);
+          const stillBlob = await imageCapture.takePhoto({
+            fillLightMode: torchEnabled ? 'flash' : 'off',
           });
-          if (i < frameCount - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 80));
+
+          if (stillBlob) {
+            const stillImg = new Image();
+            const stillBlobUrl = URL.createObjectURL(stillBlob);
+            stillImg.src = stillBlobUrl;
+            await new Promise((res, rej) => {
+              stillImg.onload = res;
+              stillImg.onerror = rej;
+            });
+
+            const sW = stillImg.naturalWidth || stillImg.width;
+            const sH = stillImg.naturalHeight || stillImg.height;
+
+            // Map crop coordinates proportionally to full sensor still image
+            const mappedCropX = Math.max(0, Math.floor((cropX / vW) * sW));
+            const mappedCropY = Math.max(0, Math.floor((cropY / vH) * sH));
+            const mappedCropW = Math.min(sW - mappedCropX, Math.ceil((cropW / vW) * sW));
+            const mappedCropH = Math.min(sH - mappedCropY, Math.ceil((cropH / vH) * sH));
+
+            const stillCanvas = document.createElement('canvas');
+            stillCanvas.width = targetW;
+            stillCanvas.height = targetH;
+            const stillCtx = stillCanvas.getContext('2d', { willReadFrequently: true })!;
+            stillCtx.imageSmoothingEnabled = true;
+            stillCtx.imageSmoothingQuality = 'high';
+            stillCtx.filter = `contrast(${contrastBoost}) brightness(${brightnessBoost})`;
+            stillCtx.drawImage(stillImg, mappedCropX, mappedCropY, mappedCropW, mappedCropH, 0, 0, targetW, targetH);
+            stillCtx.filter = 'none';
+
+            capturedUrl = stillCanvas.toDataURL('image/jpeg', 0.98);
+            nativeStillSuccess = true;
+            URL.revokeObjectURL(stillBlobUrl);
+            addDebugLog(`Full-resolution hardware still captured (${sW}x${sH} sensor -> ${targetW}x${targetH})`);
           }
+        } catch (icErr) {
+          console.warn('ImageCapture still capture fallback to high-res video canvas:', icErr);
         }
+      }
 
-        burstFrames.sort((a, b) => b.sharpness - a.sharpness);
-        const best = burstFrames[0];
-        capturedUrl = best.dataUrl;
+      if (!nativeStillSuccess) {
+        // High-Fidelity Video Track Canvas Capture (Burst or Single Frame)
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
-        setIsBurstCapturing(false);
-        setBurstProgress(null);
-        setBurstStatusMessage(
-          `Cropped foot bounding box captured (${best.sharpness.toFixed(1)} clarity score)`
-        );
-      } else {
-        drawCroppedFrame();
-        capturedUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const drawCroppedFrame = () => {
+          ctx.filter = `contrast(${contrastBoost}) brightness(${brightnessBoost})`;
+          ctx.drawImage(vid, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+          ctx.filter = 'none';
+        };
+
+        const frameCount = burstMode === 'burst5' ? 5 : burstMode === 'burst3' ? 3 : 1;
+
+        if (frameCount > 1) {
+          setIsBurstCapturing(true);
+          const burstFrames: { dataUrl: string; sharpness: number }[] = [];
+
+          for (let i = 0; i < frameCount; i++) {
+            setBurstProgress({ current: i + 1, total: frameCount });
+            drawCroppedFrame();
+            const sharpness = computeSharpnessScore(ctx, canvas.width, canvas.height);
+            burstFrames.push({
+              dataUrl: canvas.toDataURL('image/jpeg', 0.98),
+              sharpness,
+            });
+            if (i < frameCount - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 80));
+            }
+          }
+
+          burstFrames.sort((a, b) => b.sharpness - a.sharpness);
+          const best = burstFrames[0];
+          capturedUrl = best.dataUrl;
+
+          setIsBurstCapturing(false);
+          setBurstProgress(null);
+          setBurstStatusMessage(
+            `High-definition frame captured (${best.sharpness.toFixed(1)} clarity score)`
+          );
+        } else {
+          drawCroppedFrame();
+          capturedUrl = canvas.toDataURL('image/jpeg', 0.98);
+        }
       }
     } else {
       setCameraError(

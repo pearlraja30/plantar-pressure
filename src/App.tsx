@@ -15,6 +15,7 @@ import { Patient, AnalysisCase, FootSide, QualityControlResult } from './types';
 import { processHarrisMatScan } from './services/imageProcessingService';
 import { cloudSyncService, CloudSyncStatus } from './services/cloudSyncService';
 import { logAuditEvent } from './services/auditService';
+import { Layers, Activity, Users, Scan, FileText } from 'lucide-react';
 
 // Synchronous hard purge of all legacy demo data from storage
 const CLEAN_STORAGE_VERSION = 'ppa_pure_clinical_v6';
@@ -428,6 +429,62 @@ export function App() {
           />
         )}
       </main>
+
+      {/* Standard Mobile Bottom Navigation Bar (iOS & Android Native Tab Bar Standard) */}
+      <nav className="mobile-bottom-nav mobile-only" aria-label="Mobile Bottom Navigation">
+        <button
+          type="button"
+          className={`bottom-nav-item ${currentTab === 'analysis' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('analysis')}
+          title="Biomechanical Plantar Pressure Analysis"
+        >
+          <Layers className="bottom-nav-icon" />
+          <span className="bottom-nav-label">Analysis</span>
+        </button>
+
+        <button
+          type="button"
+          className={`bottom-nav-item ${currentTab === 'orthotics' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('orthotics')}
+          title="Clinical Orthotic Modifications"
+        >
+          <Activity className="bottom-nav-icon" />
+          <span className="bottom-nav-label">Orthotics</span>
+        </button>
+
+        {/* Center Prominent Scanner Floating Action Button */}
+        <button
+          type="button"
+          className="bottom-nav-item bottom-nav-scan-cta"
+          onClick={() => setIsScannerOpen(true)}
+          title="Open Document & Footprint Camera Scanner"
+        >
+          <div className="bottom-nav-scan-bubble">
+            <Scan className="w-5 h-5 text-white" />
+          </div>
+          <span className="bottom-nav-label text-teal-400 font-bold">Scan</span>
+        </button>
+
+        <button
+          type="button"
+          className={`bottom-nav-item ${currentTab === 'patients' ? 'active' : ''}`}
+          onClick={() => setCurrentTab('patients')}
+          title="Patient Records & Case History"
+        >
+          <Users className="bottom-nav-icon" />
+          <span className="bottom-nav-label">Patients</span>
+        </button>
+
+        <button
+          type="button"
+          className="bottom-nav-item"
+          onClick={() => setIsReportOpen(true)}
+          title="Clinical Diagnostic PDF Report"
+        >
+          <FileText className="bottom-nav-icon" />
+          <span className="bottom-nav-label">Report</span>
+        </button>
+      </nav>
 
       {/* MODALS */}
       {/* 1. Scanner Wizard (FR-02, FR-03, FR-05) */}
