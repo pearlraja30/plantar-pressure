@@ -1,0 +1,829 @@
+/* ========================================================
+   PODOLOAD - MEDICAL DESIGN SYSTEM (100% COLOR & FONT MATCH)
+   Supported by Technomind Healthcare
+   ======================================================== */
+
+:root {
+  --podo-sidebar-bg: #0b2529;
+  --podo-sidebar-border: #13383e;
+  --podo-sidebar-text: #8fa8ad;
+  --podo-sidebar-active-bg: #0e7477;
+  --podo-sidebar-active-text: #ffffff;
+  --podo-sidebar-section: #44666d;
+
+  --podo-primary: #0e7477;
+  --podo-primary-hover: #0a5f62;
+  --podo-primary-light: #eaf3f4;
+  --podo-primary-ring: rgba(14, 116, 119, 0.25);
+
+  --podo-app-bg: #edf2f4;
+  --podo-header-bg: #ffffff;
+  --podo-header-border: #d8e4e6;
+  --podo-footer-bg: #edf2f4;
+  --podo-footer-border: #d8e4e6;
+  --podo-footer-text: #50686d;
+
+  --podo-card-bg: #ffffff;
+  --podo-card-border: #d5e2e5;
+  --podo-card-title: #0e7477;
+
+  --podo-input-border: #c0d3d7;
+  --podo-input-bg: #ffffff;
+  --podo-input-text: #0c2328;
+  --podo-input-label: #3d585e;
+
+  --podo-pill-active-bg: #0e7477;
+  --podo-pill-active-text: #ffffff;
+  --podo-pill-idle-bg: #e2ecee;
+  --podo-pill-idle-text: #475e63;
+
+  --podo-badge-green-bg: #e8f7ee;
+  --podo-badge-green-text: #15803d;
+  --podo-badge-green-border: #bbf7d0;
+
+  --podo-badge-amber-bg: #fef3c7;
+  --podo-badge-amber-text: #b45309;
+  --podo-badge-amber-border: #fde68a;
+
+  --podo-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Base resets & layout */
+.podoload-root {
+  font-family: var(--podo-font-family);
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--podo-app-bg);
+  color: #102a30;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ----------------------------------------------------
+   LEFT SIDEBAR
+   ---------------------------------------------------- */
+.podoload-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background-color: var(--podo-sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid var(--podo-sidebar-border);
+  user-select: none;
+  z-index: 30;
+}
+
+.podoload-sidebar-top {
+  display: flex;
+  flex-direction: column;
+}
+
+.podoload-brand-area {
+  padding: 1.25rem 1.25rem 1rem 1.25rem;
+}
+
+.podoload-brand-title {
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.podoload-nav-section {
+  padding: 0.6rem 0.75rem 0.4rem 0.75rem;
+}
+
+.podoload-section-label {
+  color: var(--podo-sidebar-section);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+  padding-left: 0.5rem;
+}
+
+.podoload-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.podoload-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.52rem 0.65rem;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--podo-sidebar-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.podoload-nav-item:hover {
+  background-color: #10343a;
+  color: #ffffff;
+}
+
+.podoload-nav-item.active {
+  background-color: var(--podo-sidebar-active-bg);
+  color: var(--podo-sidebar-active-text);
+}
+
+.podoload-nav-item-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------
+   MAIN APP CONTAINER
+   ---------------------------------------------------- */
+.podoload-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ----------------------------------------------------
+   TOP HEADER BAR
+   ---------------------------------------------------- */
+.podoload-top-header {
+  background-color: var(--podo-header-bg);
+  border-bottom: 1px solid var(--podo-header-border);
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.podoload-top-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.podoload-header-title-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.podoload-header-title {
+  color: #0c2328;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.podoload-global-search {
+  position: relative;
+  width: 320px;
+}
+
+.podoload-global-search input {
+  width: 100%;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--podo-input-border);
+  background-color: #ffffff;
+  padding: 0 0.75rem 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--podo-input-text);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.podoload-global-search input:focus {
+  border-color: var(--podo-primary);
+  box-shadow: 0 0 0 2px var(--podo-primary-ring);
+}
+
+.podoload-global-search input::placeholder {
+  color: #8da4a9;
+}
+
+.podoload-top-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.podoload-synced-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: 9999px;
+  background-color: var(--podo-badge-green-bg);
+  color: var(--podo-badge-green-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.podoload-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  background-color: #e6eef0;
+  color: #385156;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.podoload-doctor-tag {
+  color: #0c2328;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.podoload-selected-patient-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0c2328;
+  letter-spacing: -0.01em;
+}
+
+/* ----------------------------------------------------
+   STEP WIZARD PILLS ROW
+   ---------------------------------------------------- */
+.podoload-stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.podoload-step-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background-color: var(--podo-pill-idle-bg);
+  color: var(--podo-pill-idle-text);
+  transition: all 0.15s ease;
+}
+
+.podoload-step-pill:hover {
+  background-color: #d6e3e5;
+}
+
+.podoload-step-pill.active {
+  background-color: var(--podo-pill-active-bg);
+  color: var(--podo-pill-active-text);
+}
+
+.podoload-step-pill.completed {
+  background-color: #d9e6e8;
+  color: #244146;
+}
+
+/* ----------------------------------------------------
+   MAIN SCROLLABLE CONTENT VIEWPORT
+   ---------------------------------------------------- */
+.podoload-content-viewport {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
+  background-color: var(--podo-app-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ----------------------------------------------------
+   CARDS & PANELS
+   ---------------------------------------------------- */
+.podoload-card {
+  background-color: var(--podo-card-bg);
+  border: 1px solid var(--podo-card-border);
+  border-radius: 6px;
+  padding: 1.15rem;
+  box-shadow: 0 1px 2px rgba(12, 35, 40, 0.04);
+}
+
+.podoload-card-title {
+  color: var(--podo-card-title);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 1rem 0;
+}
+
+/* ----------------------------------------------------
+   FORM CONTROLS & INPUTS
+   ---------------------------------------------------- */
+.podoload-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.podoload-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--podo-input-label);
+}
+
+.podoload-input,
+.podoload-select,
+.podoload-textarea {
+  width: 100%;
+  border: 1px solid var(--podo-input-border);
+  background-color: var(--podo-input-bg);
+  color: var(--podo-input-text);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  padding: 0.45rem 0.65rem;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.podoload-input:focus,
+.podoload-select:focus,
+.podoload-textarea:focus {
+  border-color: var(--podo-primary);
+  box-shadow: 0 0 0 2px var(--podo-primary-ring);
+}
+
+.podoload-input-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.podoload-segmented-buttons {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--podo-input-border);
+}
+
+.podoload-seg-btn {
+  flex: 1;
+  padding: 0.42rem 0.5rem;
+  background-color: #ffffff;
+  color: #3d585e;
+  border: none;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-right: 1px solid var(--podo-input-border);
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.podoload-seg-btn:last-child {
+  border-right: none;
+}
+
+.podoload-seg-btn.active {
+  background-color: var(--podo-primary);
+  color: #ffffff;
+}
+
+/* ----------------------------------------------------
+   BUTTONS
+   ---------------------------------------------------- */
+.podoload-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background-color: var(--podo-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.55rem 1.15rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.podoload-btn-primary:hover {
+  background-color: var(--podo-primary-hover);
+}
+
+.podoload-btn-primary:disabled {
+  background-color: #a4bfc3;
+  cursor: not-allowed;
+}
+
+.podoload-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background-color: #ffffff;
+  color: var(--podo-primary);
+  border: 1.5px solid var(--podo-primary);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.podoload-btn-secondary:hover {
+  background-color: var(--podo-primary-light);
+}
+
+.podoload-btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+/* ----------------------------------------------------
+   BOTTOM ACTION FOOTER (PAGE TRANSITION ACTIONS)
+   ---------------------------------------------------- */
+.podoload-bottom-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+
+/* ----------------------------------------------------
+   SYSTEM STATUS BOTTOM BAR
+   ---------------------------------------------------- */
+.podoload-system-status-bar {
+  background-color: var(--podo-footer-bg);
+  border-top: 1px solid var(--podo-footer-border);
+  padding: 0.4rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--podo-footer-text);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.podoload-status-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.podoload-status-right {
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------
+   BADGES (STATUS / QUALITY / CONFIDENCE)
+   ---------------------------------------------------- */
+.podo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.podo-badge-green {
+  background-color: var(--podo-badge-green-bg);
+  color: var(--podo-badge-green-text);
+}
+
+.podo-badge-amber {
+  background-color: var(--podo-badge-amber-bg);
+  color: var(--podo-badge-amber-text);
+}
+
+/* ----------------------------------------------------
+   PATIENT LIST (EXISTING PATIENTS PANEL)
+   ---------------------------------------------------- */
+.podoload-patient-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 480px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.podoload-patient-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  background-color: #ffffff;
+  border: 1px solid #e1ebed;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.podoload-patient-row:hover {
+  border-color: var(--podo-primary);
+  background-color: #fafcfc;
+}
+
+.podoload-patient-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--podo-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.podoload-patient-info {
+  display: flex;
+  flex-direction: column;
+  margin-left: 0.6rem;
+  flex: 1;
+}
+
+.podoload-patient-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0c2328;
+}
+
+.podoload-patient-sub {
+  font-size: 0.68rem;
+  color: #657e84;
+}
+
+/* ----------------------------------------------------
+   DUAL FOOT CAPTURE VIEW (SCREEN 2)
+   ---------------------------------------------------- */
+.podoload-hardware-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  background-color: #ffffff;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid var(--podo-card-border);
+}
+
+.podoload-capture-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.podoload-foot-card {
+  background-color: #ffffff;
+  border: 1px solid var(--podo-card-border);
+  border-radius: 6px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.podoload-foot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.podoload-foot-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0c2328;
+}
+
+.podoload-viewport-container {
+  position: relative;
+  height: 340px;
+  background-color: #122125;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.podoload-sheet-preview {
+  position: relative;
+  width: 200px;
+  height: 290px;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.podoload-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background-color: #000000;
+}
+
+.podoload-marker.amber {
+  background-color: #f59e0b;
+}
+
+.podoload-marker-tl { top: 8px; left: 8px; }
+.podoload-marker-tr { top: 8px; right: 8px; }
+.podoload-marker-bl { bottom: 8px; left: 8px; }
+.podoload-marker-br { bottom: 8px; right: 8px; }
+
+/* Footprint Dashed Guide on Right Foot */
+.podoload-dashed-guide {
+  position: absolute;
+  width: 90px;
+  height: 230px;
+  border: 2px dashed #0d766e;
+  border-radius: 40px 40px 30px 30px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* ----------------------------------------------------
+   HEATMAP & PROCESSED RESULTS VIEW (SCREEN 3 & 4)
+   ---------------------------------------------------- */
+.podoload-results-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1rem;
+}
+
+.podoload-results-main-viewport {
+  background-color: #ffffff;
+  border: 1px solid var(--podo-card-border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.podoload-bilateral-canvas-box {
+  background-color: #000000;
+  border-radius: 4px;
+  min-height: 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.podoload-rainbow-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #000080, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000, #800000);
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.podoload-rainbow-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #657e84;
+  font-weight: 600;
+}
+
+/* Metrics Mini Tables */
+.podoload-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+}
+
+.podoload-metrics-table th {
+  text-align: right;
+  padding: 0.35rem 0.5rem;
+  color: #556f75;
+  font-weight: 700;
+  border-bottom: 1px solid #e1ebed;
+}
+
+.podoload-metrics-table th:first-child {
+  text-align: left;
+}
+
+.podoload-metrics-table td {
+  padding: 0.35rem 0.5rem;
+  color: #0c2328;
+  border-bottom: 1px solid #f0f4f5;
+  font-weight: 600;
+  text-align: right;
+}
+
+.podoload-metrics-table td:first-child {
+  text-align: left;
+  color: #385156;
+}
+
+/* Histogram Bars */
+.podoload-histogram-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 52px;
+  padding-top: 0.5rem;
+}
+
+.podoload-hist-col {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+}
+
+/* ----------------------------------------------------
+   REPORT PREVIEW VIEW (SCREEN 5)
+   ---------------------------------------------------- */
+.podoload-report-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 260px;
+  gap: 1rem;
+}
+
+.podoload-report-sheet {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  min-height: 560px;
+  font-size: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.podoload-report-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.podoload-report-logo-box {
+  width: 48px;
+  height: 48px;
+  border: 1px dashed #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.podoload-report-divider {
+  height: 2px;
+  background-color: var(--podo-primary);
+  margin-bottom: 0.85rem;
+}
+
+.podoload-upload-box {
+  border: 1.5px dashed var(--podo-input-border);
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+  cursor: pointer;
+  background-color: #fafcfc;
+  color: #556f75;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.podoload-upload-box:hover {
+  border-color: var(--podo-primary);
+  background-color: #f1f8f9;
+}
