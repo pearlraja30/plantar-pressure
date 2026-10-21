@@ -123,7 +123,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
       </div>
 
       <div style={{ padding: '0.85rem 1.25rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
-        v1.0.26 · TechFile TF-001
+        v1.0.27 · TechFile TF-001
       </div>
     </aside>
   );

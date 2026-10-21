@@ -859,3 +859,8 @@ export async function processHarrisMatScan(
     contourBounds: { minX, maxX, minY, maxY },
   };
 }
+
+// Re-export Podo I Mat clinical image processing suite (Steps 01 - 39)
+export { processPodoIMatScan } from './podoIMatProcessing';
+export type { PodoIMatScanResult, PodoIMatFootResult, Point2D, Segment2D } from './podoIMatProcessing';
+

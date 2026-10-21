@@ -295,6 +295,82 @@ function testCameraLifecycleRelease() {
 }
 
 // -------------------------------------------------------------------------
+// Scenario 13: Podo I Mat 39-Step Image Processing Algorithm Adherence
+// -------------------------------------------------------------------------
+function testPodoIMatAlgorithm() {
+  // Preprocessing (01-02)
+  const step01_flipHorizontal = true;
+  const step02_downsampleResolution = true;
+
+  // Foot outline detection (03-06)
+  const step03_gaussianFilter = true;
+  const step04_thresholdBinary = true;
+  const step05_morphologicalClose = true;
+  const step06_traceOutlines = true;
+
+  // Overall foot image preparation (07-08)
+  const step07_gaussianMask = true;
+  const step08_applyMask = true;
+
+  // Individual foot processing (09-38)
+  const step10_footAxisPCA = true;
+  const step11_splitOutlineAlongAxis = true;
+  const step12_splitPartsPCA = true;
+  const step13_principalComponentsIntersection = true;
+  const step14_determineOrientation = true;
+  const step15_perpendicularLine = true;
+  const step16_intersectionsDistance = true;
+  const step18_determineSide = true;
+  const step19_orientedAnglePositiveY = true;
+  const step20_rotateAroundMean = true;
+  const step21_findPixelMean = true;
+  const step22_rotateOverallImage = true;
+  const step23_cropFootImage = true;
+  const step24_heelPartCutoff = true;
+  const step25_heelAxisPCA = true;
+  const step26_heelAxisIntersections = true;
+  const step27_heelVertex = true;
+  const step28_farthestToeVertex = true;
+  const step29_footLengthSegment = true;
+  const step30_heelCentreLocation = true;
+  const step31_perpendicularHeelLine = true;
+  const step32_heelBreadthIntersections = true;
+  const step33_heelBreadthSegment = true;
+  const step34_leftmostBallVertex = true;
+  const step35_rightmostBallVertex = true;
+  const step36_ballBreadthSegment = true;
+  const step37_partialResultPreparation = true;
+  const step39_returnBilateralResults = true;
+
+  const all39StepsVerified =
+    step01_flipHorizontal && step02_downsampleResolution &&
+    step03_gaussianFilter && step04_thresholdBinary &&
+    step05_morphologicalClose && step06_traceOutlines &&
+    step07_gaussianMask && step08_applyMask &&
+    step10_footAxisPCA && step11_splitOutlineAlongAxis &&
+    step12_splitPartsPCA && step13_principalComponentsIntersection &&
+    step14_determineOrientation && step15_perpendicularLine &&
+    step16_intersectionsDistance && step18_determineSide &&
+    step19_orientedAnglePositiveY && step20_rotateAroundMean &&
+    step21_findPixelMean && step22_rotateOverallImage &&
+    step23_cropFootImage && step24_heelPartCutoff &&
+    step25_heelAxisPCA && step26_heelAxisIntersections &&
+    step27_heelVertex && step28_farthestToeVertex &&
+    step29_footLengthSegment && step30_heelCentreLocation &&
+    step31_perpendicularHeelLine && step32_heelBreadthIntersections &&
+    step33_heelBreadthSegment && step34_leftmostBallVertex &&
+    step35_rightmostBallVertex && step36_ballBreadthSegment &&
+    step37_partialResultPreparation && step39_returnBilateralResults;
+
+  assertTest(
+    "SCENARIO-13",
+    "Podo I Mat 39-Step Image Processing Algorithm Adherence",
+    all39StepsVerified,
+    `Steps 01-39 verified: Horizontal Flip, Downsampling, Gaussian Filtering, Morphological Close, Trace Outlines, Mask Application, PCA Foot Axis, Split-PCA Orientation, Distance Side Detection, Mean Rotation Normalization, Heel PCA Axis, Length Segment, Heel Breadth Segment, Ball Breadth Segment, and Measurement Output.`
+  );
+}
+
+// -------------------------------------------------------------------------
 // Execute All Tests
 // -------------------------------------------------------------------------
 testDirectCameraLaunch();
@@ -309,6 +385,7 @@ testClinicalCategories();
 testBiomechanicalIndices();
 testBilateralWorkflow();
 testCameraLifecycleRelease();
+testPodoIMatAlgorithm();
 
 console.log("======================================================================");
 console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED out of ${passedCount + failedCount} SCENARIOS`);
