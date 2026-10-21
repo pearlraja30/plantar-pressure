@@ -334,47 +334,11 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
                     </tr>
                   ))
                 ) : (
-                  <>
-                    <tr>
-                      <td style={{ color: '#0c2328' }}>[date]</td>
-                      <td>Left, Right</td>
-                      <td>[findings]</td>
-                      <td style={{ fontWeight: 600, color: 'var(--podo-primary)' }}>[RPT-0000]</td>
-                      <td>
-                        <span className="podo-badge podo-badge-green">Synced</span>
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button type="button" className="podo-link-btn">View</button>
-                        <button type="button" className="podo-link-btn" style={{ marginLeft: '0.5rem' }}>Re-scan</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ color: '#0c2328' }}>[date]</td>
-                      <td>Left, Right</td>
-                      <td>[findings]</td>
-                      <td style={{ fontWeight: 600, color: 'var(--podo-primary)' }}>[RPT-0000]</td>
-                      <td>
-                        <span className="podo-badge podo-badge-green">Synced</span>
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button type="button" className="podo-link-btn">View</button>
-                        <button type="button" className="podo-link-btn" style={{ marginLeft: '0.5rem' }}>Re-scan</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ color: '#0c2328' }}>[date]</td>
-                      <td>Left, Right</td>
-                      <td>[findings]</td>
-                      <td style={{ fontWeight: 600, color: 'var(--podo-primary)' }}>[RPT-0000]</td>
-                      <td>
-                        <span className="podo-badge podo-badge-green">Synced</span>
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button type="button" className="podo-link-btn">View</button>
-                        <button type="button" className="podo-link-btn" style={{ marginLeft: '0.5rem' }}>Re-scan</button>
-                      </td>
-                    </tr>
-                  </>
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#657e84', fontSize: '0.78rem' }}>
+                      No examination history recorded yet for this patient. Click "Start new exam" above to begin.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

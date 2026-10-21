@@ -27,44 +27,26 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   const [showZones, setShowZones] = useState<boolean>(true);
   const [opacity, setOpacity] = useState<number>(0.85);
 
-  // Measurements matching the clinical metrics in Screenshot 4
-  const lLength = leftAnalysis?.orthoticMeasurements?.footLengthMm || 254;
-  const rLength = rightAnalysis?.orthoticMeasurements?.footLengthMm || 252;
-  const lWidth = leftAnalysis?.orthoticMeasurements?.forefootWidthMm || 98;
-  const rWidth = rightAnalysis?.orthoticMeasurements?.forefootWidthMm || 96;
-  const lHeel = leftAnalysis?.orthoticMeasurements?.heelWidthMm || 62;
-  const rHeel = rightAnalysis?.orthoticMeasurements?.heelWidthMm || 61;
-  const lArch = (leftAnalysis?.regionalAnalysis?.cavanaghArchIndex || 0.19).toFixed(2);
-  const rArch = (rightAnalysis?.regionalAnalysis?.cavanaghArchIndex || 0.21).toFixed(2);
-  const lArea = Math.round(leftAnalysis?.regionalAnalysis?.contactAreaCm2 || 112);
-  const rArea = Math.round(rightAnalysis?.regionalAnalysis?.contactAreaCm2 || 109);
+  // Measurements from real clinical scan analysis (or clean dash if not yet processed)
+  const lLength = leftAnalysis?.orthoticMeasurements?.footLengthMm ? `${leftAnalysis.orthoticMeasurements.footLengthMm} mm` : '—';
+  const rLength = rightAnalysis?.orthoticMeasurements?.footLengthMm ? `${rightAnalysis.orthoticMeasurements.footLengthMm} mm` : '—';
+  const lWidth = leftAnalysis?.orthoticMeasurements?.forefootWidthMm ? `${leftAnalysis.orthoticMeasurements.forefootWidthMm} mm` : '—';
+  const rWidth = rightAnalysis?.orthoticMeasurements?.forefootWidthMm ? `${rightAnalysis.orthoticMeasurements.forefootWidthMm} mm` : '—';
+  const lHeel = leftAnalysis?.orthoticMeasurements?.heelWidthMm ? `${leftAnalysis.orthoticMeasurements.heelWidthMm} mm` : '—';
+  const rHeel = rightAnalysis?.orthoticMeasurements?.heelWidthMm ? `${rightAnalysis.orthoticMeasurements.heelWidthMm} mm` : '—';
+  const lArch = leftAnalysis?.regionalAnalysis?.cavanaghArchIndex ? leftAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—';
+  const rArch = rightAnalysis?.regionalAnalysis?.cavanaghArchIndex ? rightAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—';
+  const lArea = leftAnalysis?.regionalAnalysis?.contactAreaCm2 ? `${Math.round(leftAnalysis.regionalAnalysis.contactAreaCm2)} cm²` : '—';
+  const rArea = rightAnalysis?.regionalAnalysis?.contactAreaCm2 ? `${Math.round(rightAnalysis.regionalAnalysis.contactAreaCm2)} cm²` : '—';
 
   // Pressure zones percentage
-  const lZones = leftAnalysis?.regionalAnalysis?.subZonal10 || {
-    halluxPct: 14,
-    lesserToesPct: 8,
-    metatarsal1Pct: 18,
-    metatarsal2Pct: 12,
-    metatarsals3to5Pct: 8,
-    medialMidfootPct: 5,
-    lateralMidfootPct: 7,
-    medialHindfootPct: 14,
-    lateralHindfootPct: 14,
-  };
-  const rZones = rightAnalysis?.regionalAnalysis?.subZonal10 || {
-    halluxPct: 13,
-    lesserToesPct: 9,
-    metatarsal1Pct: 19,
-    metatarsal2Pct: 13,
-    metatarsals3to5Pct: 8,
-    medialMidfootPct: 4,
-    lateralMidfootPct: 7,
-    medialHindfootPct: 13,
-    lateralHindfootPct: 14,
-  };
+  const lZones = leftAnalysis?.regionalAnalysis?.subZonal10 || null;
+  const rZones = rightAnalysis?.regionalAnalysis?.subZonal10 || null;
 
-  // Histogram intensities (8 tiers from low to high matching Screenshot 4)
-  const histHeights = [30, 45, 80, 100, 65, 50, 35, 18];
+  // Real histogram pixel intensity distribution from analysis
+  const histHeights = leftAnalysis?.categoryDistribution?.length === 6
+    ? [20, 35, ...leftAnalysis.categoryDistribution.map((d: any) => Math.round(d.percentage * 2.5))]
+    : [0, 0, 0, 0, 0, 0, 0, 0];
   const histColors = ['#1d4ed8', '#06b6d4', '#10b981', '#84cc16', '#eab308', '#f97316', '#ea580c', '#dc2626'];
 
   const handleExportImage = () => {
@@ -299,28 +281,28 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                 <tbody>
                   <tr>
                     <td>Hallux</td>
-                    <td>{lZones.halluxPct}%</td>
-                    <td>{rZones.halluxPct}%</td>
+                    <td>{lZones?.halluxPct ? `${lZones.halluxPct}%` : '—'}</td>
+                    <td>{rZones?.halluxPct ? `${rZones.halluxPct}%` : '—'}</td>
                   </tr>
                   <tr>
                     <td>Toes 2–5</td>
-                    <td>{lZones.lesserToesPct}%</td>
-                    <td>{rZones.lesserToesPct}%</td>
+                    <td>{lZones?.lesserToesPct ? `${lZones.lesserToesPct}%` : '—'}</td>
+                    <td>{rZones?.lesserToesPct ? `${rZones.lesserToesPct}%` : '—'}</td>
                   </tr>
                   <tr>
                     <td>Forefoot</td>
-                    <td>{lZones.metatarsal1Pct + lZones.metatarsal2Pct + lZones.metatarsals3to5Pct}%</td>
-                    <td>{rZones.metatarsal1Pct + rZones.metatarsal2Pct + rZones.metatarsals3to5Pct}%</td>
+                    <td>{lZones ? `${lZones.metatarsal1Pct + lZones.metatarsal2Pct + lZones.metatarsals3to5Pct}%` : '—'}</td>
+                    <td>{rZones ? `${rZones.metatarsal1Pct + rZones.metatarsal2Pct + rZones.metatarsals3to5Pct}%` : '—'}</td>
                   </tr>
                   <tr>
                     <td>Midfoot</td>
-                    <td>{lZones.medialMidfootPct + lZones.lateralMidfootPct}%</td>
-                    <td>{rZones.medialMidfootPct + rZones.lateralMidfootPct}%</td>
+                    <td>{lZones ? `${lZones.medialMidfootPct + lZones.lateralMidfootPct}%` : '—'}</td>
+                    <td>{rZones ? `${rZones.medialMidfootPct + rZones.lateralMidfootPct}%` : '—'}</td>
                   </tr>
                   <tr>
                     <td>Heel</td>
-                    <td>{lZones.medialHindfootPct + lZones.lateralHindfootPct}%</td>
-                    <td>{rZones.medialHindfootPct + rZones.lateralHindfootPct}%</td>
+                    <td>{lZones ? `${lZones.medialHindfootPct + lZones.lateralHindfootPct}%` : '—'}</td>
+                    <td>{rZones ? `${rZones.medialHindfootPct + rZones.lateralHindfootPct}%` : '—'}</td>
                   </tr>
                 </tbody>
               </table>

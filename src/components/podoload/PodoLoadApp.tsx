@@ -19,6 +19,24 @@ import { generateHarrisMatFootprint } from '../../services/sampleDataService';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { ScannerWizardModal } from '../ScannerWizardModal';
 
+// Purge all legacy stale/demo data and ensure fresh clean state
+const PURE_STORAGE_KEY = 'podoload_fresh_v2';
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem('podoload_storage_ver') !== PURE_STORAGE_KEY) {
+      localStorage.removeItem('ppa-patients');
+      localStorage.removeItem('ppa-cases');
+      localStorage.removeItem('ppa-selected-patient-id');
+      localStorage.removeItem('ppa-selected-case-id');
+      localStorage.removeItem('ppa_audit_log_v1');
+      localStorage.removeItem('ppa-real-mode-v1');
+      localStorage.setItem('podoload_storage_ver', PURE_STORAGE_KEY);
+    }
+  } catch (e) {
+    console.error('Failed to purge stale storage', e);
+  }
+}
+
 export function PodoLoadApp() {
   // Navigation & Step state
   const [currentSection, setCurrentSection] = useState<PodoLoadNavSection>('registration');
@@ -26,7 +44,7 @@ export function PodoLoadApp() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [isScannerWizardOpen, setIsScannerWizardOpen] = useState(false);
 
-  // Persistent clinical patients
+  // Persistent clinical patients (completely fresh, no stale mock records)
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const saved = localStorage.getItem('ppa-patients');
@@ -64,6 +82,8 @@ export function PodoLoadApp() {
   useEffect(() => {
     if (selectedPatientId) {
       localStorage.setItem('ppa-selected-patient-id', selectedPatientId);
+    } else {
+      localStorage.removeItem('ppa-selected-patient-id');
     }
   }, [selectedPatientId]);
 
@@ -74,6 +94,8 @@ export function PodoLoadApp() {
   useEffect(() => {
     if (selectedCaseId) {
       localStorage.setItem('ppa-selected-case-id', selectedCaseId);
+    } else {
+      localStorage.removeItem('ppa-selected-case-id');
     }
   }, [selectedCaseId]);
 
@@ -87,7 +109,7 @@ export function PodoLoadApp() {
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>(cloudSyncService.getStatus());
   const refreshCloudStatus = () => setCloudStatus(cloudSyncService.getStatus());
 
-  // Foot capture data (Screens 2 - 5)
+  // Foot capture data (Screens 2 - 5) - FRESH DATA ONLY (No auto-injection of sample footprints)
   const [leftFoot, setLeftFoot] = useState<FootCaptureData | null>(null);
   const [rightFoot, setRightFoot] = useState<FootCaptureData | null>(null);
 
@@ -97,22 +119,28 @@ export function PodoLoadApp() {
   const [leftAnalysis, setLeftAnalysis] = useState<any>(null);
   const [rightAnalysis, setRightAnalysis] = useState<any>(null);
 
-  // Initialize realistic footprint captures matching the screenshots if needed
-  useEffect(() => {
-    if (!leftFoot) {
-      const sampleLeft = generateHarrisMatFootprint('Left', 'normal', 720, 1080);
-      setLeftFoot({
-        rawDataUrl: sampleLeft,
-        capturedAt: '14:22:08',
-        sizePx: '1240 × 1754 px',
-        scalePxMm: '11.8 px/mm',
-        confidence: 92,
-        markersCount: 4,
-        lightingOk: true,
-        sharp: true,
-      });
+  // Full purge of all data to start completely fresh
+  const handlePurgeAllStaleData = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('ppa-patients');
+      localStorage.removeItem('ppa-cases');
+      localStorage.removeItem('ppa-selected-patient-id');
+      localStorage.removeItem('ppa-selected-case-id');
+      localStorage.removeItem('ppa_audit_log_v1');
     }
-  }, [leftFoot]);
+    setPatients([]);
+    setCases([]);
+    setSelectedPatientId('');
+    setSelectedCaseId('');
+    setLeftFoot(null);
+    setRightFoot(null);
+    setLeftHeatmapUrl(null);
+    setRightHeatmapUrl(null);
+    setLeftAnalysis(null);
+    setRightAnalysis(null);
+    setCurrentStep(1);
+    setCurrentSection('registration');
+  };
 
   // Navigation handlers
   const handleNavClick = (section: PodoLoadNavSection) => {
@@ -424,7 +452,9 @@ export function PodoLoadApp() {
           )}
 
           {/* SYSTEM: Settings */}
-          {currentSection === 'settings' && <PodoLoadSettings />}
+          {currentSection === 'settings' && (
+            <PodoLoadSettings onPurgeAllData={handlePurgeAllStaleData} />
+          )}
         </main>
 
         {/* Persistent Bottom Status Bar */}

@@ -122,9 +122,8 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         </div>
       </div>
 
-      {/* Subtle version footnote at the bottom of sidebar */}
       <div style={{ padding: '0.85rem 1.25rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
-        v1.0.24 · TechFile TF-001
+        v1.0.26 · TechFile TF-001
       </div>
     </aside>
   );

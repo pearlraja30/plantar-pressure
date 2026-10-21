@@ -23,7 +23,11 @@ const DEFAULT_VERIFICATION_TESTS: VerificationResult[] = [
   { id: 'VT-12', name: 'Camera Hardware Lifecycle & Stream Release', status: 'passed', evidence: 'Hardware lock released cleanly without hanging process.' },
 ];
 
-export const PodoLoadSettings: React.FC = () => {
+interface PodoLoadSettingsProps {
+  onPurgeAllData?: () => void;
+}
+
+export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllData }) => {
   const [activeMenu, setActiveMenu] = useState<
     'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital'
   >('scanner');
@@ -476,19 +480,36 @@ export const PodoLoadSettings: React.FC = () => {
 
       {/* Persistent Bottom Actions matching Screenshot 5 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
-        <button
-          type="button"
-          className="podoload-btn-secondary"
-          onClick={() => {
-            setResolution(300);
-            setColorMode('Grayscale');
-            setSheetSize('A4');
-            setUnit('mm');
-            setDateFormat('dd-mm-yyyy');
-          }}
-        >
-          Reset to defaults
-        </button>
+        <div style={{ display: 'flex', gap: '0.65rem' }}>
+          <button
+            type="button"
+            className="podoload-btn-secondary"
+            onClick={() => {
+              setResolution(300);
+              setColorMode('Grayscale');
+              setSheetSize('A4');
+              setUnit('mm');
+              setDateFormat('dd-mm-yyyy');
+            }}
+          >
+            Reset to defaults
+          </button>
+
+          {onPurgeAllData && (
+            <button
+              type="button"
+              className="podoload-btn-secondary"
+              style={{ color: '#b91c1c', borderColor: '#fca5a5' }}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to purge all stale and cached data and start completely fresh?')) {
+                  onPurgeAllData();
+                }
+              }}
+            >
+              Purge all stale data (Start fresh)
+            </button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {isSavedMessage && (

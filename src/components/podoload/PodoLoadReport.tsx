@@ -21,20 +21,18 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   onFinishExam,
   onSaveToArchive,
 }) => {
-  // Hospital branding state
-  const [clinicName, setClinicName] = useState('Technomind Podiatry & Footwear Clinic');
-  const [clinicContact, setClinicContact] = useState('124 Medical Center Blvd · (555) 019-2834 · info@technomind.clinic');
+  // Hospital branding state (clean defaults)
+  const [clinicName, setClinicName] = useState('');
+  const [clinicContact, setClinicContact] = useState('');
   const [logoPosition, setLogoPosition] = useState<'Left' | 'Centre' | 'Right'>('Left');
-  const [customFooter, setCustomFooter] = useState('Certified Clinical Diagnostic Plantar Analysis');
+  const [customFooter, setCustomFooter] = useState('');
 
   // Signatories
   const [doctorName, setDoctorName] = useState('Dr. [Name]');
-  const [technicianName, setTechnicianName] = useState('Tech. Specialist');
+  const [technicianName, setTechnicianName] = useState('');
 
   // Doctor comments & quick tags
-  const [comments, setComments] = useState(
-    'Normal bilateral plantigrade contact pattern. No pathological focal peak hyperpressures observed. Arch index within physiological normative range.'
-  );
+  const [comments, setComments] = useState('');
   const [uploadToCloud, setUploadToCloud] = useState<boolean>(true);
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
@@ -240,18 +238,18 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
             <tbody>
               <tr>
                 <td>Length</td>
-                <td>254 mm</td>
-                <td>252 mm</td>
+                <td>{currentCase?.orthoticMeasurements?.footLengthMm ? `${currentCase.orthoticMeasurements.footLengthMm} mm` : '— mm'}</td>
+                <td>{currentCase?.orthoticMeasurements?.footLengthMm ? `${currentCase.orthoticMeasurements.footLengthMm} mm` : '— mm'}</td>
               </tr>
               <tr>
                 <td>Arch index</td>
-                <td>0.19</td>
-                <td>0.21</td>
+                <td>{currentCase?.regionalAnalysis?.cavanaghArchIndex ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—'}</td>
+                <td>{currentCase?.regionalAnalysis?.cavanaghArchIndex ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—'}</td>
               </tr>
               <tr>
                 <td>Forefoot / Heel load</td>
-                <td>48 / 52 %</td>
-                <td>49 / 51 %</td>
+                <td>{currentCase?.regionalAnalysis?.forefootContactPct ? `${currentCase.regionalAnalysis.forefootContactPct} / ${currentCase.regionalAnalysis.hindfootContactPct} %` : '— / — %'}</td>
+                <td>{currentCase?.regionalAnalysis?.forefootContactPct ? `${currentCase.regionalAnalysis.forefootContactPct} / ${currentCase.regionalAnalysis.hindfootContactPct} %` : '— / — %'}</td>
               </tr>
             </tbody>
           </table>
@@ -260,7 +258,9 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
           <div style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>
             <span style={{ fontWeight: 700 }}>Interpretation (auto): </span>
             <span style={{ color: '#334155' }}>
-              Normal plantigrade pressure distribution with balanced bilateral arch indices.
+              {currentCase?.regionalAnalysis?.archClassification
+                ? `${currentCase.regionalAnalysis.archClassification} plantar distribution pattern.`
+                : '[automatic interpretation]'}
             </span>
           </div>
 

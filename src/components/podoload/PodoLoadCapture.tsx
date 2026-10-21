@@ -45,22 +45,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const leftFileInputRef = useRef<HTMLInputElement | null>(null);
   const rightFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Default initial simulated/realistic captures matching the screenshot if not already set
-  useEffect(() => {
-    if (!leftFoot) {
-      const sampleLeft = generateHarrisMatFootprint('Left', 'normal', 720, 1080);
-      onUpdateLeftFoot({
-        rawDataUrl: sampleLeft,
-        capturedAt: new Date().toTimeString().slice(0, 8),
-        sizePx: '1240 × 1754 px',
-        scalePxMm: '11.8 px/mm',
-        confidence: 92,
-        markersCount: 4,
-        lightingOk: true,
-        sharp: true,
-      });
-    }
-  }, [leftFoot, onUpdateLeftFoot]);
+  // Fresh capture state: Wait for user to scan, capture from camera, or upload real scan
 
   const handleCaptureRight = () => {
     const sampleRight = generateHarrisMatFootprint('Right', 'normal', 720, 1080);

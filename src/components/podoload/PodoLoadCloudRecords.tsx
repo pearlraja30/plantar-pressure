@@ -19,15 +19,6 @@ interface ReportRow {
   cloudStatus: 'Synced' | 'Pending' | 'Failed';
 }
 
-const SAMPLE_REPORTS: ReportRow[] = [
-  { id: '1', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Synced' },
-  { id: '2', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Synced' },
-  { id: '3', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Pending' },
-  { id: '4', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Failed' },
-  { id: '5', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Synced' },
-  { id: '6', reportNo: '[RPT-0000]', patientName: '[Patient name]', patientId: '[00000]', date: '[date]', cloudStatus: 'Pending' },
-];
-
 export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
   cloudStatus,
   onRefreshCloud,
@@ -43,20 +34,18 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
 
-  // Merge real cases if available, otherwise show sample reports matching Screenshot 4
-  const displayReports: ReportRow[] = cases.length > 0
-    ? cases.map((c) => {
-        const pat = patients.find((p) => p.id === c.patientId);
-        return {
-          id: c.id,
-          reportNo: c.caseNumber || '[RPT-0000]',
-          patientName: pat?.name || '[Patient name]',
-          patientId: pat?.mrn || '[00000]',
-          date: new Date(c.createdAt).toLocaleDateString(),
-          cloudStatus: c.syncStatus === 'synced' ? 'Synced' : 'Pending',
-        };
-      })
-    : SAMPLE_REPORTS;
+  // Map only real cases created in the system (fresh data only, zero mock records)
+  const displayReports: ReportRow[] = cases.map((c) => {
+    const pat = patients.find((p) => p.id === c.patientId);
+    return {
+      id: c.id,
+      reportNo: c.caseNumber || 'RPT-' + c.id.substring(0, 5).toUpperCase(),
+      patientName: pat?.name || 'Clinical Patient',
+      patientId: pat?.mrn || '00000',
+      date: new Date(c.createdAt).toLocaleDateString(),
+      cloudStatus: c.syncStatus === 'synced' ? 'Synced' : 'Pending',
+    };
+  });
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -219,62 +208,70 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {displayReports.map((row) => {
-                  const isChecked = selectedIds.includes(row.id);
-                  return (
-                    <tr key={row.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleRow(row.id)}
-                          style={{ accentColor: 'var(--podo-primary)' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 600, color: '#0c2328' }}>{row.reportNo}</td>
-                      <td style={{ color: '#0c2328' }}>{row.patientName}</td>
-                      <td>{row.patientId}</td>
-                      <td>{row.date}</td>
-                      <td>
-                        <span
-                          className={`podo-badge ${
-                            row.cloudStatus === 'Synced'
-                              ? 'podo-badge-green'
-                              : row.cloudStatus === 'Pending'
-                              ? 'podo-badge-pending'
-                              : 'podo-badge-failed'
-                          }`}
-                        >
-                          {row.cloudStatus}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          className="podo-link-btn"
-                          onClick={() => onSelectCase(row.id)}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          className="podo-link-btn"
-                          style={{ margin: '0 0.35rem' }}
-                          onClick={() => window.print()}
-                        >
-                          Print
-                        </button>
-                        <button
-                          type="button"
-                          className="podo-link-btn"
-                          onClick={() => handleExportSelected('PDF')}
-                        >
-                          Export
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {displayReports.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1rem', color: '#657e84', fontSize: '0.78rem' }}>
+                      No archived exam reports found. Complete an exam and click "Save to archive" to sync reports here.
+                    </td>
+                  </tr>
+                ) : (
+                  displayReports.map((row) => {
+                    const isChecked = selectedIds.includes(row.id);
+                    return (
+                      <tr key={row.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleRow(row.id)}
+                            style={{ accentColor: 'var(--podo-primary)' }}
+                          />
+                        </td>
+                        <td style={{ fontWeight: 600, color: '#0c2328' }}>{row.reportNo}</td>
+                        <td style={{ color: '#0c2328' }}>{row.patientName}</td>
+                        <td>{row.patientId}</td>
+                        <td>{row.date}</td>
+                        <td>
+                          <span
+                            className={`podo-badge ${
+                              row.cloudStatus === 'Synced'
+                                ? 'podo-badge-green'
+                                : row.cloudStatus === 'Pending'
+                                ? 'podo-badge-pending'
+                                : 'podo-badge-failed'
+                            }`}
+                          >
+                            {row.cloudStatus}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            className="podo-link-btn"
+                            onClick={() => onSelectCase(row.id)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="podo-link-btn"
+                            style={{ margin: '0 0.35rem' }}
+                            onClick={() => window.print()}
+                          >
+                            Print
+                          </button>
+                          <button
+                            type="button"
+                            className="podo-link-btn"
+                            onClick={() => handleExportSelected('PDF')}
+                          >
+                            Export
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
