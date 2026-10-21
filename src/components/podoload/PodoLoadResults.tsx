@@ -362,24 +362,24 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
               </span>
             </div>
 
-            <div>
-              <span style={{ color: '#556f75', fontWeight: 600 }}>Load distribution: </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#556f75', fontWeight: 600 }}>Load distribution</span>
               <strong style={{ color: '#0c2328' }}>[forefoot / balanced / heel dominant]</strong>
             </div>
 
-            <div>
-              <span style={{ color: '#556f75', fontWeight: 600 }}>Arch type: </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#556f75', fontWeight: 600 }}>Arch type</span>
               <strong style={{ color: '#0c2328' }}>[normal / flat / high arch]</strong>
             </div>
 
-            <div>
-              <span style={{ color: '#556f75', fontWeight: 600 }}>Left-right asymmetry: </span>
-              <strong style={{ color: '#0c2328' }}>[2.8%]</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#556f75', fontWeight: 600 }}>Left-right asymmetry</span>
+              <strong style={{ color: '#0c2328' }}>[x%]</strong>
             </div>
 
-            <div>
-              <span style={{ color: '#556f75', fontWeight: 600 }}>High-pressure regions: </span>
-              <strong style={{ color: '#0c2328' }}>[Metatarsal 1, Heel]</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#556f75', fontWeight: 600 }}>High-pressure regions</span>
+              <strong style={{ color: '#0c2328' }}>[regions]</strong>
             </div>
 
             <div style={{ fontSize: '0.65rem', color: '#7a9196', marginTop: '0.35rem', fontStyle: 'italic', lineHeight: 1.3 }}>

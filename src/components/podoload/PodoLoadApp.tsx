@@ -397,6 +397,10 @@ export function PodoLoadApp() {
                 setCurrentStep(2);
                 setCurrentSection('capture');
               }}
+              onAddNewPatient={() => {
+                setCurrentStep(1);
+                setCurrentSection('registration');
+              }}
               onDeletePatient={(pid) => {
                 setPatients((prev) => prev.filter((p) => p.id !== pid));
                 setCases((prev) => prev.filter((c) => c.patientId !== pid));
