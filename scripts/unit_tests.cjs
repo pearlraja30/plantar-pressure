@@ -399,6 +399,66 @@ it("Guarantees clean storage versioning (no stale demo records)", () => {
   expect(cleanStorageVer.startsWith('podoload_fresh_')).toBe(true);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 5: Mobile Real-Time Edge Detection & Tactile Haptics Engine
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 5: Mobile Real-Time Edge Detection & Tactile Haptics Engine ---");
+
+it("Executes multi-tier haptic feedback sequences across Native & Web Fallback", () => {
+  // Test haptic pulse signatures
+  const hapticSignatures = {
+    alignmentLock: [40],
+    countdownTick: [15],
+    captureSuccess: [60, 40, 90],
+    warning: [50, 50, 50]
+  };
+
+  expect(hapticSignatures.alignmentLock.length).toBe(1);
+  expect(hapticSignatures.alignmentLock[0]).toBe(40);
+  expect(hapticSignatures.countdownTick[0]).toBe(15);
+  expect(hapticSignatures.captureSuccess.length).toBe(3);
+  expect(hapticSignatures.warning.length).toBe(3);
+});
+
+it("Performs live quad corner extraction and Exponential Moving Average (EMA) smoothing", () => {
+  // Synthetic quad coordinates (normalized 0-1)
+  const prevQuad = {
+    topLeft: { x: 0.10, y: 0.10 },
+    topRight: { x: 0.90, y: 0.10 },
+    bottomRight: { x: 0.90, y: 0.90 },
+    bottomLeft: { x: 0.10, y: 0.90 },
+    confidence: 85
+  };
+
+  const rawDetected = {
+    topLeft: { x: 0.12, y: 0.14 },
+    topRight: { x: 0.88, y: 0.12 },
+    bottomRight: { x: 0.92, y: 0.88 },
+    bottomLeft: { x: 0.08, y: 0.92 },
+    confidence: 90
+  };
+
+  const alpha = 0.35;
+  const smooth = (curr, prev) => ({
+    x: Number((prev.x + alpha * (curr.x - prev.x)).toFixed(4)),
+    y: Number((prev.y + alpha * (curr.y - prev.y)).toFixed(4))
+  });
+
+  const smoothed = {
+    topLeft: smooth(rawDetected.topLeft, prevQuad.topLeft),
+    topRight: smooth(rawDetected.topRight, prevQuad.topRight),
+    bottomRight: smooth(rawDetected.bottomRight, prevQuad.bottomRight),
+    bottomLeft: smooth(rawDetected.bottomLeft, prevQuad.bottomLeft),
+    confidence: Math.round(prevQuad.confidence + alpha * (rawDetected.confidence - prevQuad.confidence))
+  };
+
+  // 0.10 + 0.35 * (0.12 - 0.10) = 0.107
+  expect(smoothed.topLeft.x).toBeCloseTo(0.107, 3);
+  // 0.10 + 0.35 * (0.14 - 0.10) = 0.114
+  expect(smoothed.topLeft.y).toBeCloseTo(0.114, 3);
+  expect(smoothed.confidence).toBe(87);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

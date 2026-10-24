@@ -1,7 +1,7 @@
 {
   "name": "plantar-pressure",
   "private": true,
-  "version": "1.0.29",
+  "version": "1.0.30",
   "description": "Harris Mat image-based plantar pressure analysis system",
   "author": "Technomind Healthcare Systems",
   "main": "electron/main.cjs",
@@ -32,6 +32,7 @@
     "@capacitor/camera": "^8.2.5",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.5.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.55.0",

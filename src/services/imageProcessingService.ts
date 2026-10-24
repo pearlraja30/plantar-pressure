@@ -864,3 +864,8 @@ export async function processHarrisMatScan(
 export { processPodoIMatScan } from './podoIMatProcessing';
 export type { PodoIMatScanResult, PodoIMatFootResult, Point2D, Segment2D } from './podoIMatProcessing';
 
+// Re-export Mobile Native Scanner Services
+export { HapticsService } from './hapticsService';
+export { detectLiveQuadFromCanvas } from './liveEdgeDetectionService';
+export type { DetectedQuad } from './liveEdgeDetectionService';
+

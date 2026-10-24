@@ -42,6 +42,8 @@ import {
   EnhancementResult,
   EnhancementOptions,
 } from '../services/imageEnhancementService';
+import { HapticsService } from '../services/hapticsService';
+import { detectLiveQuadFromCanvas, DetectedQuad } from '../services/liveEdgeDetectionService';
 
 export interface CompletedScanItem {
   dataUrl: string;
@@ -199,6 +201,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const sharpnessIntervalRef = useRef<number | null>(null);
+  const [liveDetectedQuad, setLiveDetectedQuad] = useState<DetectedQuad | null>(null);
+  const lastQuadRef = useRef<DetectedQuad | null>(null);
 
   // Optical Clarity & Ambient Lighting States
   const [ambientLuminance, setAmbientLuminance] = useState<number>(100);
@@ -451,6 +455,11 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             const score = computeSharpnessScore(sampleCtx, 160, 120);
             setLiveSharpnessScore(Math.round(score * 10) / 10);
 
+            // Real-Time Live Edge & Quad Boundary Detection
+            const detectedQuad = detectLiveQuadFromCanvas(sampleCtx, 160, 120, lastQuadRef.current);
+            lastQuadRef.current = detectedQuad;
+            setLiveDetectedQuad(detectedQuad);
+
             // Compute ambient luminance across sample frame
             const imgData = sampleCtx.getImageData(0, 0, 160, 120);
             const d = imgData.data;
@@ -650,8 +659,13 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 
     if (isLevel && isSteady) {
       if (autoCaptureCountdown === null && !autoCaptureTimerRef.current) {
+        // Trigger subtle tactile feedback when camera alignment is achieved
+        HapticsService.alignmentLock();
+
         let count = 2;
         setAutoCaptureCountdown(count);
+        HapticsService.countdownTick();
+
         autoCaptureTimerRef.current = window.setInterval(() => {
           count--;
           if (count <= 0) {
@@ -663,6 +677,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
             handleCaptureFromCamera();
           } else {
             setAutoCaptureCountdown(count);
+            HapticsService.countdownTick();
           }
         }, 650);
       }
@@ -817,6 +832,8 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   // High-Resolution Document Scanner Still & Burst Capture with Exact Alignment
   const handleCaptureFromCamera = async () => {
     let capturedUrl: string = '';
+    // Tactile confirmation on shutter snap
+    HapticsService.captureSuccess();
 
     if (isCameraActive && videoRef.current) {
       const vid = videoRef.current;
@@ -1459,6 +1476,45 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     className="smart-viewfinder-video"
                   />
 
+                  {/* Real-Time Live Detected Edge & Quad Bounding Box SVG HUD */}
+                  {liveDetectedQuad && (
+                    <svg
+                      className="viewfinder-detected-quad-svg"
+                      viewBox="0 0 100 100"
+                      preserveAspectRatio="none"
+                      aria-hidden="true"
+                    >
+                      <polygon
+                        points={`${liveDetectedQuad.topLeft.x * 100},${liveDetectedQuad.topLeft.y * 100} ${liveDetectedQuad.topRight.x * 100},${liveDetectedQuad.topRight.y * 100} ${liveDetectedQuad.bottomRight.x * 100},${liveDetectedQuad.bottomRight.y * 100} ${liveDetectedQuad.bottomLeft.x * 100},${liveDetectedQuad.bottomLeft.y * 100}`}
+                        className={`viewfinder-quad-polygon ${isLevel && isSteady ? 'aligned' : liveDetectedQuad.isDetected ? 'detected' : ''}`}
+                      />
+                      <circle
+                        cx={liveDetectedQuad.topLeft.x * 100}
+                        cy={liveDetectedQuad.topLeft.y * 100}
+                        r="1.8"
+                        className={`viewfinder-quad-node ${liveDetectedQuad.isDetected ? 'detected' : ''}`}
+                      />
+                      <circle
+                        cx={liveDetectedQuad.topRight.x * 100}
+                        cy={liveDetectedQuad.topRight.y * 100}
+                        r="1.8"
+                        className={`viewfinder-quad-node ${liveDetectedQuad.isDetected ? 'detected' : ''}`}
+                      />
+                      <circle
+                        cx={liveDetectedQuad.bottomRight.x * 100}
+                        cy={liveDetectedQuad.bottomRight.y * 100}
+                        r="1.8"
+                        className={`viewfinder-quad-node ${liveDetectedQuad.isDetected ? 'detected' : ''}`}
+                      />
+                      <circle
+                        cx={liveDetectedQuad.bottomLeft.x * 100}
+                        cy={liveDetectedQuad.bottomLeft.y * 100}
+                        r="1.8"
+                        className={`viewfinder-quad-node ${liveDetectedQuad.isDetected ? 'detected' : ''}`}
+                      />
+                    </svg>
+                  )}
+
                   {/* High-Tech Framing HUD Overlay */}
                   <div className="smart-viewfinder-hud">
                     {/* Top Bar: Back button, Foot indicator, Refocus & Flash Controls */}
@@ -1524,6 +1580,14 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                         <div className="viewfinder-pill-badge px-3 py-0.5 bg-slate-900/80 text-teal-300 border border-teal-500/30 text-[11px] flex items-center gap-1.5">
                           <span>💡</span>
                           <span>Optimal Illumination ({ambientLuminance} lx)</span>
+                        </div>
+                      )}
+
+                      {/* Live Real-Time Paper Boundary Tracking Badge */}
+                      {liveDetectedQuad?.isDetected && (
+                        <div className="viewfinder-pill-badge px-3 py-0.5 bg-teal-950/85 text-teal-300 border border-teal-400/60 text-[11px] shadow-md flex items-center gap-1.5 animate-pulse">
+                          <span>🎯</span>
+                          <span>Harris Mat Sheet Locked ({liveDetectedQuad.confidence}%)</span>
                         </div>
                       )}
 
