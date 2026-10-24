@@ -125,6 +125,8 @@ export interface AnalysisCase {
   // Imaging Data
   rawScanDataUrl: string;
   processedHeatMapDataUrl: string;
+  rightRawScanDataUrl?: string;
+  rightProcessedHeatMapDataUrl?: string;
   scanMetadata: {
     scannerModel: string;
     scannerDriver: string;

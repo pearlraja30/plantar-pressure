@@ -60,12 +60,28 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
 
   // Identify Left & Right paired cases for this patient
   const patientCases = allCases.filter((c) => c.patientId === patient.id);
+  const isBilateralCase =
+    currentCase.footSide === 'Bilateral' ||
+    Boolean(currentCase.rightRawScanDataUrl || currentCase.rightProcessedHeatMapDataUrl);
+
   const leftCase =
     patientCases.find((c) => c.footSide === 'Left') ||
-    (currentCase.footSide === 'Left' ? currentCase : undefined);
+    (currentCase.footSide === 'Left' || isBilateralCase ? currentCase : undefined);
+
   const rightCase =
     patientCases.find((c) => c.footSide === 'Right') ||
-    (currentCase.footSide === 'Right' ? currentCase : undefined);
+    (currentCase.footSide === 'Right'
+      ? currentCase
+      : isBilateralCase
+      ? {
+          ...currentCase,
+          footSide: 'Right' as const,
+          rawScanDataUrl: currentCase.rightRawScanDataUrl || currentCase.rawScanDataUrl,
+          processedHeatMapDataUrl:
+            currentCase.rightProcessedHeatMapDataUrl || currentCase.processedHeatMapDataUrl,
+        }
+      : undefined);
+
   const hasBilateral = Boolean(leftCase && rightCase);
 
   const activeViewingCase =
@@ -561,11 +577,15 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                         Left Foot: Raw Scan & JET Heatmap
                       </div>
                       <div className="w-full flex items-center justify-center min-h-[190px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1.5">
-                        <img
-                          src={leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl}
-                          alt="Left Foot JET Heatmap"
-                          className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
-                        />
+                        {(leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl) ? (
+                          <img
+                            src={leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl}
+                            alt="Left Foot JET Heatmap"
+                            className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
+                          />
+                        ) : (
+                          <div className="text-slate-400 text-xs italic">No left scan available</div>
+                        )}
                       </div>
                     </div>
 
@@ -575,11 +595,15 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                         Right Foot: Raw Scan & JET Heatmap
                       </div>
                       <div className="w-full flex items-center justify-center min-h-[190px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1.5">
-                        <img
-                          src={rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl}
-                          alt="Right Foot JET Heatmap"
-                          className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
-                        />
+                        {(rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl) ? (
+                          <img
+                            src={rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl}
+                            alt="Right Foot JET Heatmap"
+                            className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
+                          />
+                        ) : (
+                          <div className="text-slate-400 text-xs italic">No right scan available</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -590,11 +614,15 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                         Source: Harris Mat Raw Scan
                       </div>
                       <div className="w-full flex items-center justify-center min-h-[190px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1.5">
-                        <img
-                          src={activeViewingCase.rawScanDataUrl}
-                          alt="Raw Harris Mat Scan"
-                          className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded"
-                        />
+                        {(activeViewingCase.rawScanDataUrl || activeViewingCase.processedHeatMapDataUrl) ? (
+                          <img
+                            src={activeViewingCase.rawScanDataUrl || activeViewingCase.processedHeatMapDataUrl}
+                            alt="Raw Harris Mat Scan"
+                            className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded"
+                          />
+                        ) : (
+                          <div className="text-slate-400 text-xs italic">No raw scan available</div>
+                        )}
                       </div>
                     </div>
 
@@ -603,11 +631,15 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
                         Output: Processed JET Heat Map (FR-07)
                       </div>
                       <div className="w-full flex items-center justify-center min-h-[190px] sm:min-h-[220px] bg-white rounded border border-slate-200/80 p-1.5">
-                        <img
-                          src={activeViewingCase.processedHeatMapDataUrl || activeViewingCase.rawScanDataUrl}
-                          alt="JET Heat Map"
-                          className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
-                        />
+                        {(activeViewingCase.processedHeatMapDataUrl || activeViewingCase.rawScanDataUrl) ? (
+                          <img
+                            src={activeViewingCase.processedHeatMapDataUrl || activeViewingCase.rawScanDataUrl}
+                            alt="JET Heat Map"
+                            className="max-h-48 sm:max-h-56 max-w-full w-auto object-contain rounded shadow-sm"
+                          />
+                        ) : (
+                          <div className="text-slate-400 text-xs italic">No heat map available</div>
+                        )}
                       </div>
                     </div>
                   </div>

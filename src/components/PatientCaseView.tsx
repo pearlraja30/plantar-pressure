@@ -347,11 +347,17 @@ export const PatientCaseView: React.FC<PatientCaseViewProps> = ({
                       onClick={() => onSelectCase(c.id)}
                     >
                       <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto min-w-0">
-                        <img
-                          src={c.processedHeatMapDataUrl || c.rawScanDataUrl}
-                          alt="Thumbnail"
-                          className="w-14 h-20 object-contain rounded bg-slate-900 border border-slate-700 flex-shrink-0"
-                        />
+                        {(c.processedHeatMapDataUrl || c.rawScanDataUrl) ? (
+                          <img
+                            src={c.processedHeatMapDataUrl || c.rawScanDataUrl}
+                            alt="Thumbnail"
+                            className="w-14 h-20 object-contain rounded bg-slate-900 border border-slate-700 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-14 h-20 rounded bg-slate-900 border border-slate-700 flex-shrink-0 flex items-center justify-center text-slate-500 text-[10px]">
+                            No Scan
+                          </div>
+                        )}
                         <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-sm text-teal-400 truncate">

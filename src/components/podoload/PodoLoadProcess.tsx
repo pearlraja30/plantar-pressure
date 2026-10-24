@@ -33,38 +33,49 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   const [pipelineProgress, setPipelineProgress] = useState<number>(100);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Process both scans using clinical imageProcessingService
+  // Process both scans (or single available foot) using clinical imageProcessingService
   const runProcessingPipeline = async () => {
-    if (!leftFoot?.rawDataUrl || !rightFoot?.rawDataUrl) return;
+    if (!leftFoot?.rawDataUrl && !rightFoot?.rawDataUrl) return;
 
     setIsProcessing(true);
-    setPipelineProgress(30);
+    setPipelineProgress(20);
 
     try {
-      const leftImg = new Image();
-      leftImg.src = leftFoot.rawDataUrl;
-      await new Promise((res) => (leftImg.onload = res));
-      setPipelineProgress(55);
+      let leftResult: any = null;
+      let rightResult: any = null;
+      let leftUrl = leftHeatmapUrl || '';
+      let rightUrl = rightHeatmapUrl || '';
 
-      const leftResult = await processHarrisMatScan(leftImg, 'Left', {
-        smoothRadius: smoothingStrength,
-        sensitivity: 1.0,
-      });
+      if (leftFoot?.rawDataUrl) {
+        const leftImg = new Image();
+        leftImg.src = leftFoot.rawDataUrl;
+        await new Promise((res) => (leftImg.onload = res));
+        setPipelineProgress(50);
 
-      const rightImg = new Image();
-      rightImg.src = rightFoot.rawDataUrl;
-      await new Promise((res) => (rightImg.onload = res));
-      setPipelineProgress(80);
+        leftResult = await processHarrisMatScan(leftImg, 'Left', {
+          smoothRadius: smoothingStrength,
+          sensitivity: 1.0,
+        });
+        leftUrl = leftResult.processedDataUrl;
+      }
 
-      const rightResult = await processHarrisMatScan(rightImg, 'Right', {
-        smoothRadius: smoothingStrength,
-        sensitivity: 1.0,
-      });
+      if (rightFoot?.rawDataUrl) {
+        const rightImg = new Image();
+        rightImg.src = rightFoot.rawDataUrl;
+        await new Promise((res) => (rightImg.onload = res));
+        setPipelineProgress(80);
+
+        rightResult = await processHarrisMatScan(rightImg, 'Right', {
+          smoothRadius: smoothingStrength,
+          sensitivity: 1.0,
+        });
+        rightUrl = rightResult.processedDataUrl;
+      }
 
       setPipelineProgress(100);
       onUpdateHeatmaps(
-        leftResult.processedDataUrl,
-        rightResult.processedDataUrl,
+        leftUrl,
+        rightUrl,
         leftResult,
         rightResult
       );
@@ -77,10 +88,12 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
 
   // Run automatically on first load if heatmaps not yet generated
   useEffect(() => {
-    if ((!leftHeatmapUrl || !rightHeatmapUrl) && leftFoot?.rawDataUrl && rightFoot?.rawDataUrl) {
+    const hasAnyScan = Boolean(leftFoot?.rawDataUrl || rightFoot?.rawDataUrl);
+    const needsProcessing = (leftFoot?.rawDataUrl && !leftHeatmapUrl) || (rightFoot?.rawDataUrl && !rightHeatmapUrl);
+    if (hasAnyScan && needsProcessing) {
       runProcessingPipeline();
     }
-  }, []);
+  }, [leftFoot, rightFoot]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>

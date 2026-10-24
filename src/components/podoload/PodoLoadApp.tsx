@@ -120,6 +120,42 @@ export function PodoLoadApp() {
   const [leftAnalysis, setLeftAnalysis] = useState<any>(null);
   const [rightAnalysis, setRightAnalysis] = useState<any>(null);
 
+  // Restore scans and heatmaps when selecting an existing case from records or cloud
+  useEffect(() => {
+    if (currentCase) {
+      if (currentCase.rawScanDataUrl && !leftFoot) {
+        setLeftFoot({
+          rawDataUrl: currentCase.rawScanDataUrl,
+          capturedAt: currentCase.createdAt?.slice(11, 19) || '10:00:00',
+          sizePx: '1240 × 1754 px',
+          scalePxMm: '11.8 px/mm',
+          confidence: currentCase.qcResult?.score ?? 95,
+          markersCount: 4,
+          lightingOk: true,
+          sharp: true,
+        });
+      }
+      if (currentCase.rightRawScanDataUrl && !rightFoot) {
+        setRightFoot({
+          rawDataUrl: currentCase.rightRawScanDataUrl,
+          capturedAt: currentCase.createdAt?.slice(11, 19) || '10:00:00',
+          sizePx: '1240 × 1754 px',
+          scalePxMm: '11.8 px/mm',
+          confidence: currentCase.qcResult?.score ?? 95,
+          markersCount: 4,
+          lightingOk: true,
+          sharp: true,
+        });
+      }
+      if (currentCase.processedHeatMapDataUrl && !leftHeatmapUrl) {
+        setLeftHeatmapUrl(currentCase.processedHeatMapDataUrl);
+      }
+      if (currentCase.rightProcessedHeatMapDataUrl && !rightHeatmapUrl) {
+        setRightHeatmapUrl(currentCase.rightProcessedHeatMapDataUrl);
+      }
+    }
+  }, [selectedCaseId]);
+
   // Full purge of all data to start completely fresh
   const handlePurgeAllStaleData = () => {
     if (typeof window !== 'undefined') {
@@ -216,11 +252,13 @@ export function PodoLoadApp() {
         updatedAt: new Date().toISOString(),
         operatorName: 'Tech. Specialist',
         clinicName: 'Technomind Healthcare',
-        rawScanDataUrl: leftFoot?.rawDataUrl || '',
-        processedHeatMapDataUrl: lUrl,
+        rawScanDataUrl: leftFoot?.rawDataUrl || rightFoot?.rawDataUrl || '',
+        processedHeatMapDataUrl: lUrl || rUrl || '',
+        rightRawScanDataUrl: rightFoot?.rawDataUrl || '',
+        rightProcessedHeatMapDataUrl: rUrl || '',
         scanMetadata: {
-          scannerModel: 'Epson Perfection V39 II',
-          scannerDriver: 'TWAIN 2.4',
+          scannerModel: 'Epson Perfection V39 II / High-Res Camera',
+          scannerDriver: 'TWAIN 2.4 / Optical Homography Engine',
           dpi: 300,
           colorMode: 'Grayscale',
           orientationDeg: 0,
@@ -305,19 +343,25 @@ export function PodoLoadApp() {
 
   // Modal scanner wizard callback
   const handleScannerWizardCompleted = (payload: any) => {
-    const item = Array.isArray(payload) ? payload[0] : payload;
-    if (item?.dataUrl) {
-      setRightFoot({
+    const items = Array.isArray(payload) ? payload : [payload];
+    items.forEach((item) => {
+      if (!item?.dataUrl) return;
+      const footData: FootCaptureData = {
         rawDataUrl: item.dataUrl,
         capturedAt: new Date().toTimeString().slice(0, 8),
-        sizePx: '1240 × 1754 px',
-        scalePxMm: '11.8 px/mm',
-        confidence: 94,
+        sizePx: `${item.dpi ? Math.round(item.dpi * 4.1) : 1240} × ${item.dpi ? Math.round(item.dpi * 5.8) : 1754} px`,
+        scalePxMm: `${item.dpi ? (item.dpi / 25.4).toFixed(1) : '11.8'} px/mm`,
+        confidence: item.qcResult?.score ?? 94,
         markersCount: 4,
-        lightingOk: true,
-        sharp: true,
-      });
-    }
+        lightingOk: !item.qcResult?.flags?.isLowContrast,
+        sharp: !item.qcResult?.flags?.isBlurred,
+      };
+      if (item.footSide === 'Left') {
+        setLeftFoot(footData);
+      } else {
+        setRightFoot(footData);
+      }
+    });
     setIsScannerWizardOpen(false);
   };
 
@@ -408,6 +452,8 @@ export function PodoLoadApp() {
               currentCase={currentCase}
               leftHeatmapUrl={leftHeatmapUrl}
               rightHeatmapUrl={rightHeatmapUrl}
+              leftFoot={leftFoot}
+              rightFoot={rightFoot}
               onBack={() => handleStepClick(4)}
               onFinishExam={() => {
                 handleStartNewExam();

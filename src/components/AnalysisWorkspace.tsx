@@ -110,6 +110,7 @@ export const AnalysisWorkspace: React.FC<AnalysisWorkspaceProps> = ({
 
   // Trigger reprocessing if algorithm knobs change
   const handleReprocess = async () => {
+    if (!currentCase.rawScanDataUrl) return;
     setIsReprocessing(true);
     try {
       const img = new Image();

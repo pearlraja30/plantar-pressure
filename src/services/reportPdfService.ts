@@ -3,6 +3,47 @@ import jsPDF from 'jspdf';
 import { AnalysisCase, Patient, CLINICAL_CATEGORIES } from '../types';
 
 /**
+ * Safely adds an image to jsPDF document with automatic format inference (PNG/JPEG/WEBP)
+ * and error recovery to avoid blank spots or hard crashes.
+ */
+function safeAddImageToDoc(
+  doc: jsPDF,
+  dataUrl: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fallbackLabel: string = '[Scan Preview Available]'
+) {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(fallbackLabel, x + 6, y + h / 2);
+    return;
+  }
+  let format = 'PNG';
+  if (dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg')) {
+    format = 'JPEG';
+  } else if (dataUrl.includes('image/webp')) {
+    format = 'WEBP';
+  }
+  try {
+    doc.addImage(dataUrl, format, x, y, w, h);
+  } catch {
+    try {
+      doc.addImage(dataUrl, '', x, y, w, h);
+    } catch (fallbackErr) {
+      console.warn('Failed to embed image in PDF report:', fallbackErr);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(fallbackLabel, x + 6, y + h / 2);
+    }
+  }
+}
+
+/**
  * Generates an official 4-page Clinical Plantar Pressure Analysis PDF Report
  * Matching Technomind Healthcare Technical File specifications (Appendix A)
  */
@@ -233,11 +274,7 @@ export async function generateClinicalReportPdf(
   doc.text('Preserved Unmodified Source', margin + 4, curY + 12);
 
   if (analysisCase.rawScanDataUrl) {
-    try {
-      doc.addImage(analysisCase.rawScanDataUrl, 'PNG', margin + 4, curY + 14, imgWidth, imgHeight);
-    } catch {
-      doc.text('[Scan Preview Available]', margin + 15, curY + 50);
-    }
+    safeAddImageToDoc(doc, analysisCase.rawScanDataUrl, margin + 4, curY + 14, imgWidth, imgHeight, '[Scan Preview Available]');
   }
 
   // Processed JET Heat Map Box
@@ -253,12 +290,9 @@ export async function generateClinicalReportPdf(
   doc.setTextColor(148, 163, 184);
   doc.text('Alg: ' + analysisCase.algorithmVersion, jetX + 4, curY + 12);
 
-  if (analysisCase.processedHeatMapDataUrl) {
-    try {
-      doc.addImage(analysisCase.processedHeatMapDataUrl, 'PNG', jetX + 4, curY + 14, imgWidth, imgHeight);
-    } catch {
-      doc.text('[JET Preview Available]', jetX + 15, curY + 50);
-    }
+  const jetImg = analysisCase.processedHeatMapDataUrl || analysisCase.rawScanDataUrl;
+  if (jetImg) {
+    safeAddImageToDoc(doc, jetImg, jetX + 4, curY + 14, imgWidth, imgHeight, '[JET Preview Available]');
   }
 
   curY += imgHeight + 24;
@@ -773,12 +807,9 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFontSize(9);
   doc.setTextColor(13, 148, 136);
   doc.text('LEFT FOOT: RAW SCAN & JET HEATMAP', margin + 4, curY + 6);
-  if (leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl) {
-    try {
-      doc.addImage(leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl, 'PNG', margin + 18, curY + 10, 44, 74);
-    } catch {
-      doc.text('[Left Heatmap Loaded]', margin + 20, curY + 45);
-    }
+  const leftImg = leftCase.processedHeatMapDataUrl || leftCase.rawScanDataUrl;
+  if (leftImg) {
+    safeAddImageToDoc(doc, leftImg, margin + 18, curY + 10, 44, 74, '[Left Scan Loaded]');
   }
 
   // Right Foot Column Box
@@ -789,12 +820,9 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFontSize(9);
   doc.setTextColor(13, 148, 136);
   doc.text('RIGHT FOOT: RAW SCAN & JET HEATMAP', rX + 4, curY + 6);
-  if (rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl) {
-    try {
-      doc.addImage(rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl, 'PNG', rX + 18, curY + 10, 44, 74);
-    } catch {
-      doc.text('[Right Heatmap Loaded]', rX + 20, curY + 45);
-    }
+  const rightImg = rightCase.processedHeatMapDataUrl || rightCase.rawScanDataUrl;
+  if (rightImg) {
+    safeAddImageToDoc(doc, rightImg, rX + 18, curY + 10, 44, 74, '[Right Scan Loaded]');
   }
 
   curY += dualColH + 8;
