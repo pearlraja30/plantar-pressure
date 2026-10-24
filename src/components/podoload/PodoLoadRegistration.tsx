@@ -74,15 +74,15 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      {/* 2-Column Registration Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', flex: 1 }}>
+    <div className="podoload-registration-wrapper">
+      {/* Responsive Registration Grid */}
+      <div className="podoload-registration-grid">
         {/* Left Panel: Patient Registration Form */}
-        <div className="podoload-card">
+        <div className="podoload-card podoload-registration-form-card">
           <h3 className="podoload-card-title">PATIENT REGISTRATION</h3>
 
           {/* Row 1: Patient Name & Patient ID */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1rem' }}>
+          <div className="podoload-form-row podoload-row-name-id">
             <div className="podoload-form-group">
               <label className="podoload-label">Patient name</label>
               <input
@@ -117,8 +117,8 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
           </div>
 
           {/* Row 2: Age, Gender & Mobile Number */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr', gap: '1rem' }}>
-            <div className="podoload-form-group">
+          <div className="podoload-form-row podoload-row-demographics">
+            <div className="podoload-form-group podoload-fg-age">
               <label className="podoload-label">Age</label>
               <input
                 type="number"
@@ -129,7 +129,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
               />
             </div>
 
-            <div className="podoload-form-group">
+            <div className="podoload-form-group podoload-fg-gender">
               <label className="podoload-label">Gender</label>
               <div className="podoload-segmented-buttons">
                 <button
@@ -156,7 +156,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
               </div>
             </div>
 
-            <div className="podoload-form-group">
+            <div className="podoload-form-group podoload-fg-mobile">
               <label className="podoload-label">Mobile number</label>
               <input
                 type="tel"
@@ -169,8 +169,8 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
           </div>
 
           {/* Row 3: Height, Weight & Referring Doctor */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '1rem' }}>
-            <div className="podoload-form-group">
+          <div className="podoload-form-row podoload-row-vitals">
+            <div className="podoload-form-group podoload-fg-height">
               <label className="podoload-label">Height (cm)</label>
               <input
                 type="number"
@@ -181,7 +181,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
               />
             </div>
 
-            <div className="podoload-form-group">
+            <div className="podoload-form-group podoload-fg-weight">
               <label className="podoload-label">Weight (kg)</label>
               <input
                 type="number"
@@ -192,7 +192,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
               />
             </div>
 
-            <div className="podoload-form-group">
+            <div className="podoload-form-group podoload-fg-doctor">
               <label className="podoload-label">Referring doctor</label>
               <input
                 type="text"
@@ -218,7 +218,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
         </div>
 
         {/* Right Panel: Existing Patient Selector */}
-        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="podoload-card podoload-existing-patient-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <h3 className="podoload-card-title">EXISTING PATIENT?</h3>
 
           <div className="podoload-form-group" style={{ marginBottom: '0.5rem' }}>

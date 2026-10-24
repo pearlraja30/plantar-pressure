@@ -43,6 +43,7 @@ export function PodoLoadApp() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isScannerWizardOpen, setIsScannerWizardOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Persistent clinical patients (completely fresh, no stale mock records)
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -322,11 +323,13 @@ export function PodoLoadApp() {
 
   return (
     <div className="podoload-root">
-      {/* 1. Left Sidebar Navigation */}
+      {/* 1. Left Sidebar Navigation / Mobile Drawer */}
       <PodoLoadSidebar
         currentSection={currentSection}
         onNavigate={handleNavClick}
         onStartNewExam={handleStartNewExam}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* 2. Main Container */}
@@ -342,6 +345,7 @@ export function PodoLoadApp() {
           cloudSynced={cloudStatus.isOnline}
           onOpenCloud={() => setCurrentSection('reports_cloud')}
           doctorName="Dr. [Name]"
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
         {/* Scrollable Main Content Area */}

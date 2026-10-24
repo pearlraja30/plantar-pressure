@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Globe } from 'lucide-react';
+import { Cloud, Globe, Menu } from 'lucide-react';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
 
@@ -13,6 +13,7 @@ interface PodoLoadHeaderProps {
   cloudSynced: boolean;
   onOpenCloud: () => void;
   doctorName?: string;
+  onOpenMobileMenu?: () => void;
 }
 
 export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
@@ -25,6 +26,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   cloudSynced,
   onOpenCloud,
   doctorName = 'Dr. [Name]',
+  onOpenMobileMenu,
 }) => {
   // Compute breadcrumb title based on current view/step
   const getHeaderTitle = () => {
@@ -60,8 +62,20 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
     <header className="podoload-top-header">
       {/* Top Row: Title, Search, Status & Profile */}
       <div className="podoload-top-header-row">
-        <div className="podoload-header-title-block">
-          <h2 className="podoload-header-title">{getHeaderTitle()}</h2>
+        <div className="podoload-header-left">
+          {onOpenMobileMenu && (
+            <button
+              type="button"
+              className="podoload-mobile-menu-btn"
+              onClick={onOpenMobileMenu}
+              aria-label="Open navigation menu"
+            >
+              <Menu className="w-5 h-5 text-[#0e7477]" />
+            </button>
+          )}
+          <div className="podoload-header-title-block">
+            <h2 className="podoload-header-title">{getHeaderTitle()}</h2>
+          </div>
         </div>
 
         {/* Global Patient / Exam Search */}

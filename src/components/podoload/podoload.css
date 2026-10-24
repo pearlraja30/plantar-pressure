@@ -461,6 +461,111 @@
 }
 
 /* ----------------------------------------------------
+   RESPONSIVE DYNAMIC GRID & LAYOUT UTILITIES
+   ---------------------------------------------------- */
+.podoload-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.podoload-mobile-menu-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 0.35rem;
+  border-radius: 6px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.podoload-drawer-close-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 0.35rem;
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.podoload-drawer-backdrop {
+  display: none;
+}
+
+.podoload-registration-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+}
+
+.podoload-registration-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.15fr;
+  gap: 1.25rem;
+  flex: 1;
+  width: 100%;
+}
+
+.podoload-form-row {
+  display: grid;
+  gap: 1rem;
+}
+
+.podoload-row-name-id {
+  grid-template-columns: 2fr 1.2fr;
+}
+
+.podoload-row-demographics {
+  grid-template-columns: 1fr 1.2fr 1.2fr;
+}
+
+.podoload-row-vitals {
+  grid-template-columns: 1fr 1fr 1.5fr;
+}
+
+.podoload-capture-card-body {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.podoload-process-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: 0.85rem;
+  flex: 1;
+}
+
+.podoload-process-foot-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 260px;
+}
+
+.podoload-results-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.podoload-report-meta-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  font-size: 0.72rem;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* ----------------------------------------------------
    BOTTOM ACTION FOOTER (PAGE TRANSITION ACTIONS)
    ---------------------------------------------------- */
 .podoload-bottom-actions-bar {
@@ -1114,90 +1219,374 @@
   }
 }
 
-/* Mobile & Small Tablet (iOS & Android) */
+/* Mobile & Small Tablet (iOS & Android - Any screen resolution) */
 @media (max-width: 768px) {
   .podoload-root {
     flex-direction: column;
     height: 100dvh;
-    padding-top: env(safe-area-inset-top, 0);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ---------------------------------------------
+     MOBILE NAVIGATION DRAWER
+     --------------------------------------------- */
+  .podoload-mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .podoload-drawer-close-btn {
+    display: inline-flex;
+  }
+
+  .podoload-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 37, 41, 0.7);
+    z-index: 998;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .podoload-sidebar {
-    width: 100%;
-    min-width: 100%;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    border-right: none;
-    border-bottom: 1px solid var(--podo-sidebar-border);
-    padding: 0.5rem 0.75rem;
-    overflow-x: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100dvh;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-right: 1px solid var(--podo-sidebar-border);
+    border-bottom: none;
+    box-shadow: none;
+    padding: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .podoload-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 6px 0 28px rgba(0, 0, 0, 0.5);
   }
 
   .podoload-brand-area {
-    padding: 0.25rem 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
+    border-bottom: 1px solid var(--podo-sidebar-border);
   }
 
   .podoload-brand-title {
-    font-size: 1.1rem;
+    font-size: 1.35rem;
   }
 
   .podoload-nav-section {
     display: flex;
-    flex-direction: row;
-    padding: 0;
+    flex-direction: column;
+    padding: 0.6rem 0.75rem 0.4rem 0.75rem;
   }
 
   .podoload-section-label {
-    display: none;
+    display: block;
+    color: var(--podo-sidebar-section);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+    padding-left: 0.5rem;
   }
 
   .podoload-nav-list {
-    flex-direction: row;
-    gap: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .podoload-nav-item {
-    padding: 0.4rem 0.55rem;
-    font-size: 0.72rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.82rem;
+    white-space: normal;
+  }
+
+  /* ---------------------------------------------
+     TOP HEADER ADAPTATION
+     --------------------------------------------- */
+  .podoload-top-header {
+    padding: max(env(safe-area-inset-top, 0px), 0.5rem) 0.85rem 0.45rem 0.85rem;
+    gap: 0.45rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .podoload-top-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .podoload-header-title {
+    font-size: 0.95rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Hide global search bar on phone header during exam to prevent squeeze */
+  .podoload-global-search {
+    display: none;
+  }
+
+  .podoload-top-right-actions {
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .podoload-synced-pill {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.68rem;
     white-space: nowrap;
   }
 
-  .podoload-header {
-    padding: 0.5rem 0.75rem;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
+  .podoload-lang-badge {
+    padding: 0.18rem 0.45rem;
+    font-size: 0.68rem;
   }
 
-  .podoload-header-top {
+  .podoload-doctor-tag {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  /* ---------------------------------------------
+     STEPPER HORIZONTAL SMOOTH SCROLL
+     --------------------------------------------- */
+  .podoload-stepper-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-  }
-
-  .podoload-stepper-bar {
+    gap: 0.4rem;
     overflow-x: auto;
-    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.2rem 0 0.35rem 0;
+    width: 100%;
   }
 
-  .podoload-registration-grid,
-  .podoload-capture-grid,
-  .podoload-process-grid,
-  .podoload-patient-search-layout,
+  .podoload-stepper-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .podoload-step-pill {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    padding: 0.32rem 0.65rem;
+  }
+
+  /* ---------------------------------------------
+     VIEWPORT & CONTAINER
+     --------------------------------------------- */
+  .podoload-main-container {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .podoload-content-viewport {
+    padding: 0.75rem 0.75rem 1.25rem 0.75rem;
+    overflow-y: visible;
+  }
+
+  /* ---------------------------------------------
+     REGISTRATION SCREEN MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-registration-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .podoload-row-name-id {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .podoload-row-demographics {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .podoload-row-demographics .podoload-fg-gender {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+
+  .podoload-row-demographics .podoload-fg-age {
+    grid-column: 1;
+    order: 2;
+  }
+
+  .podoload-row-demographics .podoload-fg-mobile {
+    grid-column: 2;
+    order: 3;
+  }
+
+  .podoload-row-vitals {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .podoload-row-vitals .podoload-fg-doctor {
+    grid-column: 1 / -1;
+  }
+
+  .podoload-bottom-actions-bar {
+    flex-direction: column-reverse;
+    gap: 0.65rem;
+    align-items: stretch;
+    margin-top: 1rem;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
+  }
+
+  .podoload-bottom-actions-bar button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  /* ---------------------------------------------
+     CAPTURE SCREEN MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-capture-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .podoload-capture-card-body {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* ---------------------------------------------
+     PROCESS SCREEN MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-process-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .podoload-process-foot-preview {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  /* ---------------------------------------------
+     RESULTS SCREEN MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-results-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .podoload-results-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* ---------------------------------------------
+     REPORT SCREEN MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-report-sheet {
+    padding: 1rem 0.85rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .podoload-report-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  /* ---------------------------------------------
+     PATIENT SEARCH & SETTINGS MOBILE ALIGNMENT
+     --------------------------------------------- */
+  .podoload-patient-search-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
   .podoload-settings-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  /* ---------------------------------------------
+     FOOTER STATUS BAR (HIDDEN ON PHONES TO FREE VIEWPORT)
+     --------------------------------------------- */
+  .podoload-system-status-bar {
+    display: none;
+  }
+
+  /* ---------------------------------------------
+     TOUCH TARGETS & ERGONOMICS
+     --------------------------------------------- */
+  .podoload-btn-primary,
+  .podoload-btn-secondary,
+  .podoload-seg-btn {
+    min-height: 42px;
+    touch-action: manipulation;
+  }
+}
+
+/* Extra Small Phones (< 380px, e.g. iPhone SE, Compact Galaxy) */
+@media (max-width: 380px) {
+  .podoload-row-demographics {
     grid-template-columns: 1fr;
   }
 
-  .podoload-footer {
-    display: none; /* Hidden on mobile to maximize viewport */
+  .podoload-row-demographics .podoload-fg-age,
+  .podoload-row-demographics .podoload-fg-mobile {
+    grid-column: 1 / -1;
   }
 
-  .podoload-btn-primary,
-  .podoload-btn-secondary {
-    min-height: 40px;
-    touch-action: manipulation;
+  .podoload-row-vitals {
+    grid-template-columns: 1fr;
+  }
+
+  .podoload-row-vitals .podoload-fg-height,
+  .podoload-row-vitals .podoload-fg-weight {
+    grid-column: 1 / -1;
+  }
+
+  .podoload-top-header {
+    padding: max(env(safe-area-inset-top, 0px), 0.4rem) 0.65rem 0.4rem 0.65rem;
+  }
+
+  .podoload-header-title {
+    font-size: 0.85rem;
+  }
+
+  .podoload-lang-badge {
+    display: none;
+  }
+
+  .podoload-doctor-tag {
+    display: none;
   }
 }
 

@@ -175,8 +175,8 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
           </h4>
 
           {/* Row 1: Patient Name & Patient ID */}
-          <div style={{ display: 'flex', gap: '0.85rem', marginBottom: '0.75rem' }}>
-            <div className="podoload-form-group" style={{ flex: 2 }}>
+          <div className="podoload-form-row podoload-row-name-id" style={{ marginBottom: '0.75rem' }}>
+            <div className="podoload-form-group">
               <label className="podoload-label">Patient name</label>
               <input
                 type="text"
@@ -186,7 +186,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
               />
             </div>
 
-            <div className="podoload-form-group" style={{ flex: 1 }}>
+            <div className="podoload-form-group">
               <label className="podoload-label">Patient ID</label>
               <input
                 type="text"
@@ -198,8 +198,8 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
           </div>
 
           {/* Row 2: Age, Gender Segmented Buttons & Mobile number */}
-          <div style={{ display: 'flex', gap: '0.85rem', marginBottom: '1rem', alignItems: 'flex-end' }}>
-            <div className="podoload-form-group" style={{ flex: 1 }}>
+          <div className="podoload-form-row podoload-row-demographics" style={{ marginBottom: '1rem' }}>
+            <div className="podoload-form-group podoload-fg-age">
               <label className="podoload-label">Age</label>
               <input
                 type="text"
@@ -209,7 +209,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
               />
             </div>
 
-            <div className="podoload-form-group" style={{ flex: 1.5 }}>
+            <div className="podoload-form-group podoload-fg-gender">
               <label className="podoload-label">Gender</label>
               <div className="podoload-segmented-buttons">
                 <button
@@ -236,7 +236,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
               </div>
             </div>
 
-            <div className="podoload-form-group" style={{ flex: 1.5 }}>
+            <div className="podoload-form-group podoload-fg-mobile">
               <label className="podoload-label">Mobile number</label>
               <input
                 type="text"

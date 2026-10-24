@@ -209,7 +209,7 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
           </div>
 
           {/* Patient Details Meta Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', fontSize: '0.72rem', gap: '0.25rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+          <div className="podoload-report-meta-grid">
             <div>Name: <strong>{patientName}</strong></div>
             <div>ID: <strong>[{patientId}]</strong></div>
             <div>Age / gender: <strong>[{patientAge}] / [{patientGender}]</strong></div>

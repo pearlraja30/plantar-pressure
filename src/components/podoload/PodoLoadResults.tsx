@@ -221,7 +221,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
         {/* ================= RIGHT SIDE PANELS ================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {/* Top Row: Foot Measurements & Pressure Zones Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="podoload-results-metrics-grid">
             {/* Card 1: Foot Measurements */}
             <div className="podoload-card" style={{ padding: '0.75rem' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--podo-card-title)', marginBottom: '0.4rem' }}>

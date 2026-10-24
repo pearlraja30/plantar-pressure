@@ -222,7 +222,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           </div>
 
           {/* Viewport + Side Info Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.85rem', alignItems: 'center' }}>
+          <div className="podoload-capture-card-body">
             {/* Viewport Canvas Box */}
             <div className="podoload-viewport-container">
               <div className="podoload-sheet-preview">
@@ -355,7 +355,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           </div>
 
           {/* Viewport + Side Info Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.85rem', alignItems: 'center' }}>
+          <div className="podoload-capture-card-body">
             {/* Viewport Box */}
             <div className="podoload-viewport-container" style={{ flexDirection: 'column' }}>
               <div className="podoload-sheet-preview">

@@ -85,7 +85,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>
       {/* Main Grid: Left Foot Card + Right Foot Card + Processing Parameters */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.15fr', gap: '0.85rem', flex: 1 }}>
+      <div className="podoload-process-grid">
         {/* ================= LEFT FOOT PROCESSED CARD ================= */}
         <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -93,7 +93,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             <span className="podo-badge podo-badge-green">Processed</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', flex: 1, minHeight: '260px' }}>
+          <div className="podoload-process-foot-preview">
             {/* Raw Scan Box */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div
@@ -167,7 +167,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             <span className="podo-badge podo-badge-green">Processed</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', flex: 1, minHeight: '260px' }}>
+          <div className="podoload-process-foot-preview">
             {/* Raw Scan Box */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div
