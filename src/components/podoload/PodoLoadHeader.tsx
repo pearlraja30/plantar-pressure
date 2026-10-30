@@ -25,7 +25,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   onSearchChange,
   cloudSynced,
   onOpenCloud,
-  doctorName = 'Dr. [Name]',
+  doctorName = 'Dr. Specialist',
   onOpenMobileMenu,
 }) => {
   // Compute breadcrumb title based on current view/step
@@ -162,9 +162,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
           {/* Right Selected Patient Badge (Steps 2 - 5) */}
           {selectedPatient && currentStep >= 2 && (
             <div className="podoload-selected-patient-badge">
-              [{selectedPatient.name}] · ID [{selectedPatient.mrn || '00000'}] · [
-              {selectedPatient.dateOfBirth ? `${new Date().getFullYear() - new Date(selectedPatient.dateOfBirth).getFullYear()}y` : '42y'}
-              ] · [{selectedPatient.gender?.toLowerCase() || 'male'}]
+              {selectedPatient.name} · ID {selectedPatient.mrn || '00000'} · {selectedPatient.dateOfBirth ? `${new Date().getFullYear() - new Date(selectedPatient.dateOfBirth).getFullYear()}y` : '42y'} · {selectedPatient.gender?.toLowerCase() || 'male'}
             </div>
           )}
         </div>

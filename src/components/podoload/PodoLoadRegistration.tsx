@@ -16,6 +16,9 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
   onSelectPatient,
   onCancel,
 }) => {
+  // Explicitly track the active record ID (to distinguish new vs editing existing)
+  const [activeRecordId, setActiveRecordId] = useState<string | null>(selectedPatient?.id || null);
+
   // Form State initialized with selected patient or blank
   const [name, setName] = useState(selectedPatient?.name || '');
   const [patientId, setPatientId] = useState(selectedPatient?.mrn || '');
@@ -31,6 +34,26 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
   const [referringDoctor, setReferringDoctor] = useState(selectedPatient?.referringDoctor || '');
   const [clinicalHistory, setClinicalHistory] = useState(selectedPatient?.clinicalNotes || '');
 
+  // Sync if selectedPatient prop updates
+  React.useEffect(() => {
+    if (selectedPatient) {
+      setActiveRecordId(selectedPatient.id);
+      setName(selectedPatient.name);
+      setPatientId(selectedPatient.mrn);
+      setAge(
+        selectedPatient.dateOfBirth
+          ? String(new Date().getFullYear() - new Date(selectedPatient.dateOfBirth).getFullYear())
+          : ''
+      );
+      setGender(selectedPatient.gender || 'Male');
+      setMobile(selectedPatient.phone || '');
+      setHeightCm(selectedPatient.heightCm ? String(selectedPatient.heightCm) : '');
+      setWeightKg(selectedPatient.weightKg ? String(selectedPatient.weightKg) : '');
+      setReferringDoctor(selectedPatient.referringDoctor || '');
+      setClinicalHistory(selectedPatient.clinicalNotes || '');
+    }
+  }, [selectedPatient]);
+
   // Existing patient search filter
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -39,14 +62,28 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
     setPatientId(`P-${randomId}`);
   };
 
+  const handleStartNewPatient = () => {
+    setActiveRecordId(null);
+    setName('');
+    const randomId = Math.floor(10000 + Math.random() * 90000);
+    setPatientId(`P-${randomId}`);
+    setAge('');
+    setGender('Male');
+    setMobile('');
+    setHeightCm('');
+    setWeightKg('');
+    setReferringDoctor('');
+    setClinicalHistory('');
+  };
+
   const handleSaveAndContinue = () => {
     const finalId = patientId || `P-${Math.floor(10000 + Math.random() * 90000)}`;
-    const finalName = name.trim() || 'Patient [Name]';
+    const finalName = name.trim() || 'Clinical Patient';
     const numAge = parseInt(age, 10) || 40;
     const birthYear = new Date().getFullYear() - numAge;
 
     const patientRecord: Patient = {
-      id: selectedPatient?.id || 'pat-' + Math.random().toString(36).substring(2, 9),
+      id: activeRecordId || selectedPatient?.id || 'pat-' + Math.random().toString(36).substring(2, 9),
       mrn: finalId,
       name: finalName,
       dateOfBirth: `${birthYear}-01-01`,
@@ -79,7 +116,17 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
       <div className="podoload-registration-grid">
         {/* Left Panel: Patient Registration Form */}
         <div className="podoload-card podoload-registration-form-card">
-          <h3 className="podoload-card-title">PATIENT REGISTRATION</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <h3 className="podoload-card-title" style={{ margin: 0 }}>PATIENT REGISTRATION</h3>
+            <button
+              type="button"
+              className="podoload-btn-secondary podoload-btn-sm"
+              onClick={handleStartNewPatient}
+              title="Clear form and register a new patient"
+            >
+              + New Patient
+            </button>
+          </div>
 
           {/* Row 1: Patient Name & Patient ID */}
           <div className="podoload-form-row podoload-row-name-id">
@@ -100,7 +147,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
                 <input
                   type="text"
                   className="podoload-input"
-                  placeholder="ID [00000]"
+                  placeholder="e.g. P-10023"
                   value={patientId}
                   onChange={(e) => setPatientId(e.target.value)}
                 />
@@ -252,15 +299,16 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
                   <div key={pat.id} className="podoload-patient-row">
                     <div className="podoload-patient-avatar">{initials}</div>
                     <div className="podoload-patient-info">
-                      <span className="podoload-patient-name">[{pat.name}]</span>
+                      <span className="podoload-patient-name">{pat.name}</span>
                       <span className="podoload-patient-sub">
-                        ID [{pat.mrn || '00000'}] · [{calcAge}]
+                        ID: {pat.mrn || '00000'} · {calcAge}
                       </span>
                     </div>
                     <button
                       type="button"
                       className="podoload-btn-secondary podoload-btn-sm"
                       onClick={() => {
+                        setActiveRecordId(pat.id);
                         onSelectPatient(pat);
                         setName(pat.name);
                         setPatientId(pat.mrn);

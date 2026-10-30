@@ -1371,7 +1371,7 @@
   }
 
   /* ---------------------------------------------
-     STEPPER HORIZONTAL SMOOTH SCROLL
+     STEPPER HORIZONTAL SMOOTH SCROLL & BADGE
      --------------------------------------------- */
   .podoload-stepper-row {
     display: flex;
@@ -1393,6 +1393,20 @@
     white-space: nowrap;
     font-size: 0.72rem;
     padding: 0.32rem 0.65rem;
+  }
+
+  .podoload-selected-patient-badge {
+    font-size: 0.72rem;
+    color: #334e54;
+    background-color: #eaf3f4;
+    border: 1px solid #d5e4e6;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    margin-top: 0.2rem;
   }
 
   /* ---------------------------------------------
@@ -1507,6 +1521,14 @@
     gap: 0.75rem;
   }
 
+  .podoload-bilateral-canvas-box {
+    min-height: 320px;
+  }
+
+  .podoload-bilateral-canvas-box img {
+    max-height: 270px !important;
+  }
+
   /* ---------------------------------------------
      REPORT SCREEN MOBILE ALIGNMENT
      --------------------------------------------- */
@@ -1548,7 +1570,7 @@
   .podoload-btn-primary,
   .podoload-btn-secondary,
   .podoload-seg-btn {
-    min-height: 42px;
+    min-height: 44px;
     touch-action: manipulation;
   }
 }

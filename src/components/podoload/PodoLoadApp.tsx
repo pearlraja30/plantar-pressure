@@ -43,7 +43,13 @@ export function PodoLoadApp() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isScannerWizardOpen, setIsScannerWizardOpen] = useState(false);
+  const [wizardFootSide, setWizardFootSide] = useState<'Left' | 'Right'>('Left');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleOpenLiveScannerWizard = (side: 'Left' | 'Right' = 'Left') => {
+    setWizardFootSide(side);
+    setIsScannerWizardOpen(true);
+  };
 
   // Persistent clinical patients (completely fresh, no stale mock records)
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -220,7 +226,7 @@ export function PodoLoadApp() {
     logAuditEvent(
       'PATIENT_REGISTERED',
       `Patient ${patientRecord.name} (${patientRecord.mrn}) created/updated`,
-      'Dr. [Name]'
+      'Dr. Specialist'
     );
 
     // Advance to Step 2: Capture
@@ -335,7 +341,7 @@ export function PodoLoadApp() {
       logAuditEvent(
         'REPORT_SAVED_ARCHIVE',
         `Exam report ${updatedCase.caseNumber} signed and archived`,
-        'Dr. [Name]',
+        'Dr. Specialist',
         updatedCase.id
       );
     }
@@ -388,7 +394,7 @@ export function PodoLoadApp() {
           onSearchChange={setGlobalSearch}
           cloudSynced={cloudStatus.isOnline}
           onOpenCloud={() => setCurrentSection('reports_cloud')}
-          doctorName="Dr. [Name]"
+          doctorName="Dr. Specialist"
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
@@ -414,7 +420,7 @@ export function PodoLoadApp() {
               onUpdateRightFoot={setRightFoot}
               onBack={() => handleStepClick(1)}
               onContinue={() => handleStepClick(3)}
-              onOpenLiveScannerWizard={() => setIsScannerWizardOpen(true)}
+              onOpenLiveScannerWizard={handleOpenLiveScannerWizard}
             />
           )}
 
@@ -454,6 +460,8 @@ export function PodoLoadApp() {
               rightHeatmapUrl={rightHeatmapUrl}
               leftFoot={leftFoot}
               rightFoot={rightFoot}
+              leftAnalysis={leftAnalysis}
+              rightAnalysis={rightAnalysis}
               onBack={() => handleStepClick(4)}
               onFinishExam={() => {
                 handleStartNewExam();
@@ -509,10 +517,10 @@ export function PodoLoadApp() {
 
         {/* Persistent Bottom Status Bar */}
         <PodoLoadFooter
-          scannerModel="[Scanner model]"
+          scannerModel="Epson Perfection V39 II"
           scannerConnected={true}
           resolutionDpi={300}
-          lastSyncTime="[time]"
+          lastSyncTime="Just now"
         />
       </div>
 
@@ -521,6 +529,7 @@ export function PodoLoadApp() {
         isOpen={isScannerWizardOpen}
         onClose={() => setIsScannerWizardOpen(false)}
         onScanCompleted={handleScannerWizardCompleted}
+        initialFootSide={wizardFootSide}
       />
     </div>
   );

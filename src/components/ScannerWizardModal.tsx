@@ -61,6 +61,7 @@ interface ScannerWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanCompleted: (payloads: CompletedScanItem | CompletedScanItem[]) => void;
+  initialFootSide?: FootSide;
 }
 
 interface CameraHardwareCapabilities {
@@ -79,6 +80,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   isOpen,
   onClose,
   onScanCompleted,
+  initialFootSide,
 }) => {
   const isMobileDevice =
     Capacitor.isNativePlatform() ||
@@ -106,7 +108,13 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   const [selectedScanner] = useState<ScannerDevice>(MOCK_SCANNER_DEVICES[0]);
   const [selectedDpi] = useState<number>(300);
   const [colorMode, setColorMode] = useState<'Grayscale' | 'RGB'>('Grayscale');
-  const [footSide, setFootSide] = useState<FootSide>('Right');
+  const [footSide, setFootSide] = useState<FootSide>(initialFootSide || 'Right');
+
+  useEffect(() => {
+    if (initialFootSide) {
+      setFootSide(initialFootSide);
+    }
+  }, [initialFootSide, isOpen]);
 
   // Camera Settings
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);

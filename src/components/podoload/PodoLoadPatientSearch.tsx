@@ -28,7 +28,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
     patients.find((p) => p.id === selectedPatientId) || (patients.length > 0 ? patients[0] : null);
 
   // Form edit states for Patient Details card
-  const [editName, setEditName] = useState(activePatient?.name || '[Patient name]');
+  const [editName, setEditName] = useState(activePatient?.name || 'Clinical Patient');
   const [editId, setEditId] = useState(activePatient?.mrn || '00000');
   const [editAge, setEditAge] = useState(
     activePatient?.dateOfBirth
@@ -69,7 +69,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
 
   // Get initials
   const getInitials = (name: string) => {
-    if (!name || name === '[Patient name]') return 'PN';
+    if (!name || name === 'Clinical Patient') return 'PN';
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return (name.substring(0, 2) || 'PN').toUpperCase();
@@ -128,8 +128,8 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
               const isSelected = activePatient?.id === pat.id;
               const calcAge = pat.dateOfBirth
                 ? `${new Date().getFullYear() - new Date(pat.dateOfBirth).getFullYear()}y`
-                : '[age]';
-              const pGender = pat.gender ? `[${pat.gender.toLowerCase()}]` : '[gender]';
+                : '42y';
+              const pGender = pat.gender ? pat.gender.toLowerCase() : 'male';
 
               return (
                 <div
@@ -141,9 +141,9 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
                     {getInitials(pat.name)}
                   </div>
                   <div className="podoload-patient-item-details">
-                    <span className="podoload-patient-item-name">{pat.name || '[Patient name]'}</span>
+                    <span className="podoload-patient-item-name">{pat.name || 'Clinical Patient'}</span>
                     <span className="podoload-patient-item-sub">
-                      ID [{pat.mrn || '00000'}] · {calcAge} · {pGender}
+                      ID {pat.mrn || '00000'} · {calcAge} · {pGender}
                     </span>
                   </div>
                 </div>
@@ -300,10 +300,10 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
                       </td>
                       <td>Left, Right</td>
                       <td>
-                        {exam.regionalAnalysis?.archClassification || '[findings]'}
+                        {exam.regionalAnalysis?.archClassification || 'Normal Arch'}
                       </td>
                       <td style={{ fontWeight: 600, color: 'var(--podo-primary)' }}>
-                        {exam.caseNumber || '[RPT-0000]'}
+                        {exam.caseNumber || 'RPT-0001'}
                       </td>
                       <td>
                         <span className="podo-badge podo-badge-green">

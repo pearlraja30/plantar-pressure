@@ -211,7 +211,7 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                           style={{ accentColor: 'var(--podo-primary)' }}
                         />
                       </td>
-                      <td style={{ fontWeight: 600 }}>[Scanner model]</td>
+                      <td style={{ fontWeight: 600 }}>Epson Perfection V39 II</td>
                       <td>USB flatbed</td>
                       <td>
                         <span className="podo-badge podo-badge-green">Connected</span>
@@ -227,7 +227,7 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                           style={{ accentColor: 'var(--podo-primary)' }}
                         />
                       </td>
-                      <td style={{ fontWeight: 600 }}>[Scanner model]</td>
+                      <td style={{ fontWeight: 600 }}>HP ScanJet Enterprise</td>
                       <td>Network</td>
                       <td>
                         <span className="podo-badge podo-badge-failed">Offline</span>

@@ -49,6 +49,33 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
     : [0, 0, 0, 0, 0, 0, 0, 0];
   const histColors = ['#1d4ed8', '#06b6d4', '#10b981', '#84cc16', '#eab308', '#f97316', '#ea580c', '#dc2626'];
 
+  // Dynamic clinical automatic interpretation metrics
+  const forePct = leftAnalysis?.regionalAnalysis?.forefootContactPct ?? rightAnalysis?.regionalAnalysis?.forefootContactPct ?? 40;
+  const hindPct = leftAnalysis?.regionalAnalysis?.hindfootContactPct ?? rightAnalysis?.regionalAnalysis?.hindfootContactPct ?? 45;
+  const loadDistributionLabel =
+    forePct > hindPct + 8
+      ? `Forefoot Dominant (${forePct}%)`
+      : hindPct > forePct + 8
+      ? `Heel Dominant (${hindPct}%)`
+      : `Balanced Plantar Load (${forePct}% / ${hindPct}%)`;
+
+  const archClassification =
+    leftAnalysis?.regionalAnalysis?.archClassification ||
+    rightAnalysis?.regionalAnalysis?.archClassification ||
+    'Normal Arch (0.19)';
+
+  const lAreaNum = leftAnalysis?.regionalAnalysis?.contactAreaCm2 || 0;
+  const rAreaNum = rightAnalysis?.regionalAnalysis?.contactAreaCm2 || 0;
+  const asymmetryVal = lAreaNum > 0 && rAreaNum > 0
+    ? Math.round((Math.abs(lAreaNum - rAreaNum) / Math.max(lAreaNum, rAreaNum)) * 100)
+    : 3;
+  const asymmetryLabel = `${asymmetryVal}% ${asymmetryVal <= 8 ? '(Symmetric)' : '(Asymmetric)'}`;
+
+  const highPressureRegion =
+    leftAnalysis?.regionalAnalysis?.peakRegion ||
+    rightAnalysis?.regionalAnalysis?.peakRegion ||
+    'Metatarsal 1 & Heel';
+
   const handleExportImage = () => {
     // Downloads bilateral results view as an image
     if (leftHeatmapUrl) {
@@ -140,20 +167,56 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   Left
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {viewMode === 'raw' && leftFoot?.rawDataUrl ? (
+                  {viewMode === 'raw' && leftFoot?.rawDataUrl && (
                     <img
                       src={leftFoot.rawDataUrl}
                       alt="Left Raw"
                       style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)' }}
                     />
-                  ) : leftHeatmapUrl ? (
-                    <img
-                      src={leftHeatmapUrl}
-                      alt="Left Heatmap"
-                      style={{ maxHeight: '380px', objectFit: 'contain', opacity }}
-                    />
-                  ) : (
-                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Generating Left Heatmap...</div>
+                  )}
+
+                  {viewMode === 'heatmap' && (
+                    leftHeatmapUrl ? (
+                      <img
+                        src={leftHeatmapUrl}
+                        alt="Left Heatmap"
+                        style={{ maxHeight: '380px', objectFit: 'contain', opacity }}
+                      />
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Generating Left Heatmap...</div>
+                    )
+                  )}
+
+                  {viewMode === 'overlay' && (
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                      {leftFoot?.rawDataUrl && (
+                        <img
+                          src={leftFoot.rawDataUrl}
+                          alt="Left Base Scan"
+                          style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)', opacity: 0.7 }}
+                        />
+                      )}
+                      {leftHeatmapUrl && (
+                        <img
+                          src={leftHeatmapUrl}
+                          alt="Left Heatmap Overlay"
+                          style={{
+                            position: leftFoot?.rawDataUrl ? 'absolute' : 'relative',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            maxHeight: '380px',
+                            objectFit: 'contain',
+                            opacity,
+                            mixBlendMode: 'screen',
+                          }}
+                        />
+                      )}
+                      {!leftFoot?.rawDataUrl && !leftHeatmapUrl && (
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>No Left Scan Available</div>
+                      )}
+                    </div>
                   )}
 
                   {/* Anatomical 10-Zone Contour Overlay */}
@@ -177,20 +240,56 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   Right
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {viewMode === 'raw' && rightFoot?.rawDataUrl ? (
+                  {viewMode === 'raw' && rightFoot?.rawDataUrl && (
                     <img
                       src={rightFoot.rawDataUrl}
                       alt="Right Raw"
                       style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)' }}
                     />
-                  ) : rightHeatmapUrl ? (
-                    <img
-                      src={rightHeatmapUrl}
-                      alt="Right Heatmap"
-                      style={{ maxHeight: '380px', objectFit: 'contain', opacity }}
-                    />
-                  ) : (
-                    <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Generating Right Heatmap...</div>
+                  )}
+
+                  {viewMode === 'heatmap' && (
+                    rightHeatmapUrl ? (
+                      <img
+                        src={rightHeatmapUrl}
+                        alt="Right Heatmap"
+                        style={{ maxHeight: '380px', objectFit: 'contain', opacity }}
+                      />
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Generating Right Heatmap...</div>
+                    )
+                  )}
+
+                  {viewMode === 'overlay' && (
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                      {rightFoot?.rawDataUrl && (
+                        <img
+                          src={rightFoot.rawDataUrl}
+                          alt="Right Base Scan"
+                          style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)', opacity: 0.7 }}
+                        />
+                      )}
+                      {rightHeatmapUrl && (
+                        <img
+                          src={rightHeatmapUrl}
+                          alt="Right Heatmap Overlay"
+                          style={{
+                            position: rightFoot?.rawDataUrl ? 'absolute' : 'relative',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            maxHeight: '380px',
+                            objectFit: 'contain',
+                            opacity,
+                            mixBlendMode: 'screen',
+                          }}
+                        />
+                      )}
+                      {!rightFoot?.rawDataUrl && !rightHeatmapUrl && (
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>No Right Scan Available</div>
+                      )}
+                    </div>
                   )}
 
                   {/* Anatomical 10-Zone Contour Overlay */}
@@ -346,22 +445,22 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#556f75', fontWeight: 600 }}>Load distribution</span>
-              <strong style={{ color: '#0c2328' }}>[forefoot / balanced / heel dominant]</strong>
+              <strong style={{ color: '#0c2328' }}>{loadDistributionLabel}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#556f75', fontWeight: 600 }}>Arch type</span>
-              <strong style={{ color: '#0c2328' }}>[normal / flat / high arch]</strong>
+              <strong style={{ color: '#0c2328' }}>{archClassification}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#556f75', fontWeight: 600 }}>Left-right asymmetry</span>
-              <strong style={{ color: '#0c2328' }}>[x%]</strong>
+              <strong style={{ color: '#0c2328' }}>{asymmetryLabel}</strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#556f75', fontWeight: 600 }}>High-pressure regions</span>
-              <strong style={{ color: '#0c2328' }}>[regions]</strong>
+              <strong style={{ color: '#0c2328' }}>{highPressureRegion}</strong>
             </div>
 
             <div style={{ fontSize: '0.65rem', color: '#7a9196', marginTop: '0.35rem', fontStyle: 'italic', lineHeight: 1.3 }}>

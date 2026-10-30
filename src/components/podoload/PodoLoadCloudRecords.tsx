@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CheckCircle } from 'lucide-react';
 import { CloudSyncStatus, cloudSyncService } from '../../services/cloudSyncService';
 import { AnalysisCase, Patient } from '../../types';
 
@@ -33,6 +34,12 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+
+  // Computed sync metrics from real cases
+  const totalCount = cases.length;
+  const syncedCount = cases.filter((c) => c.syncStatus === 'synced').length;
+  const pendingCases = cases.filter((c) => c.syncStatus !== 'synced');
+  const progressPct = totalCount > 0 ? Math.round((syncedCount / totalCount) * 100) : 100;
 
   // Map only real cases created in the system (fresh data only, zero mock records)
   const displayReports: ReportRow[] = cases.map((c) => {
@@ -158,7 +165,7 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
           {/* Top Selected Count & Export Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
-              [{selectedIds.length}] selected
+              {selectedIds.length} selected
             </span>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -277,13 +284,13 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
           </div>
 
           <div style={{ fontSize: '0.7rem', color: '#556f75', marginTop: '0.75rem' }}>
-            Showing 1–{displayReports.length} of [{displayReports.length}] reports
+            Showing 1–{displayReports.length} of {displayReports.length} reports
           </div>
         </div>
 
         {/* ================= RIGHT COLUMN: CLOUD SYNC & UPLOAD QUEUE ================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Card 1: CLOUD SYNC matching Screenshot 4 */}
+          {/* Card 1: CLOUD SYNC */}
           <div className="podoload-card" style={{ padding: '0.85rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
               <h4 className="podoload-card-title" style={{ margin: 0 }}>
@@ -297,12 +304,12 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
             <div style={{ fontSize: '0.75rem', color: '#3d585e', marginBottom: '0.35rem' }}>
               Overall progress
               <span style={{ float: 'right', fontWeight: 700, color: '#0c2328' }}>
-                [n] of [N] uploaded
+                {syncedCount} of {totalCount} uploaded
               </span>
             </div>
 
             <div className="podoload-progress-track" style={{ marginBottom: '0.85rem' }}>
-              <div className="podoload-progress-fill" style={{ width: '65%' }} />
+              <div className="podoload-progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
 
             <div style={{ display: 'flex', gap: '0.65rem' }}>
@@ -327,48 +334,44 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
             </div>
           </div>
 
-          {/* Card 2: UPLOAD QUEUE matching Screenshot 4 */}
+          {/* Card 2: UPLOAD QUEUE */}
           <div className="podoload-card podoload-upload-queue-card" style={{ padding: '0.85rem', flex: 1 }}>
             <h4 className="podoload-card-title" style={{ margin: 0 }}>
               UPLOAD QUEUE
             </h4>
 
-            {/* Queue Item 1: Uploading */}
-            <div className="podoload-queue-item">
-              <div className="podoload-queue-item-header">
-                <span>[RPT-0000] · [Patient name]</span>
-                <span className="podo-badge podo-badge-amber">Uploading</span>
+            {pendingCases.length > 0 ? (
+              pendingCases.slice(0, 3).map((c) => {
+                const pat = patients.find((p) => p.id === c.patientId);
+                return (
+                  <div key={c.id} className="podoload-queue-item">
+                    <div className="podoload-queue-item-header">
+                      <span>{c.caseNumber || 'RPT'} · {pat?.name || 'Clinical Patient'}</span>
+                      <span className="podo-badge podo-badge-pending">Queued</span>
+                    </div>
+                    <div className="podoload-progress-track">
+                      <div className="podoload-progress-fill" style={{ width: '45%' }} />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ textAlign: 'center', padding: '1.75rem 0.5rem', color: '#657e84', fontSize: '0.74rem' }}>
+                <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto mb-1.5" />
+                Queue clear · All records synchronized
               </div>
-              <div className="podoload-progress-track">
-                <div className="podoload-progress-fill" style={{ width: '45%' }} />
-              </div>
-            </div>
+            )}
 
-            {/* Queue Item 2: Pending */}
-            <div className="podoload-queue-item">
-              <div className="podoload-queue-item-header">
-                <span>[RPT-0000] · [Patient name]</span>
-                <span className="podo-badge podo-badge-pending">Pending</span>
-              </div>
-            </div>
-
-            {/* Queue Item 3: Failed */}
-            <div className="podoload-queue-item">
-              <div className="podoload-queue-item-header">
-                <span>[RPT-0000] · [Patient name]</span>
-                <span className="podo-badge podo-badge-failed">Failed</span>
-              </div>
-            </div>
-
-            {/* Retry Failed Button */}
-            <button
-              type="button"
-              className="podoload-btn-secondary"
-              style={{ width: '100%', marginTop: '0.25rem' }}
-              onClick={handleSyncNow}
-            >
-              Retry failed
-            </button>
+            {pendingCases.length > 0 && (
+              <button
+                type="button"
+                className="podoload-btn-secondary"
+                style={{ width: '100%', marginTop: '0.25rem' }}
+                onClick={handleSyncNow}
+              >
+                Sync pending queue
+              </button>
+            )}
 
             {/* Caption */}
             <p style={{ fontSize: '0.68rem', color: '#657e84', margin: 0, marginTop: 'auto', lineHeight: 1.35 }}>

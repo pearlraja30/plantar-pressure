@@ -8,10 +8,10 @@ interface PodoLoadFooterProps {
 }
 
 export const PodoLoadFooter: React.FC<PodoLoadFooterProps> = ({
-  scannerModel = '[Scanner model]',
+  scannerModel = 'Epson Perfection V39 II',
   scannerConnected = true,
   resolutionDpi = 300,
-  lastSyncTime = '[time]',
+  lastSyncTime = 'Just now',
 }) => {
   return (
     <footer className="podoload-system-status-bar" aria-label="System Hardware Status">

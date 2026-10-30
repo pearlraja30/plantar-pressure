@@ -20,7 +20,7 @@ interface PodoLoadCaptureProps {
   onUpdateRightFoot: (data: FootCaptureData | null) => void;
   onBack: () => void;
   onContinue: () => void;
-  onOpenLiveScannerWizard?: () => void;
+  onOpenLiveScannerWizard?: (side?: 'Left' | 'Right') => void;
 }
 
 export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
@@ -33,32 +33,36 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   onOpenLiveScannerWizard,
 }) => {
   // Top hardware toolbar state
-  const [scannerModel, setScannerModel] = useState('[Scanner / camera model]');
+  const [scannerModel, setScannerModel] = useState('Epson Perfection V39 II / HD Camera');
   const [resolutionDpi, setResolutionDpi] = useState('300 DPI');
   const [colourMode, setColourMode] = useState('Grayscale');
   const [sheetSize, setSheetSize] = useState('A4');
 
   // Foot acquisition modes: Camera | Scanner | Import file
-  const [leftMode, setLeftMode] = useState<'camera' | 'scanner' | 'import'>('scanner');
+  const [leftMode, setLeftMode] = useState<'camera' | 'scanner' | 'import'>('camera');
   const [rightMode, setRightMode] = useState<'camera' | 'scanner' | 'import'>('camera');
 
   const leftFileInputRef = useRef<HTMLInputElement | null>(null);
   const rightFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Fresh capture state: Wait for user to scan, capture from camera, or upload real scan
-
-  const handleCaptureRight = () => {
-    const sampleRight = generateHarrisMatFootprint('Right', 'normal', 720, 1080);
-    onUpdateRightFoot({
-      rawDataUrl: sampleRight,
+  // Generate sample footprint for demo/testing mode
+  const handleLoadSample = (side: 'Left' | 'Right') => {
+    const sample = generateHarrisMatFootprint(side, 'normal', 720, 1080);
+    const data: FootCaptureData = {
+      rawDataUrl: sample,
       capturedAt: new Date().toTimeString().slice(0, 8),
       sizePx: '1240 × 1754 px',
       scalePxMm: '11.8 px/mm',
-      confidence: 88,
+      confidence: side === 'Left' ? 94 : 88,
       markersCount: 4,
       lightingOk: true,
       sharp: true,
-    });
+    };
+    if (side === 'Left') {
+      onUpdateLeftFoot(data);
+    } else {
+      onUpdateRightFoot(data);
+    }
   };
 
   const handleFileUpload = (side: 'Left' | 'Right', file: File) => {
@@ -97,10 +101,10 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             value={scannerModel}
             onChange={(e) => setScannerModel(e.target.value)}
           >
-            <option value="[Scanner / camera model]">[Scanner / camera model]</option>
+            <option value="Epson Perfection V39 II / HD Camera">Epson Perfection V39 II / HD Camera</option>
             <option value="Built-in HD Camera">Built-in HD Camera</option>
-            <option value="Epson Perfection V39 II">Epson Perfection V39 II</option>
             <option value="Mobile Camera Scanner">Mobile Camera Scanner</option>
+            <option value="USB Flatbed Scanner">USB Flatbed Scanner</option>
           </select>
         </div>
 
@@ -146,7 +150,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           type="button"
           className="podoload-btn-secondary"
           style={{ height: '32px' }}
-          onClick={onOpenLiveScannerWizard}
+          onClick={() => onOpenLiveScannerWizard?.('Left')}
         >
           Calibrate
         </button>
@@ -155,7 +159,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           type="button"
           className="podoload-btn-secondary"
           style={{ height: '32px' }}
-          onClick={onOpenLiveScannerWizard}
+          onClick={() => onOpenLiveScannerWizard?.('Left')}
         >
           Scanner settings
         </button>
@@ -197,7 +201,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               className={`podoload-seg-btn ${leftMode === 'camera' ? 'active' : ''}`}
               onClick={() => {
                 setLeftMode('camera');
-                if (onOpenLiveScannerWizard) onOpenLiveScannerWizard();
+                if (onOpenLiveScannerWizard) onOpenLiveScannerWizard('Left');
               }}
             >
               Camera
@@ -250,9 +254,9 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               <span style={{ color: 'var(--podo-card-title)', fontWeight: 800, fontSize: '0.72rem' }}>
                 IMAGE INFO
               </span>
-              <div>Size: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.sizePx || '[px]'}</span></div>
-              <div>Scale: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.scalePxMm || '[px/mm]'}</span></div>
-              <div>Captured: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.capturedAt || '[time]'}</span></div>
+              <div>Size: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.sizePx || '1240 × 1754 px'}</span></div>
+              <div>Scale: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.scalePxMm || '11.8 px/mm'}</span></div>
+              <div>Captured: <span style={{ color: '#0c2328', fontWeight: 600 }}>{leftFoot?.capturedAt || 'Ready'}</span></div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
                 <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
@@ -267,32 +271,22 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               </div>
 
               <div style={{ marginTop: '0.4rem', fontWeight: 700, fontSize: '0.78rem' }}>
-                CONFIDENCE <span style={{ color: '#0c2328' }}>[{leftFoot?.confidence || 92}%]</span>
+                CONFIDENCE <span style={{ color: '#0c2328' }}>{leftFoot?.confidence || 94}%</span>
               </div>
             </div>
           </div>
 
           {/* Action Buttons for Left Foot */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
-                className="podoload-btn-secondary podoload-btn-sm"
-                onClick={() => {
-                  const newScan = generateHarrisMatFootprint('Left', 'normal', 720, 1080);
-                  onUpdateLeftFoot({
-                    rawDataUrl: newScan,
-                    capturedAt: new Date().toTimeString().slice(0, 8),
-                    sizePx: '1240 × 1754 px',
-                    scalePxMm: '11.8 px/mm',
-                    confidence: 94,
-                    markersCount: 4,
-                    lightingOk: true,
-                    sharp: true,
-                  });
-                }}
+                className="podoload-btn-primary podoload-btn-sm"
+                onClick={() => onOpenLiveScannerWizard?.('Left')}
+                title="Launch camera alignment and scanner wizard"
               >
-                Rescan
+                <Camera className="w-3.5 h-3.5 mr-1 inline" />
+                Camera
               </button>
 
               <button
@@ -302,16 +296,27 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               >
                 Import image
               </button>
+
+              <button
+                type="button"
+                className="podoload-btn-secondary podoload-btn-sm"
+                onClick={() => handleLoadSample('Left')}
+                title="Load sample Harris Mat imprint for testing"
+              >
+                Sample scan
+              </button>
             </div>
 
-            <button
-              type="button"
-              className="podoload-btn-secondary podoload-btn-sm"
-              onClick={() => onUpdateLeftFoot(null)}
-              title="Delete scan"
-            >
-              Delete
-            </button>
+            {leftFoot && (
+              <button
+                type="button"
+                className="podoload-btn-secondary podoload-btn-sm"
+                onClick={() => onUpdateLeftFoot(null)}
+                title="Delete scan"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
 
@@ -322,7 +327,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             {rightFoot ? (
               <span className="podo-badge podo-badge-green">Captured</span>
             ) : (
-              <span className="podo-badge podo-badge-amber">Live view</span>
+              <span className="podo-badge podo-badge-amber">Ready</span>
             )}
           </div>
 
@@ -331,7 +336,10 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             <button
               type="button"
               className={`podoload-seg-btn ${rightMode === 'camera' ? 'active' : ''}`}
-              onClick={() => setRightMode('camera')}
+              onClick={() => {
+                setRightMode('camera');
+                if (onOpenLiveScannerWizard) onOpenLiveScannerWizard('Right');
+              }}
             >
               Camera
             </button>
@@ -359,7 +367,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             {/* Viewport Box */}
             <div className="podoload-viewport-container" style={{ flexDirection: 'column' }}>
               <div className="podoload-sheet-preview">
-                {/* 4 Corner Markers (3 Black, 1 Amber/Orange as seen in Screenshot 2) */}
+                {/* 4 Corner Markers */}
                 <div className="podoload-marker podoload-marker-tl" />
                 <div className="podoload-marker podoload-marker-tr" />
                 <div className="podoload-marker podoload-marker-bl" />
@@ -372,14 +380,14 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                     style={{ width: '82%', height: '88%', objectFit: 'contain' }}
                   />
                 ) : (
-                  /* Dashed Foot Alignment Guide Outline (100% matched from screenshot 2) */
+                  /* Dashed Foot Alignment Guide Outline */
                   <div className="podoload-dashed-guide" />
                 )}
               </div>
 
               {!rightFoot && (
                 <div style={{ color: '#d97706', fontSize: '0.65rem', fontWeight: 600, marginTop: '0.4rem', textAlign: 'center' }}>
-                  Move back until all 4 markers are visible
+                  Position sheet until all 4 corner markers are visible
                 </div>
               )}
             </div>
@@ -389,9 +397,9 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               <span style={{ color: 'var(--podo-card-title)', fontWeight: 800, fontSize: '0.72rem' }}>
                 IMAGE INFO
               </span>
-              <div>Size: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.sizePx || '[px]'}</span></div>
-              <div>Scale: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.scalePxMm || '[px/mm]'}</span></div>
-              <div>Captured: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.capturedAt || '[time]'}</span></div>
+              <div>Size: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.sizePx || '1240 × 1754 px'}</span></div>
+              <div>Scale: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.scalePxMm || '11.8 px/mm'}</span></div>
+              <div>Captured: <span style={{ color: '#0c2328', fontWeight: 600 }}>{rightFoot?.capturedAt || 'Ready'}</span></div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
                 {rightFoot ? (
@@ -412,21 +420,22 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               </div>
 
               <div style={{ marginTop: '0.4rem', fontWeight: 700, fontSize: '0.78rem' }}>
-                CONFIDENCE <span style={{ color: '#0c2328' }}>[{rightFoot?.confidence || 64}%]</span>
+                CONFIDENCE <span style={{ color: '#0c2328' }}>{rightFoot?.confidence || 88}%</span>
               </div>
             </div>
           </div>
 
           {/* Action Buttons for Right Foot */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="podoload-btn-primary podoload-btn-sm"
-                onClick={handleCaptureRight}
+                onClick={() => onOpenLiveScannerWizard?.('Right')}
+                title="Launch camera alignment and scanner wizard"
               >
                 <Camera className="w-3.5 h-3.5 mr-1 inline" />
-                Capture
+                Camera
               </button>
 
               <button
@@ -435,6 +444,15 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 onClick={() => rightFileInputRef.current?.click()}
               >
                 Import image
+              </button>
+
+              <button
+                type="button"
+                className="podoload-btn-secondary podoload-btn-sm"
+                onClick={() => handleLoadSample('Right')}
+                title="Load sample Harris Mat imprint for testing"
+              >
+                Sample scan
               </button>
             </div>
 

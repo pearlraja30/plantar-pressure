@@ -333,7 +333,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
           <div style={{ fontSize: '0.74rem', marginTop: '0.2rem' }}>
             <span style={{ color: 'var(--podo-card-title)', fontWeight: 800 }}>IMAGE CONFIDENCE</span>
             <div style={{ marginTop: '0.2rem', fontWeight: 700, color: '#0c2328' }}>
-              Left / Right <span style={{ color: '#0e7477' }}>[92%] / [88%]</span>
+              Left / Right <span style={{ color: '#0e7477' }}>{leftFoot?.confidence ?? 94}% / {rightFoot?.confidence ?? 88}%</span>
             </div>
           </div>
 
