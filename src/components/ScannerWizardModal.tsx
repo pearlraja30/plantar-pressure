@@ -1828,10 +1828,18 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                             }
                           }}
                         >
-                          <option value="custom">Custom Size (Custom mm)</option>
                           <option value="a4">ISO 216 A4 (210 × 297 mm)</option>
-                          <option value="harris_mat">Harris Mat Sheet (215 × 310 mm)</option>
+                          <option value="a3">ISO 216 A3 (297 × 420 mm)</option>
+                          <option value="a5">ISO 216 A5 (148 × 210 mm)</option>
+                          <option value="harris_mat">Harris Mat Standard (215 × 310 mm)</option>
+                          <option value="harris_mat_large">Harris Mat XL (220 × 340 mm)</option>
+                          <option value="podotrack">Podotrack Imprint Sheet (200 × 320 mm)</option>
                           <option value="us_letter">US Letter (215.9 × 279.4 mm)</option>
+                          <option value="us_legal">US Legal (215.9 × 355.6 mm)</option>
+                          <option value="us_tabloid">US Tabloid (279.4 × 431.8 mm)</option>
+                          <option value="b4">JIS B4 (250 × 353 mm)</option>
+                          <option value="b5">JIS B5 (176 × 250 mm)</option>
+                          <option value="custom">Custom Size (User Defined mm)</option>
                         </select>
                       </div>
 

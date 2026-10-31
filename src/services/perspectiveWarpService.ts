@@ -14,7 +14,19 @@ export interface QuadCorners {
   bl: Point2D;
 }
 
-export type PaperPresetId = 'custom' | 'a4' | 'us_letter' | 'harris_mat';
+export type PaperPresetId =
+  | 'a4'
+  | 'a3'
+  | 'a5'
+  | 'harris_mat'
+  | 'harris_mat_large'
+  | 'podotrack'
+  | 'us_letter'
+  | 'us_legal'
+  | 'us_tabloid'
+  | 'b4'
+  | 'b5'
+  | 'custom';
 
 export interface PaperDimensionConfig {
   preset: PaperPresetId;
@@ -24,29 +36,77 @@ export interface PaperDimensionConfig {
 }
 
 export const PAPER_PRESETS: Record<PaperPresetId, PaperDimensionConfig> = {
-  custom: {
-    preset: 'custom',
-    name: 'Custom Size Sheet',
-    widthMm: 210.0,
-    heightMm: 297.0,
-  },
   a4: {
     preset: 'a4',
     name: 'ISO 216 A4 (210 × 297 mm)',
     widthMm: 210.0,
     heightMm: 297.0,
   },
+  a3: {
+    preset: 'a3',
+    name: 'ISO 216 A3 (297 × 420 mm)',
+    widthMm: 297.0,
+    heightMm: 420.0,
+  },
+  a5: {
+    preset: 'a5',
+    name: 'ISO 216 A5 (148 × 210 mm)',
+    widthMm: 148.0,
+    heightMm: 210.0,
+  },
   harris_mat: {
     preset: 'harris_mat',
-    name: 'Harris Mat Grid Sheet (215 × 310 mm)',
+    name: 'Harris Mat Standard (215 × 310 mm)',
     widthMm: 215.0,
     heightMm: 310.0,
   },
+  harris_mat_large: {
+    preset: 'harris_mat_large',
+    name: 'Harris Mat XL (220 × 340 mm)',
+    widthMm: 220.0,
+    heightMm: 340.0,
+  },
+  podotrack: {
+    preset: 'podotrack',
+    name: 'Podotrack Carbon Sheet (200 × 320 mm)',
+    widthMm: 200.0,
+    heightMm: 320.0,
+  },
   us_letter: {
     preset: 'us_letter',
-    name: 'ANSI A / US Letter (216 × 279 mm)',
+    name: 'ANSI A / US Letter (215.9 × 279.4 mm)',
     widthMm: 215.9,
     heightMm: 279.4,
+  },
+  us_legal: {
+    preset: 'us_legal',
+    name: 'ANSI Legal (215.9 × 355.6 mm)',
+    widthMm: 215.9,
+    heightMm: 355.6,
+  },
+  us_tabloid: {
+    preset: 'us_tabloid',
+    name: 'ANSI B / Tabloid (279.4 × 431.8 mm)',
+    widthMm: 279.4,
+    heightMm: 431.8,
+  },
+  b4: {
+    preset: 'b4',
+    name: 'JIS B4 (250 × 353 mm)',
+    widthMm: 250.0,
+    heightMm: 353.0,
+  },
+  b5: {
+    preset: 'b5',
+    name: 'JIS B5 (176 × 250 mm)',
+    widthMm: 176.0,
+    heightMm: 250.0,
+  },
+  custom: {
+    preset: 'custom',
+    name: 'Custom Dimensions (User-Defined)',
+    widthMm: 210.0,
+    heightMm: 297.0,
   },
 };
 

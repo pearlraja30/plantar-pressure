@@ -47,6 +47,8 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const [resolutionDpi, setResolutionDpi] = useState('300 DPI');
   const [colourMode, setColourMode] = useState('Grayscale');
   const [sheetSize, setSheetSize] = useState('A4');
+  const [customWidthMm, setCustomWidthMm] = useState('210');
+  const [customHeightMm, setCustomHeightMm] = useState('297');
 
   // Foot acquisition modes: On Web and Windows, default to 'scanner'. Camera is only for mobile.
   const [leftMode, setLeftMode] = useState<'camera' | 'scanner' | 'import'>(
@@ -87,11 +89,18 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
 
     setTimeout(() => {
       const sample = generateHarrisMatFootprint(side, 'normal', 720, 1080);
+      const wMm = parseFloat(customWidthMm) || 210;
+      const hMm = parseFloat(customHeightMm) || 297;
+      const dpiVal = resolutionDpi.includes('600') ? 600 : resolutionDpi.includes('150') ? 150 : resolutionDpi.includes('1200') ? 1200 : 300;
+      const pxPerMm = (dpiVal / 25.4).toFixed(1);
+      const wPx = Math.round(wMm * (dpiVal / 25.4));
+      const hPx = Math.round(hMm * (dpiVal / 25.4));
+
       const data: FootCaptureData = {
         rawDataUrl: sample,
         capturedAt: new Date().toTimeString().slice(0, 8),
-        sizePx: '1240 × 1754 px',
-        scalePxMm: resolutionDpi === '600 DPI' ? '23.6 px/mm' : '11.8 px/mm',
+        sizePx: `${wPx} × ${hPx} px`,
+        scalePxMm: `${pxPerMm} px/mm`,
         confidence: side === 'Left' ? 96 : 94,
         markersCount: 4,
         lightingOk: true,
@@ -113,11 +122,18 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   // Generate sample footprint for demo/testing mode
   const handleLoadSample = (side: 'Left' | 'Right') => {
     const sample = generateHarrisMatFootprint(side, 'normal', 720, 1080);
+    const wMm = parseFloat(customWidthMm) || 210;
+    const hMm = parseFloat(customHeightMm) || 297;
+    const dpiVal = resolutionDpi.includes('600') ? 600 : resolutionDpi.includes('150') ? 150 : 300;
+    const pxPerMm = (dpiVal / 25.4).toFixed(1);
+    const wPx = Math.round(wMm * (dpiVal / 25.4));
+    const hPx = Math.round(hMm * (dpiVal / 25.4));
+
     const data: FootCaptureData = {
       rawDataUrl: sample,
       capturedAt: new Date().toTimeString().slice(0, 8),
-      sizePx: '1240 × 1754 px',
-      scalePxMm: '11.8 px/mm',
+      sizePx: `${wPx} × ${hPx} px`,
+      scalePxMm: `${pxPerMm} px/mm`,
       confidence: side === 'Left' ? 96 : 94,
       markersCount: 4,
       lightingOk: true,
@@ -205,18 +221,67 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           </select>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '3px' }}>
           <label className="podoload-label">Sheet size</label>
           <select
             className="podoload-select"
             value={sheetSize}
-            onChange={(e) => setSheetSize(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSheetSize(val);
+              if (val === 'A4') { setCustomWidthMm('210'); setCustomHeightMm('297'); }
+              else if (val === 'A3') { setCustomWidthMm('297'); setCustomHeightMm('420'); }
+              else if (val === 'A5') { setCustomWidthMm('148'); setCustomHeightMm('210'); }
+              else if (val === 'Harris Mat') { setCustomWidthMm('215'); setCustomHeightMm('310'); }
+              else if (val === 'Harris Mat XL') { setCustomWidthMm('220'); setCustomHeightMm('340'); }
+              else if (val === 'Podotrack') { setCustomWidthMm('200'); setCustomHeightMm('320'); }
+              else if (val === 'Letter') { setCustomWidthMm('215.9'); setCustomHeightMm('279.4'); }
+              else if (val === 'Legal') { setCustomWidthMm('215.9'); setCustomHeightMm('355.6'); }
+              else if (val === 'Tabloid') { setCustomWidthMm('279.4'); setCustomHeightMm('431.8'); }
+              else if (val === 'B4') { setCustomWidthMm('250'); setCustomHeightMm('353'); }
+              else if (val === 'B5') { setCustomWidthMm('176'); setCustomHeightMm('250'); }
+            }}
           >
             <option value="A4">A4 (210 × 297 mm)</option>
+            <option value="A3">A3 (297 × 420 mm - Large)</option>
+            <option value="A5">A5 (148 × 210 mm - Pediatric)</option>
             <option value="Harris Mat">Harris Mat (215 × 310 mm)</option>
-            <option value="Letter">US Letter (8.5 × 11 in)</option>
+            <option value="Harris Mat XL">Harris Mat XL (220 × 340 mm)</option>
+            <option value="Podotrack">Podotrack Imprint (200 × 320 mm)</option>
+            <option value="Letter">US Letter (215.9 × 279.4 mm)</option>
+            <option value="Legal">US Legal (215.9 × 355.6 mm)</option>
+            <option value="Tabloid">US Tabloid (279.4 × 431.8 mm)</option>
+            <option value="B4">JIS B4 (250 × 353 mm)</option>
+            <option value="B5">JIS B5 (176 × 250 mm)</option>
+            <option value="Custom">Custom Dimensions</option>
           </select>
         </div>
+
+        {sheetSize === 'Custom' && (
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '65px' }}>
+              <label className="podoload-label">W (mm)</label>
+              <input
+                type="number"
+                className="podoload-select"
+                style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.35rem' }}
+                value={customWidthMm}
+                onChange={(e) => setCustomWidthMm(e.target.value)}
+              />
+            </div>
+            <span style={{ paddingBottom: '6px', color: '#64748b', fontSize: '0.75rem' }}>×</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '65px' }}>
+              <label className="podoload-label">H (mm)</label>
+              <input
+                type="number"
+                className="podoload-select"
+                style={{ height: '28px', fontSize: '0.72rem', padding: '0 0.35rem' }}
+                value={customHeightMm}
+                onChange={(e) => setCustomHeightMm(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
 
         <button
           type="button"
@@ -333,7 +398,9 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   }}
                 />
                 <strong style={{ color: '#0f172a' }}>{scannerModel.split('(')[0].trim()}</strong>
-                <span style={{ color: '#64748b' }}>· {resolutionDpi}</span>
+                <span style={{ color: '#64748b' }}>
+                  · {resolutionDpi} · {sheetSize === 'Custom' ? `Custom (${customWidthMm}×${customHeightMm} mm)` : sheetSize}
+                </span>
               </div>
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                 <span className="podo-badge podo-badge-green" style={{ fontSize: '0.65rem' }}>
@@ -581,7 +648,9 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   }}
                 />
                 <strong style={{ color: '#0f172a' }}>{scannerModel.split('(')[0].trim()}</strong>
-                <span style={{ color: '#64748b' }}>· {resolutionDpi}</span>
+                <span style={{ color: '#64748b' }}>
+                  · {resolutionDpi} · {sheetSize === 'Custom' ? `Custom (${customWidthMm}×${customHeightMm} mm)` : sheetSize}
+                </span>
               </div>
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                 <span className="podo-badge podo-badge-green" style={{ fontSize: '0.65rem' }}>

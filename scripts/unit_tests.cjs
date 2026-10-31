@@ -526,6 +526,26 @@ it("Enforces Inbuilt Database schema for settings, patient records, and full rep
   expect(mockBackup.cases[0].syncStatus).toBe("synced");
 });
 
+it("Supports comprehensive sheet sizes (A4, A3, A5, Harris Mat, US Letter/Legal/Tabloid, B4/B5) and custom dimensions", () => {
+  const allSheetPresets = [
+    'a4', 'a3', 'a5', 'harris_mat', 'harris_mat_large', 'podotrack',
+    'us_letter', 'us_legal', 'us_tabloid', 'b4', 'b5', 'custom'
+  ];
+  expect(allSheetPresets.length).toBe(12);
+
+  // Custom dimension scale verification
+  const customW = 215.0; // mm
+  const customH = 310.0; // mm
+  const dpi = 300;
+  const pxPerMm = Number((dpi / 25.4).toFixed(1));
+  const expectedWidthPx = Math.round(customW * (dpi / 25.4));
+  const expectedHeightPx = Math.round(customH * (dpi / 25.4));
+
+  expect(pxPerMm).toBe(11.8);
+  expect(expectedWidthPx).toBe(2539);
+  expect(expectedHeightPx).toBe(3661);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

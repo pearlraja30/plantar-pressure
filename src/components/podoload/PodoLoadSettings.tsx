@@ -562,11 +562,34 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                     <select
                       className="podoload-input"
                       value={sheetSize}
-                      onChange={(e) => setSheetSize(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSheetSize(val);
+                        if (val === 'A4') { setWidthMm('210'); setHeightMm('297'); }
+                        else if (val === 'A3') { setWidthMm('297'); setHeightMm('420'); }
+                        else if (val === 'A5') { setWidthMm('148'); setHeightMm('210'); }
+                        else if (val === 'Harris Mat') { setWidthMm('215'); setHeightMm('310'); }
+                        else if (val === 'Harris Mat XL') { setWidthMm('220'); setHeightMm('340'); }
+                        else if (val === 'Podotrack') { setWidthMm('200'); setHeightMm('320'); }
+                        else if (val === 'Letter') { setWidthMm('215.9'); setHeightMm('279.4'); }
+                        else if (val === 'Legal') { setWidthMm('215.9'); setHeightMm('355.6'); }
+                        else if (val === 'Tabloid') { setWidthMm('279.4'); setHeightMm('431.8'); }
+                        else if (val === 'B4') { setWidthMm('250'); setHeightMm('353'); }
+                        else if (val === 'B5') { setWidthMm('176'); setHeightMm('250'); }
+                      }}
                     >
-                      <option value="A4">A4</option>
-                      <option value="Letter">Letter</option>
-                      <option value="Custom">Custom</option>
+                      <option value="A4">A4 (210 × 297 mm)</option>
+                      <option value="A3">A3 (297 × 420 mm)</option>
+                      <option value="A5">A5 (148 × 210 mm)</option>
+                      <option value="Harris Mat">Harris Mat (215 × 310 mm)</option>
+                      <option value="Harris Mat XL">Harris Mat XL (220 × 340 mm)</option>
+                      <option value="Podotrack">Podotrack Imprint (200 × 320 mm)</option>
+                      <option value="Letter">US Letter (215.9 × 279.4 mm)</option>
+                      <option value="Legal">US Legal (215.9 × 355.6 mm)</option>
+                      <option value="Tabloid">US Tabloid (279.4 × 431.8 mm)</option>
+                      <option value="B4">JIS B4 (250 × 353 mm)</option>
+                      <option value="B5">JIS B5 (176 × 250 mm)</option>
+                      <option value="Custom">Custom Dimensions</option>
                     </select>
                   </div>
 
