@@ -20,22 +20,26 @@ import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { ScannerWizardModal } from '../ScannerWizardModal';
 import { dbService } from '../../services/dbService';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
+import { safeStorage, stripHeavyCasePayloads } from '../../services/storageUtils';
 
-// Purge all legacy stale/demo data and ensure fresh clean state
-const PURE_STORAGE_KEY = 'podoload_fresh_v2';
+// Purge all legacy stale/demo data and ensure fresh clean state without quota exhaustion
+const PURE_STORAGE_KEY = 'podoload_fresh_v3';
 if (typeof window !== 'undefined') {
   try {
-    if (localStorage.getItem('podoload_storage_ver') !== PURE_STORAGE_KEY) {
-      localStorage.removeItem('ppa-patients');
+    const rawCases = localStorage.getItem('ppa-cases');
+    // If ppa-cases holds bloated base64 scans, purge from 5MB localStorage immediately.
+    // The full cases, raw scans, and heatmaps remain 100% safe in IndexedDB!
+    if (rawCases && (rawCases.length > 50000 || rawCases.includes('data:image'))) {
       localStorage.removeItem('ppa-cases');
-      localStorage.removeItem('ppa-selected-patient-id');
-      localStorage.removeItem('ppa-selected-case-id');
-      localStorage.removeItem('ppa_audit_log_v1');
-      localStorage.removeItem('ppa-real-mode-v1');
+    }
+
+    if (localStorage.getItem('podoload_storage_ver') !== PURE_STORAGE_KEY) {
+      localStorage.removeItem('ppa-cases');
+      localStorage.removeItem('podoload_storage_ver');
       localStorage.setItem('podoload_storage_ver', PURE_STORAGE_KEY);
     }
   } catch (e) {
-    console.error('Failed to purge stale storage', e);
+    console.warn('Failed to clean up storage cache', e);
   }
 }
 
@@ -56,7 +60,7 @@ export function PodoLoadApp() {
   // Persistent clinical patients (completely fresh, no stale mock records)
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
-      const saved = localStorage.getItem('ppa-patients');
+      const saved = safeStorage.getItem('ppa-patients');
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
@@ -65,13 +69,13 @@ export function PodoLoadApp() {
   });
 
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => {
-    return localStorage.getItem('ppa-selected-patient-id') || '';
+    return safeStorage.getItem('ppa-selected-patient-id') || '';
   });
 
   // Persistent clinical cases
   const [cases, setCases] = useState<AnalysisCase[]>(() => {
     try {
-      const saved = localStorage.getItem('ppa-cases');
+      const saved = safeStorage.getItem('ppa-cases');
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
@@ -80,7 +84,7 @@ export function PodoLoadApp() {
   });
 
   const [selectedCaseId, setSelectedCaseId] = useState<string>(() => {
-    return localStorage.getItem('ppa-selected-case-id') || '';
+    return safeStorage.getItem('ppa-selected-case-id') || '';
   });
 
   // Real hardware scanner state
@@ -104,28 +108,47 @@ export function PodoLoadApp() {
     });
   }, []);
 
-  // Save to local storage
+  // Save to local storage safely (protecting 5MB quota)
   useEffect(() => {
-    localStorage.setItem('ppa-patients', JSON.stringify(patients));
+    try {
+      safeStorage.setItem('ppa-patients', JSON.stringify(patients));
+    } catch {
+      // Ignore
+    }
   }, [patients]);
 
   useEffect(() => {
-    if (selectedPatientId) {
-      localStorage.setItem('ppa-selected-patient-id', selectedPatientId);
-    } else {
-      localStorage.removeItem('ppa-selected-patient-id');
+    try {
+      if (selectedPatientId) {
+        safeStorage.setItem('ppa-selected-patient-id', selectedPatientId);
+      } else {
+        safeStorage.removeItem('ppa-selected-patient-id');
+      }
+    } catch {
+      // Ignore
     }
   }, [selectedPatientId]);
 
   useEffect(() => {
-    localStorage.setItem('ppa-cases', JSON.stringify(cases));
+    try {
+      // Strip multi-megabyte base64 scans before writing to 5MB localStorage mirror.
+      // Full cases with scans & heatmaps are safely stored in IndexedDB (PodoPressDB)!
+      const lightweightCases = cases.map(stripHeavyCasePayloads);
+      safeStorage.setItem('ppa-cases', JSON.stringify(lightweightCases));
+    } catch (err) {
+      console.warn('LocalStorage quota protected; IndexedDB holds full scans:', err);
+    }
   }, [cases]);
 
   useEffect(() => {
-    if (selectedCaseId) {
-      localStorage.setItem('ppa-selected-case-id', selectedCaseId);
-    } else {
-      localStorage.removeItem('ppa-selected-case-id');
+    try {
+      if (selectedCaseId) {
+        safeStorage.setItem('ppa-selected-case-id', selectedCaseId);
+      } else {
+        safeStorage.removeItem('ppa-selected-case-id');
+      }
+    } catch {
+      // Ignore
     }
   }, [selectedCaseId]);
 
@@ -154,6 +177,49 @@ export function PodoLoadApp() {
 
   // Restore scans and heatmaps when selecting an existing case from records or cloud
   useEffect(() => {
+    if (selectedCaseId) {
+      // If the case in memory has no raw scans, hydrate it directly from IndexedDB
+      if (!currentCase?.rawScanDataUrl && !currentCase?.rightRawScanDataUrl) {
+        dbService.getCase(selectedCaseId).then((fullDbCase) => {
+          if (fullDbCase && (fullDbCase.rawScanDataUrl || fullDbCase.rightRawScanDataUrl)) {
+            setCases((prev) =>
+              prev.map((c) => (c.id === fullDbCase.id ? { ...c, ...fullDbCase } : c))
+            );
+            if (fullDbCase.rawScanDataUrl) {
+              setLeftFoot({
+                rawDataUrl: fullDbCase.rawScanDataUrl,
+                capturedAt: fullDbCase.createdAt?.slice(11, 19) || '10:00:00',
+                sizePx: '1240 × 1754 px',
+                scalePxMm: '11.8 px/mm',
+                confidence: fullDbCase.qcResult?.score ?? 95,
+                markersCount: 4,
+                lightingOk: true,
+                sharp: true,
+              });
+            }
+            if (fullDbCase.rightRawScanDataUrl) {
+              setRightFoot({
+                rawDataUrl: fullDbCase.rightRawScanDataUrl,
+                capturedAt: fullDbCase.createdAt?.slice(11, 19) || '10:00:00',
+                sizePx: '1240 × 1754 px',
+                scalePxMm: '11.8 px/mm',
+                confidence: fullDbCase.qcResult?.score ?? 95,
+                markersCount: 4,
+                lightingOk: true,
+                sharp: true,
+              });
+            }
+            if (fullDbCase.processedHeatMapDataUrl) {
+              setLeftHeatmapUrl(fullDbCase.processedHeatMapDataUrl);
+            }
+            if (fullDbCase.rightProcessedHeatMapDataUrl) {
+              setRightHeatmapUrl(fullDbCase.rightProcessedHeatMapDataUrl);
+            }
+          }
+        });
+      }
+    }
+
     if (currentCase) {
       if (currentCase.rawScanDataUrl && !leftFoot) {
         setLeftFoot({
@@ -186,7 +252,7 @@ export function PodoLoadApp() {
         setRightHeatmapUrl(currentCase.rightProcessedHeatMapDataUrl);
       }
     }
-  }, [selectedCaseId]);
+  }, [selectedCaseId, currentCase?.rawScanDataUrl, currentCase?.rightRawScanDataUrl]);
 
   // Full purge of all data to start completely fresh
   const handlePurgeAllStaleData = () => {

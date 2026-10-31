@@ -2,6 +2,7 @@
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
 import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile } from '../types';
+import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 1;
@@ -584,7 +585,8 @@ class PodoPressDatabase {
         request.onsuccess = () => {
           const list: AnalysisCase[] = request.result || [];
           try {
-            localStorage.setItem(LS_KEYS.CASES, JSON.stringify(list));
+            const lightweight = list.map(stripHeavyCasePayloads);
+            safeStorage.setItem(LS_KEYS.CASES, JSON.stringify(lightweight));
           } catch {
             // Large base64 scans can exceed localStorage; IndexedDB handles them safely!
           }
@@ -632,7 +634,8 @@ class PodoPressDatabase {
     }
 
     try {
-      localStorage.setItem(LS_KEYS.CASES, JSON.stringify(updated));
+      const lightweight = updated.map(stripHeavyCasePayloads);
+      safeStorage.setItem(LS_KEYS.CASES, JSON.stringify(lightweight));
     } catch {
       // LocalStorage quota may be reached by raw image scans; IndexedDB safely holds high-resolution scans!
     }
@@ -654,7 +657,8 @@ class PodoPressDatabase {
   public async deleteCase(id: string): Promise<void> {
     const current = this.getCasesSync().filter((c) => c.id !== id);
     try {
-      localStorage.setItem(LS_KEYS.CASES, JSON.stringify(current));
+      const lightweight = current.map(stripHeavyCasePayloads);
+      safeStorage.setItem(LS_KEYS.CASES, JSON.stringify(lightweight));
     } catch {
       // Ignore
     }

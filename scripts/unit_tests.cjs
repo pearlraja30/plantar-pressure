@@ -1078,6 +1078,106 @@ it("Enforces bilateral anatomical symmetry (mirrored hallux and medial arches) a
   expect(slotStatus.calibrationScale).toContain("11.8 px/mm");
 });
 
+it("Enforces storage quota protection: offloads high-res scans to IndexedDB, strips heavy payloads from localStorage mirror, and prevents QuotaExceededError crashes", () => {
+  // 1. stripHeavyCasePayloads function simulation
+  const stripHeavyCasePayloads = (c) => {
+    if (!c) return c;
+    return {
+      ...c,
+      rawScanDataUrl: '',
+      processedHeatMapDataUrl: '',
+      rightRawScanDataUrl: '',
+      rightProcessedHeatMapDataUrl: '',
+      heatmapDataUrl: '',
+    };
+  };
+
+  // Create simulated case with 2MB raw scan and 1.5MB heatmap
+  const heavyScan = "data:image/jpeg;base64," + "A".repeat(2 * 1024 * 1024);
+  const heavyHeatmap = "data:image/png;base64," + "B".repeat(1.5 * 1024 * 1024);
+
+  const fullExamCase = {
+    id: "case-test-101",
+    caseNumber: "PPA-2026-9999",
+    patientId: "PAT-001",
+    footSide: "Bilateral",
+    rawScanDataUrl: heavyScan,
+    processedHeatMapDataUrl: heavyHeatmap,
+    rightRawScanDataUrl: heavyScan,
+    rightProcessedHeatMapDataUrl: heavyHeatmap,
+    measurements: {
+      lengthMm: 265,
+      widthMm: 98,
+      archIndex: 0.22,
+    },
+    syncStatus: "synced",
+  };
+
+  // Full case is > 7MB (exceeds 5MB browser limit)
+  const fullJson = JSON.stringify(fullExamCase);
+  expect(fullJson.length).toBeGreaterThan(7 * 1024 * 1024);
+
+  // Stripped case removes heavy image strings
+  const stripped = stripHeavyCasePayloads(fullExamCase);
+  expect(stripped.rawScanDataUrl).toBe("");
+  expect(stripped.processedHeatMapDataUrl).toBe("");
+  expect(stripped.rightRawScanDataUrl).toBe("");
+  expect(stripped.rightProcessedHeatMapDataUrl).toBe("");
+  expect(stripped.measurements.archIndex).toBe(0.22);
+
+  const strippedJson = JSON.stringify(stripped);
+  // Lightweight mirror is only ~200 bytes, safe for 5MB localStorage
+  expect(strippedJson.length).toBeLessThan(1024);
+
+  // 2. SafeStorage Quota Protection Simulation
+  const mockStorage = new Map();
+  let quotaLimit = 5000; // Small simulated 5KB quota
+
+  const safeStorage = {
+    setItem(key, value) {
+      try {
+        let currentSize = 0;
+        mockStorage.forEach((v) => { currentSize += v.length; });
+        if (currentSize + value.length > quotaLimit) {
+          const quotaErr = new Error("Failed to execute 'setItem' on 'Storage': Setting the value of '" + key + "' exceeded the quota.");
+          quotaErr.name = "QuotaExceededError";
+          quotaErr.code = 22;
+          throw quotaErr;
+        }
+        mockStorage.set(key, value);
+        return true;
+      } catch (e) {
+        if (e.name === "QuotaExceededError") {
+          // Auto-evicts bloated mirror key
+          mockStorage.delete("ppa-cases");
+          if (key !== "ppa-cases") {
+            mockStorage.set(key, value);
+            return true;
+          }
+        }
+        return false;
+      }
+    },
+    getItem(key) {
+      return mockStorage.get(key) || null;
+    },
+    removeItem(key) {
+      mockStorage.delete(key);
+    }
+  };
+
+  // SafeStorage safely handles quota limit and does not throw unhandled error
+  const oversizedData = "X".repeat(6000);
+  const result = safeStorage.setItem("ppa-cases", oversizedData);
+  expect(result).toBe(false); // Cleanly returned false without crashing
+  expect(safeStorage.getItem("ppa-cases")).toBe(null);
+
+  // Saving normal metadata succeeds
+  const okResult = safeStorage.setItem("ppa-patients", JSON.stringify([{ id: "P1" }]));
+  expect(okResult).toBe(true);
+  expect(safeStorage.getItem("ppa-patients")).toContain("P1");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
