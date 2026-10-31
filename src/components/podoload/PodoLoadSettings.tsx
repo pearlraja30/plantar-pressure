@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb } from 'lucide-react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { PatientIdConfig, PatientIdMode } from '../../types';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
@@ -105,6 +105,7 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
   const [idConfig, setIdConfig] = useState<PatientIdConfig>(() => dbService.getPatientIdConfigSync());
   const [dbStats, setDbStats] = useState({ patientCount: 0, casesCount: 0 });
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [schemaTab, setSchemaTab] = useState<'patients' | 'cases' | 'settings' | 'audit_logs'>('patients');
 
   // Verification battery
   const [tests, setTests] = useState<VerificationResult[]>(DEFAULT_VERIFICATION_TESTS);
@@ -436,6 +437,121 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                       style={{ display: 'none' }}
                     />
                   </label>
+                </div>
+              </div>
+
+              {/* Card 3: TABLE SCHEMAS & DATABASE STRUCTURE */}
+              <div className="podoload-card" style={{ padding: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                  <h4 className="podoload-card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Table className="w-4 h-4 text-teal-600" />
+                    <span>DATABASE TABLE SCHEMAS & STRUCTURE</span>
+                  </h4>
+                  <span className="podo-badge podo-badge-green">PodoPressDB v1</span>
+                </div>
+
+                {/* Sub-tabs for tables */}
+                <div className="podoload-segmented-buttons" style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  {[
+                    { id: 'patients', label: `patients (${dbStats.patientCount})` },
+                    { id: 'cases', label: `cases / reports (${dbStats.casesCount})` },
+                    { id: 'settings', label: 'settings (config)' },
+                    { id: 'audit_logs', label: 'audit_logs (21 CFR)' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`podoload-seg-btn ${schemaTab === tab.id ? 'active' : ''}`}
+                      style={{ fontSize: '0.72rem', flex: 1, minHeight: '30px' }}
+                      onClick={() => setSchemaTab(tab.id as any)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Active Table Details */}
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    <span>Store Name: <strong style={{ color: '#0c2328' }}>{schemaTab}</strong></span>
+                    <span>Primary Key: <strong style={{ color: '#0891b2' }}>{schemaTab === 'settings' ? 'key' : 'id'}</strong></span>
+                    <span>Indexed Fields: <strong style={{ color: '#059669' }}>{schemaTab === 'patients' ? 'mrn, name, createdAt' : schemaTab === 'cases' ? 'patientId, caseNumber, createdAt, syncStatus' : schemaTab === 'audit_logs' ? 'timestamp' : 'key-value store'}</strong></span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                    {schemaTab === 'patients' && 'Stores patient master records, demographic profiles, and alphanumeric Medical Record Numbers (MRN).'}
+                    {schemaTab === 'cases' && 'Stores complete plantar pressure examination cases, bilateral raw footprints, synthesized heatmaps, biomechanical indices, and PDF reports.'}
+                    {schemaTab === 'settings' && 'Stores application runtime configurations, alphanumeric patient ID generation rules, and hospital/clinic branding.'}
+                    {schemaTab === 'audit_logs' && 'Stores immutable clinical compliance audit trail records tracking every registration, scan, and sign-off.'}
+                  </p>
+                </div>
+
+                {/* Schema Columns Table */}
+                <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+                  <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.72rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>FIELD / COLUMN</th>
+                        <th style={{ textAlign: 'left' }}>DATA TYPE</th>
+                        <th style={{ textAlign: 'left' }}>KEY / INDEX</th>
+                        <th style={{ textAlign: 'left' }}>DESCRIPTION</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schemaTab === 'patients' && (
+                        <>
+                          <tr><td style={{ fontWeight: 600 }}>id</td><td>string (UUID)</td><td><span className="podo-badge podo-badge-green">PK</span></td><td>Unique internal patient record key</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>mrn</td><td>string</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Alphanumeric Patient ID (e.g. PP-A82KX)</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>name</td><td>string</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Full legal patient name</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>age</td><td>number</td><td>Optional</td><td>Patient age in years</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>gender</td><td>string</td><td>Optional</td><td>Male | Female | Other</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>heightCm / weightKg</td><td>number</td><td>Optional</td><td>Patient physical stature and body mass</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>contact</td><td>string</td><td>Optional</td><td>Mobile or telephone number</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>clinicalNotes</td><td>string</td><td>Optional</td><td>Pathology, neuropathy indication, or referrals</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>createdAt / updatedAt</td><td>string (ISO 8601)</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Registration & modification timestamps</td></tr>
+                        </>
+                      )}
+                      {schemaTab === 'cases' && (
+                        <>
+                          <tr><td style={{ fontWeight: 600 }}>id</td><td>string (UUID)</td><td><span className="podo-badge podo-badge-green">PK</span></td><td>Unique clinical exam record key</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>caseNumber</td><td>string</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Accession code (e.g. PPA-2026-1042)</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>patientId</td><td>string</td><td><span className="podo-badge podo-badge-green">FK INDEX</span></td><td>Foreign key pointing to patients.id</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>footSide</td><td>string</td><td>Required</td><td>Left | Right | Bilateral</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>rawScanDataUrl</td><td>string (PNG base64)</td><td>Original Scan</td><td>Uncompressed original left foot scan image</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>processedHeatMapDataUrl</td><td>string (PNG base64)</td><td>Synthesized</td><td>Calibrated JET colormap pressure heatmap</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>rightRawScanDataUrl</td><td>string (PNG base64)</td><td>Original Scan</td><td>Uncompressed original right foot scan image</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>rightProcessedHeatMapDataUrl</td><td>string (PNG base64)</td><td>Synthesized</td><td>Calibrated right foot pressure heatmap</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>scanMetadata</td><td>JSON object</td><td>Hardware</td><td>Scanner model, DPI, optical scale px/mm</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>qcResult</td><td>JSON object</td><td>QC Score</td><td>Automated sharpness, lighting, 4-marker status</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>regionalAnalysis</td><td>JSON object</td><td>Biomechanics</td><td>Forefoot/midfoot/hindfoot contact %, Cavanagh arch index</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>orthoticMeasurements</td><td>JSON object</td><td>Orthotics</td><td>Foot length, ball breadth, heel width, recommendations</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>syncStatus</td><td>string</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>local | synced | pending | failed</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>createdAt</td><td>string (ISO 8601)</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Exam acquisition timestamp</td></tr>
+                        </>
+                      )}
+                      {schemaTab === 'settings' && (
+                        <>
+                          <tr><td style={{ fontWeight: 600 }}>key</td><td>string</td><td><span className="podo-badge podo-badge-green">PK</span></td><td>Configuration namespace identifier</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>value</td><td>JSON object</td><td>Required</td><td>Serialized configuration payload</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>patient_id_config</td><td>JSON object</td><td>Config</td><td>Prefix, alphanumeric mode, uppercase rules</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>app_settings</td><td>JSON object</td><td>Config</td><td>Scanner resolution, sheet size, cloud server address</td></tr>
+                        </>
+                      )}
+                      {schemaTab === 'audit_logs' && (
+                        <>
+                          <tr><td style={{ fontWeight: 600 }}>id</td><td>string (UUID)</td><td><span className="podo-badge podo-badge-green">PK</span></td><td>Unique audit entry key</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>timestamp</td><td>string (ISO 8601)</td><td><span className="podo-badge podo-badge-green">INDEX</span></td><td>Audit event timestamp (UTC)</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>userId</td><td>string</td><td>Required</td><td>Clinician / technician username</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>action</td><td>string</td><td>Required</td><td>PATIENT_REGISTERED, SCAN_ACQUIRED, REPORT_SAVED</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>details</td><td>string</td><td>Required</td><td>Detailed narrative of the clinical transaction</td></tr>
+                          <tr><td style={{ fontWeight: 600 }}>algorithmVersion</td><td>string</td><td>Required</td><td>Medical algorithm version (IEC 62304 verified)</td></tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '0.65rem', padding: '0.45rem', backgroundColor: '#eff6ff', borderRadius: '4px', border: '1px solid #bfdbfe', fontSize: '0.72rem', color: '#1e40af' }}>
+                  💡 <strong>How to Inspect Raw Tables in Browser DevTools:</strong> Press <kbd>F12</kbd> (or <kbd>Cmd+Option+I</kbd> on Mac) → Open <strong>Application</strong> tab → In left sidebar under <strong>Storage</strong>, expand <strong>IndexedDB</strong> → Click <strong>PodoPressDB</strong> → Click any table (e.g. <code>patients</code>, <code>cases</code>) to view, filter, or delete raw rows in real-time.
                 </div>
               </div>
             </>

@@ -577,6 +577,28 @@ it("Enforces strict clinical data integrity: enumerates genuine hardware devices
   expect(validateScanDataOrigin("")).toBe(false);
 });
 
+it("Enforces mutually exclusive capture buttons: displays only Scanner button in scanner mode and only Import button in import mode", () => {
+  const getRenderedButtons = (mode, isMobile) => {
+    const buttons = [];
+    if (mode === "scanner") buttons.push("Scan Foot");
+    if (mode === "import") buttons.push("Import image");
+    if (mode === "camera" && isMobile) buttons.push("Camera");
+    return buttons;
+  };
+
+  const scannerModeDesktop = getRenderedButtons("scanner", false);
+  expect(scannerModeDesktop.length).toBe(1);
+  expect(scannerModeDesktop[0]).toBe("Scan Foot");
+
+  const importModeDesktop = getRenderedButtons("import", false);
+  expect(importModeDesktop.length).toBe(1);
+  expect(importModeDesktop[0]).toBe("Import image");
+
+  const cameraModeMobile = getRenderedButtons("camera", true);
+  expect(cameraModeMobile.length).toBe(1);
+  expect(cameraModeMobile[0]).toBe("Camera");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -245,3 +245,4 @@ class HardwareScannerService {
 }
 
 export const hardwareScannerService = new HardwareScannerService();
+

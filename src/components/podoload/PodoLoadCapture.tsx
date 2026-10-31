@@ -774,17 +774,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             }}
           >
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {isMobileDevice ? (
-                <button
-                  type="button"
-                  className="podoload-btn-primary podoload-btn-sm"
-                  onClick={() => onOpenLiveScannerWizard?.('Left')}
-                  title="Launch camera alignment and scanner wizard"
-                >
-                  <Camera className="w-3.5 h-3.5 mr-1 inline" />
-                  Camera
-                </button>
-              ) : (
+              {leftMode === 'scanner' && (
                 <button
                   type="button"
                   className="podoload-btn-primary podoload-btn-sm"
@@ -810,16 +800,31 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </button>
               )}
 
-              <button
-                type="button"
-                className="podoload-btn-secondary podoload-btn-sm"
-                onClick={() => leftFileInputRef.current?.click()}
-                title="Select original scan image file"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import image</span>
-              </button>
+              {leftMode === 'import' && (
+                <button
+                  type="button"
+                  className="podoload-btn-primary podoload-btn-sm"
+                  onClick={() => leftFileInputRef.current?.click()}
+                  title="Select original scan image file"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{leftFoot ? 'Replace Image' : 'Import image'}</span>
+                </button>
+              )}
+
+              {leftMode === 'camera' && isMobileDevice && (
+                <button
+                  type="button"
+                  className="podoload-btn-primary podoload-btn-sm"
+                  onClick={() => onOpenLiveScannerWizard?.('Left')}
+                  title="Launch camera alignment and scanner wizard"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Camera className="w-3.5 h-3.5 mr-1 inline" />
+                  <span>{leftFoot ? 'Re-take Photo' : 'Camera'}</span>
+                </button>
+              )}
             </div>
 
             {leftFoot && (
@@ -1064,17 +1069,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             }}
           >
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {isMobileDevice ? (
-                <button
-                  type="button"
-                  className="podoload-btn-primary podoload-btn-sm"
-                  onClick={() => onOpenLiveScannerWizard?.('Right')}
-                  title="Launch camera alignment and scanner wizard"
-                >
-                  <Camera className="w-3.5 h-3.5 mr-1 inline" />
-                  Camera
-                </button>
-              ) : (
+              {rightMode === 'scanner' && (
                 <button
                   type="button"
                   className="podoload-btn-primary podoload-btn-sm"
@@ -1100,16 +1095,31 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </button>
               )}
 
-              <button
-                type="button"
-                className="podoload-btn-secondary podoload-btn-sm"
-                onClick={() => rightFileInputRef.current?.click()}
-                title="Select original scan image file"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import image</span>
-              </button>
+              {rightMode === 'import' && (
+                <button
+                  type="button"
+                  className="podoload-btn-primary podoload-btn-sm"
+                  onClick={() => rightFileInputRef.current?.click()}
+                  title="Select original scan image file"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{rightFoot ? 'Replace Image' : 'Import image'}</span>
+                </button>
+              )}
+
+              {rightMode === 'camera' && isMobileDevice && (
+                <button
+                  type="button"
+                  className="podoload-btn-primary podoload-btn-sm"
+                  onClick={() => onOpenLiveScannerWizard?.('Right')}
+                  title="Launch camera alignment and scanner wizard"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Camera className="w-3.5 h-3.5 mr-1 inline" />
+                  <span>{rightFoot ? 'Re-take Photo' : 'Camera'}</span>
+                </button>
+              )}
             </div>
 
             {rightFoot && (
