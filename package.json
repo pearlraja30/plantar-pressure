@@ -1,7 +1,7 @@
 {
   "name": "plantar-pressure",
   "private": true,
-  "version": "1.0.46",
+  "version": "1.0.47",
   "description": "PodoPress - Harris Mat image-based plantar pressure analysis system",
   "author": "Technomind Healthcare Systems",
   "main": "electron/main.cjs",

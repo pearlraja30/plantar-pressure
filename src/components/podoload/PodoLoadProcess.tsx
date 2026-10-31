@@ -29,8 +29,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   const [flattenLighting, setFlattenLighting] = useState<boolean>(true);
   const [removePaperNoise, setRemovePaperNoise] = useState<boolean>(true);
 
-  // Pipeline execution animation / state
-  const [pipelineProgress, setPipelineProgress] = useState<number>(100);
+  // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Process both scans (or single available foot) using clinical imageProcessingService
@@ -38,7 +37,6 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
     if (!leftFoot?.rawDataUrl && !rightFoot?.rawDataUrl) return;
 
     setIsProcessing(true);
-    setPipelineProgress(20);
 
     try {
       let leftResult: any = null;
@@ -50,7 +48,6 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
         const leftImg = new Image();
         leftImg.src = leftFoot.rawDataUrl;
         await new Promise((res) => (leftImg.onload = res));
-        setPipelineProgress(50);
 
         leftResult = await processHarrisMatScan(leftImg, 'Left', {
           smoothRadius: smoothingStrength,
@@ -63,7 +60,6 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
         const rightImg = new Image();
         rightImg.src = rightFoot.rawDataUrl;
         await new Promise((res) => (rightImg.onload = res));
-        setPipelineProgress(80);
 
         rightResult = await processHarrisMatScan(rightImg, 'Right', {
           smoothRadius: smoothingStrength,
@@ -72,7 +68,6 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
         rightUrl = rightResult.processedDataUrl;
       }
 
-      setPipelineProgress(100);
       onUpdateHeatmaps(
         leftUrl,
         rightUrl,
@@ -282,34 +277,6 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
           >
             {isProcessing ? 'Processing...' : 'Reprocess'}
           </button>
-        </div>
-      </div>
-
-      {/* ================= BOTTOM CARD: PROCESSING PIPELINE ================= */}
-      <div className="podoload-card" style={{ padding: '0.85rem 1.15rem' }}>
-        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--podo-card-title)', marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
-          PROCESSING PIPELINE
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.5rem' }}>
-          <span>Calibration <strong style={{ color: '#15803d' }}>Done</strong></span>
-          <span>Lens correction <strong style={{ color: '#15803d' }}>Done</strong></span>
-          <span>Lighting flattening <strong style={{ color: '#15803d' }}>Done</strong></span>
-          <span>Smoothing <strong style={{ color: '#15803d' }}>Done</strong></span>
-          <span>Heatmap <strong style={{ color: pipelineProgress >= 100 ? '#15803d' : '#b45309' }}>{pipelineProgress >= 100 ? 'Done' : '60%'}</strong></span>
-          <span>Measurements <strong style={{ color: pipelineProgress >= 100 ? '#15803d' : '#657e84' }}>{pipelineProgress >= 100 ? 'Done' : 'Queued'}</strong></span>
-        </div>
-
-        {/* Progress Bar */}
-        <div style={{ width: '100%', height: '6px', backgroundColor: '#e2ecee', borderRadius: '3px', overflow: 'hidden' }}>
-          <div
-            style={{
-              width: `${pipelineProgress}%`,
-              height: '100%',
-              backgroundColor: 'var(--podo-primary)',
-              transition: 'width 0.4s ease',
-            }}
-          />
         </div>
       </div>
 

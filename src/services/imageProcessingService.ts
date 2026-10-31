@@ -279,6 +279,43 @@ function segmentPlantarFootAndToes(
     binary[i] = darkNorm[i] > threshold ? 1 : 0;
   }
 
+  // Pre-filter linear scanner sensor & paper edge lines before morphological closing to prevent bridging
+  for (let y = 0; y < h; y++) {
+    let runStart = -1;
+    for (let x = 0; x <= w; x++) {
+      const isSet = x < w && binary[y * w + x] === 1;
+      if (isSet) {
+        if (runStart < 0) runStart = x;
+      } else if (runStart >= 0) {
+        const runLen = x - runStart;
+        if (runLen >= 15) {
+          // Check if this horizontal run has thin vertical thickness (<= 3px)
+          let isThinLine = true;
+          for (let rx = runStart; rx < x; rx++) {
+            let vThick = 0;
+            for (let dy = -3; dy <= 3; dy++) {
+              const ny = y + dy;
+              if (ny >= 0 && ny < h && binary[ny * w + rx] === 1) vThick++;
+            }
+            if (vThick > 3) {
+              isThinLine = false;
+              break;
+            }
+          }
+          if (isThinLine) {
+            for (let rx = runStart; rx < x; rx++) {
+              for (let dy = -2; dy <= 2; dy++) {
+                const ny = y + dy;
+                if (ny >= 0 && ny < h) binary[ny * w + rx] = 0;
+              }
+            }
+          }
+        }
+        runStart = -1;
+      }
+    }
+  }
+
   // 2. Grid-scale morphological closing (radius 4) to bridge 2-4px mesh lines without arch bridging
   const dil = new Uint8Array(w * h);
   const closed = new Uint8Array(w * h);

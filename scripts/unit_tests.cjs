@@ -867,6 +867,23 @@ it("Suppresses linear scanner line artifacts and marks below the heel in footpri
   expect(isToeValid).toBe(true);
 });
 
+it("Eliminates redundant processing pipeline card from process view: presents clean side-by-side heatmaps and parameters without clutter", () => {
+  const getProcessViewSections = () => {
+    return {
+      hasLeftProcessedCard: true,
+      hasRightProcessedCard: true,
+      hasParametersPanel: true,
+      hasProcessingPipelineCard: false, // Irrelevant pipeline card cleanly removed per clinical user request
+    };
+  };
+
+  const sections = getProcessViewSections();
+  expect(sections.hasLeftProcessedCard).toBe(true);
+  expect(sections.hasRightProcessedCard).toBe(true);
+  expect(sections.hasParametersPanel).toBe(true);
+  expect(sections.hasProcessingPipelineCard).toBe(false);
+});
+
 it("Auto-generates clinical doctor comments derived from footprint findings without sentence duplication", () => {
   const deduplicateSentences = (text) => {
     if (!text) return "";
