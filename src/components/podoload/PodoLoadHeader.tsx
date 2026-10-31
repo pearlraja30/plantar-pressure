@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Globe, Menu } from 'lucide-react';
+import { Cloud, Globe, Menu, Building2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
@@ -14,6 +14,8 @@ interface PodoLoadHeaderProps {
   cloudSynced: boolean;
   onOpenCloud: () => void;
   doctorName?: string;
+  clinicName?: string;
+  onOpenAdmin?: () => void;
   onOpenMobileMenu?: () => void;
 }
 
@@ -27,6 +29,8 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   cloudSynced,
   onOpenCloud,
   doctorName = 'Dr. Specialist',
+  clinicName = 'Technomind Healthcare Systems',
+  onOpenAdmin,
   onOpenMobileMenu,
 }) => {
   const isMobileDevice =
@@ -40,6 +44,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
     if (currentSection === 'patient_search') return 'Patient records · Search directory';
     if (currentSection === 'reports_cloud') return 'Clinical records · Reports and cloud archive';
     if (currentSection === 'settings') return 'System · Clinical device settings';
+    if (currentSection === 'admin') return 'Administration · Hospital profile & report branding';
 
     switch (currentStep) {
       case 1:
@@ -116,6 +121,31 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             <Globe className="w-3 h-3 mr-1 inline opacity-70" />
             <span>EN</span>
           </div>
+
+          {/* Active Hospital Pill */}
+          {clinicName && (
+            <button
+              type="button"
+              className="podoload-lang-badge"
+              onClick={onOpenAdmin}
+              title="Active Hospital Account (Click to open Admin Panel)"
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                backgroundColor: '#f0fdf4',
+                borderColor: '#bbf7d0',
+                color: '#166534',
+                fontWeight: 700,
+                fontSize: '0.72rem',
+                padding: '0.2rem 0.55rem',
+              }}
+            >
+              <Building2 className="w-3.5 h-3.5 text-teal-600" />
+              <span>{clinicName}</span>
+            </button>
+          )}
 
           {/* Doctor Profile Name */}
           <div className="podoload-doctor-tag">{doctorName}</div>

@@ -18,6 +18,7 @@ interface PodoLoadReportProps {
   onFinishExam: () => void;
   onSaveToArchive: (updatedCase: Partial<AnalysisCase>) => void;
   onOpenArchive?: () => void;
+  onOpenAdmin?: () => void;
 }
 
 /**
@@ -137,15 +138,54 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   onFinishExam,
   onSaveToArchive,
   onOpenArchive,
+  onOpenAdmin,
 }) => {
   const savedSettings = dbService.getSettingsSync();
   // Hospital branding state (clean defaults from Inbuilt DB)
-  const [clinicName, setClinicName] = useState(savedSettings.clinical?.clinicName || 'Technomind Healthcare Systems');
-  const [clinicContact, setClinicContact] = useState('');
-  const [logoPosition, setLogoPosition] = useState<'Left' | 'Centre' | 'Right'>('Left');
-  const [customFooter, setCustomFooter] = useState('');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [clinicName, setClinicName] = useState(
+    currentCase?.clinicName || savedSettings.clinical?.clinicName || 'Technomind Healthcare Systems'
+  );
+  const [clinicContact, setClinicContact] = useState(savedSettings.clinical?.clinicContact || '');
+  const [logoPosition, setLogoPosition] = useState<'Left' | 'Centre' | 'Right'>(
+    savedSettings.clinical?.logoPosition || 'Left'
+  );
+  const [customFooter, setCustomFooter] = useState(savedSettings.clinical?.clinicFooterText || '');
+  const [logoUrl, setLogoUrl] = useState<string | null>(savedSettings.clinical?.clinicLogoUrl || null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [hospitalSaveFeedback, setHospitalSaveFeedback] = useState<string | null>(null);
+
+  const handleSaveHospitalDefault = async () => {
+    const settings = dbService.getSettingsSync();
+    settings.clinical = {
+      ...settings.clinical,
+      clinicName,
+      clinicLogoUrl: logoUrl || '',
+      logoPosition,
+      clinicContact,
+      clinicFooterText: customFooter,
+      defaultDoctor: doctorName,
+      defaultTechnician: technicianName,
+    };
+    await dbService.saveSettings(settings);
+
+    // Also update active hospital profile
+    const active = dbService.getActiveHospitalSync();
+    if (active) {
+      await dbService.saveHospitalProfile({
+        ...active,
+        name: clinicName,
+        logoUrl: logoUrl || '',
+        logoPosition,
+        contact: clinicContact,
+        footerText: customFooter,
+        defaultDoctor: doctorName,
+        defaultTechnician: technicianName,
+      });
+    }
+
+    setHospitalSaveFeedback('✓ Hospital name and logo saved as default for all future reports!');
+    setTimeout(() => setHospitalSaveFeedback(null), 3500);
+  };
 
   // Signatories
   const [doctorName, setDoctorName] = useState(savedSettings.clinical?.defaultDoctor || 'Dr. Specialist');
@@ -491,6 +531,36 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 onChange={(e) => setCustomFooter(e.target.value)}
               />
             </div>
+
+            {/* Save as Hospital Default & Admin Panel Link */}
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
+              <button
+                type="button"
+                className="podoload-btn-primary podoload-btn-sm"
+                style={{ flex: 1, fontSize: '0.68rem' }}
+                onClick={handleSaveHospitalDefault}
+                title="Save current hospital name, logo and contacts as defaults in Inbuilt Database"
+              >
+                💾 Save Hospital Defaults
+              </button>
+              {onOpenAdmin && (
+                <button
+                  type="button"
+                  className="podoload-btn-secondary podoload-btn-sm"
+                  style={{ fontSize: '0.68rem' }}
+                  onClick={onOpenAdmin}
+                  title="Open Hospital Admin Panel"
+                >
+                  🏥 Admin Panel
+                </button>
+              )}
+            </div>
+
+            {hospitalSaveFeedback && (
+              <div style={{ fontSize: '0.68rem', color: '#0d9488', fontWeight: 600 }}>
+                {hospitalSaveFeedback}
+              </div>
+            )}
           </div>
 
           {/* Card 2: Signatories */}

@@ -224,7 +224,53 @@ export interface SystemSettings {
   };
   clinical: {
     clinicName: string;
+    clinicLogoUrl?: string;
+    logoPosition?: 'Left' | 'Centre' | 'Right';
+    clinicAddress?: string;
+    clinicContact?: string;
+    clinicRegistrationNo?: string;
+    clinicFooterText?: string;
     defaultDoctor: string;
     defaultTechnician: string;
+    hospitalId?: string;
+    role?: 'admin' | 'doctor' | 'technician';
+  };
+}
+
+export interface HospitalDoctor {
+  id: string;
+  name: string;
+  specialization: string;
+  licenseNo: string;
+}
+
+export interface HospitalTechnician {
+  id: string;
+  name: string;
+  staffId: string;
+}
+
+export interface HospitalProfile {
+  id: string;
+  name: string;
+  code: string;
+  logoUrl?: string;
+  logoPosition?: 'Left' | 'Centre' | 'Right';
+  address: string;
+  contact: string;
+  email: string;
+  website?: string;
+  registrationNo: string;
+  department: string;
+  defaultDoctor: string;
+  defaultTechnician: string;
+  footerText: string;
+  doctors: HospitalDoctor[];
+  technicians: HospitalTechnician[];
+  activeUser?: {
+    username: string;
+    name: string;
+    role: 'admin' | 'doctor' | 'technician';
+    loginTime: string;
   };
 }

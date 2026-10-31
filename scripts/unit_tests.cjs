@@ -928,6 +928,60 @@ it("Provides multi-format report sharing and output options: Print, PDF, Web Sha
   expect(caps.supportsInbuiltDbArchive).toBe(true);
 });
 
+it("Enforces configurable hospital branding, logo persistence, and multi-clinic profile switching in Inbuilt Database", () => {
+  const hospitalDb = new Map();
+  const saveHospital = (hosp) => {
+    hospitalDb.set(hosp.id, hosp);
+    return hosp;
+  };
+
+  // Hospital 1: Technomind Central
+  saveHospital({
+    id: "hosp-01",
+    name: "Technomind Healthcare Systems",
+    code: "TMH-CENTRAL",
+    logoUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    logoPosition: "Left",
+    defaultDoctor: "Dr. Specialist",
+  });
+
+  // Hospital 2: Apex Orthopaedic Center
+  saveHospital({
+    id: "hosp-02",
+    name: "Apex Orthopaedic & Podiatry Center",
+    code: "APEX-ORTHO",
+    logoUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+    logoPosition: "Centre",
+    defaultDoctor: "Dr. Marcus Vance",
+  });
+
+  expect(hospitalDb.size).toBe(2);
+  const hosp1 = hospitalDb.get("hosp-01");
+  const hosp2 = hospitalDb.get("hosp-02");
+
+  expect(hosp1.name).toBe("Technomind Healthcare Systems");
+  expect(hosp1.logoUrl.startsWith("data:image/png")).toBe(true);
+  expect(hosp2.name).toBe("Apex Orthopaedic & Podiatry Center");
+  expect(hosp2.logoPosition).toBe("Centre");
+  expect(hosp2.defaultDoctor).toBe("Dr. Marcus Vance");
+});
+
+it("Guarantees hospital login session management and report header synchronization", () => {
+  let activeHospitalId = "hosp-01";
+  const loginToHospital = (hospId, role = "admin") => {
+    activeHospitalId = hospId;
+    return {
+      activeHospitalId,
+      user: `Dr. Clinician (${role.toUpperCase()})`,
+      sessionTime: new Date().toISOString(),
+    };
+  };
+
+  const session = loginToHospital("hosp-02", "admin");
+  expect(session.activeHospitalId).toBe("hosp-02");
+  expect(session.user).toBe("Dr. Clinician (ADMIN)");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

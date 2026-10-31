@@ -11,8 +11,9 @@ import { PodoLoadReport } from './PodoLoadReport';
 import { PodoLoadPatientSearch } from './PodoLoadPatientSearch';
 import { PodoLoadCloudRecords } from './PodoLoadCloudRecords';
 import { PodoLoadSettings } from './PodoLoadSettings';
+import { PodoLoadAdmin } from './PodoLoadAdmin';
 
-import { Patient, AnalysisCase } from '../../types';
+import { Patient, AnalysisCase, HospitalProfile } from '../../types';
 import { cloudSyncService, CloudSyncStatus } from '../../services/cloudSyncService';
 import { logAuditEvent } from '../../services/auditService';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
@@ -133,6 +134,9 @@ export function PodoLoadApp() {
     patients.find((p) => p.id === selectedPatientId) || (patients.length > 0 ? patients[0] : undefined);
   const currentCase =
     cases.find((c) => c.id === selectedCaseId) || (cases.length > 0 ? cases[0] : undefined);
+
+  // Active hospital profile
+  const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());
 
   // Cloud Sync state
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>(cloudSyncService.getStatus());
@@ -515,7 +519,9 @@ export function PodoLoadApp() {
           onSearchChange={setGlobalSearch}
           cloudSynced={cloudStatus.isOnline}
           onOpenCloud={() => setCurrentSection('reports_cloud')}
-          doctorName="Dr. Specialist"
+          doctorName={activeHospital.defaultDoctor || 'Dr. Specialist'}
+          clinicName={activeHospital.name}
+          onOpenAdmin={() => setCurrentSection('admin')}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
@@ -591,6 +597,7 @@ export function PodoLoadApp() {
               }}
               onSaveToArchive={handleSaveToArchive}
               onOpenArchive={() => setCurrentSection('reports_cloud')}
+              onOpenAdmin={() => setCurrentSection('admin')}
             />
           )}
 
@@ -632,9 +639,29 @@ export function PodoLoadApp() {
             />
           )}
 
+          {/* ADMINISTRATION: Hospital & Admin */}
+          {currentSection === 'admin' && (
+            <PodoLoadAdmin
+              onHospitalChanged={(hosp) => {
+                setActiveHospital(hosp);
+              }}
+              onNavigateToReport={() => {
+                setCurrentStep(5);
+                setCurrentSection('report');
+              }}
+              onNavigateToRegistration={() => {
+                setCurrentStep(1);
+                setCurrentSection('registration');
+              }}
+            />
+          )}
+
           {/* SYSTEM: Settings */}
           {currentSection === 'settings' && (
-            <PodoLoadSettings onPurgeAllData={handlePurgeAllStaleData} />
+            <PodoLoadSettings
+              onPurgeAllData={handlePurgeAllStaleData}
+              onOpenAdmin={() => setCurrentSection('admin')}
+            />
           )}
         </main>
 

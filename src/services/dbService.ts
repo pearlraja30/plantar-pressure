@@ -1,7 +1,7 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile } from '../types';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 1;
@@ -41,10 +41,95 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   },
   clinical: {
     clinicName: 'Technomind Healthcare Systems',
+    clinicLogoUrl: '',
+    logoPosition: 'Left',
+    clinicAddress: '100 Medical Center Blvd, Suite 400',
+    clinicContact: '+1 (800) 555-PODO · contact@technomind.health',
+    clinicRegistrationNo: 'NABH-CLINIC-2026-88',
+    clinicFooterText: 'Affiliated with National Institute of Podiatry · ISO 13485 Certified',
     defaultDoctor: 'Dr. Specialist',
-    defaultTechnician: '',
+    defaultTechnician: 'Tech. Specialist',
+    hospitalId: 'hosp-001',
+    role: 'admin',
   },
 };
+
+export const DEFAULT_HOSPITALS: HospitalProfile[] = [
+  {
+    id: 'hosp-001',
+    name: 'Technomind Healthcare Systems',
+    code: 'TMH-CENTRAL',
+    logoUrl: '',
+    logoPosition: 'Left',
+    address: '100 Medical Center Blvd, Suite 400',
+    contact: '+1 (800) 555-PODO · www.technomind.health',
+    email: 'contact@technomind.health',
+    website: 'https://technomind.health',
+    registrationNo: 'NABH-CLINIC-2026-88',
+    department: 'Department of Podiatry & Lower Limb Biomechanics',
+    defaultDoctor: 'Dr. Specialist',
+    defaultTechnician: 'Tech. Specialist',
+    footerText: 'Affiliated with National Institute of Podiatry · ISO 13485 Certified',
+    doctors: [
+      { id: 'doc-01', name: 'Dr. Specialist', specialization: 'Consultant Podiatric Surgeon', licenseNo: 'MED-REG-8492' },
+      { id: 'doc-02', name: 'Dr. Sarah Jenkins', specialization: 'Diabetic Foot Care Specialist', licenseNo: 'MED-REG-9912' },
+    ],
+    technicians: [
+      { id: 'tech-01', name: 'Tech. Specialist', staffId: 'TECH-101' },
+      { id: 'tech-02', name: 'Alex Rivera', staffId: 'TECH-104' },
+    ],
+    activeUser: {
+      username: 'admin@technomind.health',
+      name: 'Dr. Specialist (Admin)',
+      role: 'admin',
+      loginTime: new Date().toISOString(),
+    },
+  },
+  {
+    id: 'hosp-002',
+    name: 'Apex Orthopaedic & Podiatry Center',
+    code: 'APEX-ORTHO',
+    logoUrl: '',
+    logoPosition: 'Centre',
+    address: '450 Northway Expressway, Sector 12',
+    contact: '+1 (888) 420-APEX · info@apexortho.org',
+    email: 'info@apexortho.org',
+    website: 'https://apexortho.org',
+    registrationNo: 'JCI-APEX-2025-104',
+    department: 'Center for Foot & Ankle Reconstruction',
+    defaultDoctor: 'Dr. Marcus Vance',
+    defaultTechnician: 'Robert Chen',
+    footerText: 'JCI Accredited Center of Excellence in Orthopaedic Sports Medicine',
+    doctors: [
+      { id: 'doc-03', name: 'Dr. Marcus Vance', specialization: 'Senior Orthopaedic Podiatrist', licenseNo: 'APEX-DOC-012' },
+    ],
+    technicians: [
+      { id: 'tech-03', name: 'Robert Chen', staffId: 'TECH-APEX-01' },
+    ],
+  },
+  {
+    id: 'hosp-003',
+    name: 'Metro Diabetes & Preventive Foot Care',
+    code: 'METRO-FOOT',
+    logoUrl: '',
+    logoPosition: 'Left',
+    address: '78 Metro Boulevard, Floor 2',
+    contact: '+1 (800) 902-METRO · support@metrofootcare.com',
+    email: 'support@metrofootcare.com',
+    website: 'https://metrofootcare.com',
+    registrationNo: 'STATE-LIC-9941-DF',
+    department: 'Preventive Diabetic Footwear & Biomechanics Lab',
+    defaultDoctor: 'Dr. Priya Sharma',
+    defaultTechnician: 'Kavita Rao',
+    footerText: 'Dedicated to Diabetic Wound Offloading & Preventive Podiatric Care',
+    doctors: [
+      { id: 'doc-04', name: 'Dr. Priya Sharma', specialization: 'Endocrine & Podiatric Clinician', licenseNo: 'METRO-DOC-08' },
+    ],
+    technicians: [
+      { id: 'tech-04', name: 'Kavita Rao', staffId: 'TECH-METRO-05' },
+    ],
+  },
+];
 
 // Storage keys for local mirroring and instant synchronous hydration
 const LS_KEYS = {
@@ -55,6 +140,8 @@ const LS_KEYS = {
   AUDIT_LOG: 'ppa_audit_log_v1',
   SELECTED_PATIENT: 'ppa-selected-patient-id',
   SELECTED_CASE: 'ppa-selected-case-id',
+  HOSPITALS: 'podopress_hospitals_v1',
+  ACTIVE_HOSPITAL_ID: 'podopress_active_hospital_id_v1',
 };
 
 class PodoPressDatabase {
@@ -709,6 +796,120 @@ class PodoPressDatabase {
       console.error('Failed to import database backup:', err);
       return false;
     }
+  }
+
+  // =========================================================================
+  // HOSPITAL PROFILES & LOGIN OPERATIONS
+  // =========================================================================
+
+  public getHospitalProfilesSync(): HospitalProfile[] {
+    try {
+      const raw = localStorage.getItem(LS_KEYS.HOSPITALS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return DEFAULT_HOSPITALS;
+  }
+
+  public async getHospitalProfiles(): Promise<HospitalProfile[]> {
+    return this.getHospitalProfilesSync();
+  }
+
+  public getActiveHospitalSync(): HospitalProfile {
+    const list = this.getHospitalProfilesSync();
+    const activeId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) || list[0].id;
+    return list.find((h) => h.id === activeId) || list[0];
+  }
+
+  public async saveHospitalProfile(profile: HospitalProfile): Promise<void> {
+    const list = this.getHospitalProfilesSync();
+    const idx = list.findIndex((h) => h.id === profile.id);
+    let updated: HospitalProfile[];
+    if (idx >= 0) {
+      updated = [...list];
+      updated[idx] = profile;
+    } else {
+      updated = [profile, ...list];
+    }
+    try {
+      localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(updated));
+    } catch {
+      // Ignore
+    }
+
+    // If this profile is active, synchronize settings.clinical as well
+    const active = this.getActiveHospitalSync();
+    if (active.id === profile.id) {
+      const settings = this.getSettingsSync();
+      settings.clinical = {
+        ...settings.clinical,
+        clinicName: profile.name,
+        clinicLogoUrl: profile.logoUrl || '',
+        logoPosition: profile.logoPosition || 'Left',
+        clinicAddress: profile.address || '',
+        clinicContact: profile.contact || '',
+        clinicRegistrationNo: profile.registrationNo || '',
+        clinicFooterText: profile.footerText || '',
+        defaultDoctor: profile.defaultDoctor || 'Dr. Specialist',
+        defaultTechnician: profile.defaultTechnician || '',
+        hospitalId: profile.id,
+      };
+      await this.saveSettings(settings);
+    }
+  }
+
+  public async setActiveHospital(
+    hospitalId: string,
+    userRole: 'admin' | 'doctor' | 'technician' = 'admin'
+  ): Promise<HospitalProfile> {
+    const list = this.getHospitalProfilesSync();
+    const target = list.find((h) => h.id === hospitalId) || list[0];
+    try {
+      localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, target.id);
+    } catch {
+      // Ignore
+    }
+
+    // Update settings.clinical to mirror active hospital
+    const settings = this.getSettingsSync();
+    settings.clinical = {
+      ...settings.clinical,
+      clinicName: target.name,
+      clinicLogoUrl: target.logoUrl || '',
+      logoPosition: target.logoPosition || 'Left',
+      clinicAddress: target.address || '',
+      clinicContact: target.contact || '',
+      clinicRegistrationNo: target.registrationNo || '',
+      clinicFooterText: target.footerText || '',
+      defaultDoctor: target.defaultDoctor || 'Dr. Specialist',
+      defaultTechnician: target.defaultTechnician || '',
+      hospitalId: target.id,
+      role: userRole,
+    };
+    await this.saveSettings(settings);
+
+    target.activeUser = {
+      username: `${userRole}@${target.code.toLowerCase()}.health`,
+      name: `${target.defaultDoctor} (${userRole.toUpperCase()})`,
+      role: userRole,
+      loginTime: new Date().toISOString(),
+    };
+
+    const idx = list.findIndex((h) => h.id === target.id);
+    if (idx >= 0) {
+      list[idx] = target;
+      try {
+        localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(list));
+      } catch {
+        // Ignore
+      }
+    }
+
+    return target;
   }
 }
 

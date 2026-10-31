@@ -8,6 +8,7 @@ import {
   Search,
   FolderArchive,
   Sliders,
+  Building2,
   X,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -20,7 +21,8 @@ export type PodoLoadNavSection =
   | 'report'
   | 'patient_search'
   | 'reports_cloud'
-  | 'settings';
+  | 'settings'
+  | 'admin';
 
 interface PodoLoadSidebarProps {
   currentSection: PodoLoadNavSection;
@@ -158,10 +160,19 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
           </nav>
         </div>
 
-        {/* Section 3: SYSTEM */}
+        {/* Section 3: ADMINISTRATION & SYSTEM */}
         <div className="podoload-nav-section">
-          <div className="podoload-section-label">SYSTEM</div>
+          <div className="podoload-section-label">ADMIN & SYSTEM</div>
           <nav className="podoload-nav-list">
+            <button
+              type="button"
+              className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
+              onClick={() => handleItemClick('admin')}
+            >
+              <Building2 className="podoload-nav-item-icon" />
+              <span>Hospital & Admin</span>
+            </button>
+
             <button
               type="button"
               className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}

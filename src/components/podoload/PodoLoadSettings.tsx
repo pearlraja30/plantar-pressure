@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye } from 'lucide-react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye, Building2 } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { PatientIdConfig, PatientIdMode } from '../../types';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
@@ -28,9 +28,10 @@ const DEFAULT_VERIFICATION_TESTS: VerificationResult[] = [
 
 interface PodoLoadSettingsProps {
   onPurgeAllData?: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllData }) => {
+export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllData, onOpenAdmin }) => {
   const [activeMenu, setActiveMenu] = useState<
     'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital' | 'database_id'
   >('scanner');
@@ -594,6 +595,75 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          ) : activeMenu === 'hospital' ? (
+            <div className="podoload-card" style={{ padding: '0.85rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Building2 className="w-5 h-5 text-teal-600" />
+                  <h4 className="podoload-card-title" style={{ margin: 0 }}>
+                    HOSPITAL & CLINIC BRANDING CONFIGURATION
+                  </h4>
+                </div>
+                {onOpenAdmin && (
+                  <button
+                    type="button"
+                    className="podoload-btn-primary podoload-btn-sm"
+                    onClick={onOpenAdmin}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Open Full Admin Panel</span>
+                  </button>
+                )}
+              </div>
+
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
+                Manage hospital name, logo, accreditation, and default clinician sign-offs applied across all patient reports.
+              </p>
+
+              {(() => {
+                const activeHosp = dbService.getActiveHospitalSync();
+                return (
+                  <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Active Hospital Name:</span>
+                      <strong style={{ color: '#0c2328' }}>{activeHosp.name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Hospital Code / Branch:</span>
+                      <strong style={{ color: '#0c2328' }}>{activeHosp.code}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Accreditation / Reg No:</span>
+                      <strong style={{ color: '#0c2328' }}>{activeHosp.registrationNo || 'Accredited'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Default Attending Clinician:</span>
+                      <strong style={{ color: '#0c2328' }}>{activeHosp.defaultDoctor}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Logo Status:</span>
+                      <span className="podo-badge podo-badge-green">
+                        {activeHosp.logoUrl ? '✓ Custom Logo Configured' : 'Default Hospital Seal'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                {onOpenAdmin && (
+                  <button
+                    type="button"
+                    className="podoload-btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={onOpenAdmin}
+                  >
+                    Manage Hospital Profiles, Multi-Clinic Login & Staff Directory →
+                  </button>
+                )}
               </div>
             </div>
           ) : (
