@@ -542,11 +542,11 @@
 }
 
 .podoload-process-foot-preview {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   flex: 1;
-  min-height: 260px;
+  min-height: 310px;
 }
 
 .podoload-results-metrics-grid {
@@ -886,8 +886,9 @@
 }
 
 .podoload-bilateral-canvas-box {
-  background-color: #000000;
-  border-radius: 4px;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
   min-height: 440px;
   display: flex;
   align-items: center;

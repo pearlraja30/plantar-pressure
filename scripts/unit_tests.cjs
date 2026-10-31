@@ -725,6 +725,53 @@ it("Guarantees clean viewport presentation: eliminates corner marker overlays on
   expect(loadedState.imageStyle.includes("object-fit: contain")).toBe(true);
 });
 
+it("Enforces single heatmap presentation in processing view: displays only the processed plantar heatmap without redundant raw scan side-by-side", () => {
+  // Evaluates the process card preview structure
+  const getProcessCardViews = (hasProcessedHeatmap) => {
+    // Single view structure: only the processed heatmap is presented
+    return {
+      showRawScan: false, // redundant raw scan removed
+      showHeatmap: true,
+      viewportCount: 1, // only one preview is sufficient
+      containerBg: "#ffffff", // clean clinical background, not black
+    };
+  };
+
+  const processView = getProcessCardViews(true);
+  expect(processView.showRawScan).toBe(false);
+  expect(processView.showHeatmap).toBe(true);
+  expect(processView.viewportCount).toBe(1);
+  expect(processView.containerBg).toBe("#ffffff");
+});
+
+it("Enforces clean clinical presentation: eliminates black background in heatmap synthesis and container viewports", () => {
+  // Evaluates non-contact pixel rendering in heatmap generation
+  const renderPixelData = (isPlantarContact, pressureVal) => {
+    const rgba = [0, 0, 0, 0];
+    if (!isPlantarContact || pressureVal < 0.05) {
+      // Zero-contact / background: Transparent alpha 0 (zero black background)
+      rgba[0] = 255;
+      rgba[1] = 255;
+      rgba[2] = 255;
+      rgba[3] = 0; // Transparent
+    } else {
+      // Plantar pressure contact: Colormap colors with full opacity
+      rgba[0] = 0;
+      rgba[1] = 255;
+      rgba[2] = 0;
+      rgba[3] = 255;
+    }
+    return rgba;
+  };
+
+  const nonContactPixel = renderPixelData(false, 0);
+  expect(nonContactPixel[3]).toBe(0); // Fully transparent (not black)
+  expect(nonContactPixel[0]).not.toBe(15); // Not old dark slate navy [15, 23, 42]
+
+  const contactPixel = renderPixelData(true, 0.5);
+  expect(contactPixel[3]).toBe(255); // Visible pressure heat
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

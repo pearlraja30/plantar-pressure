@@ -163,7 +163,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
             <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-around', padding: '1rem' }}>
               {/* Left Foot Container */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
-                <span style={{ color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <span style={{ color: '#0c2328', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   Left
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -171,7 +171,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                     <img
                       src={leftFoot.rawDataUrl}
                       alt="Left Raw"
-                      style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)' }}
+                      style={{ maxHeight: '380px', objectFit: 'contain' }}
                     />
                   )}
 
@@ -236,7 +236,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
 
               {/* Right Foot Container */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
-                <span style={{ color: '#ffffff', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <span style={{ color: '#0c2328', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
                   Right
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -244,7 +244,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                     <img
                       src={rightFoot.rawDataUrl}
                       alt="Right Raw"
-                      style={{ maxHeight: '380px', objectFit: 'contain', filter: 'invert(1) grayscale(1)' }}
+                      style={{ maxHeight: '380px', objectFit: 'contain' }}
                     />
                   )}
 

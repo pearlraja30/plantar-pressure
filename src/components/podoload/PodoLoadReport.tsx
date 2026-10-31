@@ -383,7 +383,8 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
           {/* Bilateral Image Presentation Box */}
           <div
             style={{
-              backgroundColor: '#000000',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
               borderRadius: '6px',
               minHeight: '175px',
               display: 'flex',
@@ -400,19 +401,19 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
               // 4-Pane Dual Comparison View
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', width: '100%', height: '100%' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '0.62rem', fontWeight: 700 }}>LEFT SCAN</span>
+                  <span style={{ color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>LEFT SCAN</span>
                   <img src={leftRawScan || leftHeatmap || ''} alt="Left Raw Scan" style={{ maxHeight: '130px', objectFit: 'contain' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#38bdf8', fontSize: '0.62rem', fontWeight: 700 }}>LEFT HEATMAP</span>
+                  <span style={{ color: '#0284c7', fontSize: '0.62rem', fontWeight: 700 }}>LEFT HEATMAP</span>
                   <img src={leftHeatmap || leftRawScan || ''} alt="Left Heatmap" style={{ maxHeight: '130px', objectFit: 'contain' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT SCAN</span>
+                  <span style={{ color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT SCAN</span>
                   <img src={rightRawScan || rightHeatmap || ''} alt="Right Raw Scan" style={{ maxHeight: '130px', objectFit: 'contain' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#38bdf8', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT HEATMAP</span>
+                  <span style={{ color: '#0284c7', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT HEATMAP</span>
                   <img src={rightHeatmap || rightRawScan || ''} alt="Right Heatmap" style={{ maxHeight: '130px', objectFit: 'contain' }} />
                 </div>
               </div>

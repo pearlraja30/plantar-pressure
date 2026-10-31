@@ -620,20 +620,18 @@ export async function processHarrisMatScan(
   let forefootDensity = 0;
   let halluxDensity = 0;
 
-  // Dark blue background for non-contact areas matching medical convention
-  const bgBlue: [number, number, number] = [15, 23, 42]; // Sleek dark slate navy background
-
+  // Non-contact areas are transparent (zero black background) matching modern clinical convention
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
       const val = smoothed[y * width + x];
 
       if (val < 0.05 || mask[y * width + x] < 0.5) {
-        // Background or zero contact
-        outData[idx] = bgBlue[0];
-        outData[idx + 1] = bgBlue[1];
-        outData[idx + 2] = bgBlue[2];
-        outData[idx + 3] = 255;
+        // Zero contact or background: Transparent (zero black background)
+        outData[idx] = 255;
+        outData[idx + 1] = 255;
+        outData[idx + 2] = 255;
+        outData[idx + 3] = 0; // Pure transparent alpha
       } else {
         totalPlantarPixels++;
         const cat = mapIntensityToCategory(val);

@@ -107,63 +107,37 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
           </div>
 
           <div className="podoload-process-foot-preview">
-            {/* Raw Scan Box */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  flex: 1,
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {leftFoot?.rawDataUrl && (
-                  <img
-                    src={leftFoot.rawDataUrl}
-                    alt="Left Foot Impression"
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                  />
-                )}
-              </div>
-              <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600 }}>
-                Raw scan
-              </span>
+            {/* Heatmap Viewport Box (Zero Black Background) */}
+            <div
+              style={{
+                width: '100%',
+                flex: 1,
+                minHeight: '290px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                padding: '0.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                position: 'relative',
+              }}
+            >
+              {leftHeatmapUrl ? (
+                <img
+                  src={leftHeatmapUrl}
+                  alt="Left Plantar Heatmap"
+                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                />
+              ) : (
+                <div style={{ color: '#0ea5e9', fontSize: '0.74rem', fontWeight: 600 }}>Processing Heatmap...</div>
+              )}
             </div>
-
-            {/* Processed Heatmap Box */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
-                style={{
-                  width: '100%',
-                  flex: 1,
-                  backgroundColor: '#000000',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {leftHeatmapUrl ? (
-                  <img
-                    src={leftHeatmapUrl}
-                    alt="Left Heatmap"
-                    style={{ width: '85%', height: '90%', objectFit: 'contain' }}
-                  />
-                ) : (
-                  <div style={{ color: '#0ea5e9', fontSize: '0.72rem' }}>Processing...</div>
-                )}
-              </div>
-              <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600 }}>
-                Processed heatmap
-              </span>
-            </div>
+            <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600, textAlign: 'center' }}>
+              Plantar Pressure Heatmap
+            </span>
           </div>
         </div>
 
@@ -175,63 +149,37 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
           </div>
 
           <div className="podoload-process-foot-preview">
-            {/* Raw Scan Box */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  flex: 1,
-                  backgroundColor: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {rightFoot?.rawDataUrl && (
-                  <img
-                    src={rightFoot.rawDataUrl}
-                    alt="Right Foot Impression"
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                  />
-                )}
-              </div>
-              <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600 }}>
-                Raw scan
-              </span>
+            {/* Heatmap Viewport Box (Zero Black Background) */}
+            <div
+              style={{
+                width: '100%',
+                flex: 1,
+                minHeight: '290px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                padding: '0.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                position: 'relative',
+              }}
+            >
+              {rightHeatmapUrl ? (
+                <img
+                  src={rightHeatmapUrl}
+                  alt="Right Plantar Heatmap"
+                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                />
+              ) : (
+                <div style={{ color: '#0ea5e9', fontSize: '0.74rem', fontWeight: 600 }}>Processing Heatmap...</div>
+              )}
             </div>
-
-            {/* Processed Heatmap Box */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
-                style={{
-                  width: '100%',
-                  flex: 1,
-                  backgroundColor: '#000000',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
-              >
-                {rightHeatmapUrl ? (
-                  <img
-                    src={rightHeatmapUrl}
-                    alt="Right Heatmap"
-                    style={{ width: '85%', height: '90%', objectFit: 'contain' }}
-                  />
-                ) : (
-                  <div style={{ color: '#0ea5e9', fontSize: '0.72rem' }}>Processing...</div>
-                )}
-              </div>
-              <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600 }}>
-                Processed heatmap
-              </span>
-            </div>
+            <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600, textAlign: 'center' }}>
+              Plantar Pressure Heatmap
+            </span>
           </div>
         </div>
 
