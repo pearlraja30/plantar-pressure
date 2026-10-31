@@ -856,17 +856,6 @@
 .podoload-marker-bl { bottom: 8px; left: 8px; }
 .podoload-marker-br { bottom: 8px; right: 8px; }
 
-/* Footprint Dashed Guide on Right Foot */
-.podoload-dashed-guide {
-  position: absolute;
-  width: 90px;
-  height: 230px;
-  border: 2px dashed #0d766e;
-  border-radius: 40px 40px 30px 30px;
-  pointer-events: none;
-  opacity: 0.85;
-}
-
 /* ----------------------------------------------------
    HEATMAP & PROCESSED RESULTS VIEW (SCREEN 3 & 4)
    ---------------------------------------------------- */

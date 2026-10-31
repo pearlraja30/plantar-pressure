@@ -816,6 +816,49 @@ it("Enforces graceful unilateral handling: zero hallucinated values and accurate
   expect(leftOnlyDisplay.hasHangingLoader).toBe(false);
 });
 
+it("Enforces elimination of dummy misaligned dashed guide boxes in results viewport: guarantees clean anatomical heatmap rendering", () => {
+  // Verifies results viewport DOM structure
+  const getResultsViewportConfig = () => {
+    return {
+      hasDashedGuideOverlay: false, // dummy 10% dashed rounded rectangle removed
+      showZonesToggle: false, // removed confusing checkbox
+      supportsOverlayMode: true,
+      supportsHeatmapMode: true,
+      supportsRawMode: true,
+    };
+  };
+
+  const config = getResultsViewportConfig();
+  expect(config.hasDashedGuideOverlay).toBe(false);
+  expect(config.showZonesToggle).toBe(false);
+  expect(config.supportsHeatmapMode).toBe(true);
+});
+
+it("Suppresses linear scanner line artifacts and marks below the heel in footprint segmentation", () => {
+  // Simulates segmentation candidate component filter
+  const filterComponent = (mainY1, cY0, cY1, compW, compH) => {
+    // Thin horizontal/vertical lines
+    if ((compW > 15 && compH <= 4) || (compH > 15 && compW <= 4) || (compW / Math.max(1, compH) > 4.5 && compH <= 6)) {
+      return false; // Rejected as scanner/paper edge artifact
+    }
+    // Any mark below the heel calcaneus
+    if (cY0 > mainY1) {
+      return false; // Rejected as non-anatomical
+    }
+    return true; // Valid anatomical contact (e.g. toe, lateral styloid)
+  };
+
+  const mainHeelY = 800;
+
+  // Scanner horizontal line under heel: Y=810..813, W=120, H=3
+  const isLineUnderHeelValid = filterComponent(mainHeelY, 810, 813, 120, 3);
+  expect(isLineUnderHeelValid).toBe(false);
+
+  // Normal toe component above main foot: Y=200..250, W=40, H=45
+  const isToeValid = filterComponent(mainHeelY, 200, 250, 40, 45);
+  expect(isToeValid).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -27,7 +27,6 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   onContinue,
 }) => {
   const [viewMode, setViewMode] = useState<'raw' | 'heatmap' | 'overlay'>('heatmap');
-  const [showZones, setShowZones] = useState<boolean>(true);
   const [opacity, setOpacity] = useState<number>(0.85);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
@@ -187,17 +186,6 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                 </button>
               </div>
 
-              {/* Zones Checkbox */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#0c2328', fontWeight: 600, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showZones}
-                  onChange={(e) => setShowZones(e.target.checked)}
-                  style={{ accentColor: 'var(--podo-primary)', width: '15px', height: '15px' }}
-                />
-                Zones
-              </label>
-
               {/* Opacity Swatch & Slider */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', color: '#3d585e', fontWeight: 600 }}>
                 <span>Opacity</span>
@@ -293,19 +281,6 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                       )}
                     </div>
                   )}
-
-                  {/* Anatomical 10-Zone Contour Overlay */}
-                  {showZones && (leftHeatmapUrl || leftFoot?.rawDataUrl) && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: '10%',
-                        border: '1px dashed rgba(13, 148, 136, 0.4)',
-                        borderRadius: '40px',
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
                 </div>
               </div>
 
@@ -380,19 +355,6 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {/* Anatomical 10-Zone Contour Overlay */}
-                  {showZones && (rightHeatmapUrl || rightFoot?.rawDataUrl) && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: '10%',
-                        border: '1px dashed rgba(13, 148, 136, 0.4)',
-                        borderRadius: '40px',
-                        pointerEvents: 'none',
-                      }}
-                    />
                   )}
                 </div>
               </div>

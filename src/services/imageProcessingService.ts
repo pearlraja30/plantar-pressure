@@ -409,8 +409,7 @@ function segmentPlantarFootAndToes(
 
     // Anatomical corridor for toes and adjacent plantar contact
     const padX = Math.round(mainW * 0.45);
-    const padYTop = Math.round(mainH * 0.35);
-    const padYBot = Math.round(mainH * 0.15);
+    const padYTop = Math.round(mainH * 0.35); // Toes are positioned superiorly above the main foot body
 
     areaMap.forEach((area, root) => {
       if (root === mainBodyRoot) return;
@@ -421,10 +420,26 @@ function segmentPlantarFootAndToes(
       const cX1 = maxXMap.get(root)!;
       const cY0 = minYMap.get(root)!;
       const cY1 = maxYMap.get(root)!;
+      const compW = cX1 - cX0 + 1;
+      const compH = cY1 - cY0 + 1;
 
-      // Check spatial proximity to main foot
+      // Filter out thin linear artifacts (scanner sensor lines, paper folds, grid lines)
+      if (
+        (compW > 15 && compH <= 4) ||
+        (compH > 15 && compW <= 4) ||
+        (compW / Math.max(1, compH) > 4.5 && compH <= 6)
+      ) {
+        return;
+      }
+
+      // Eliminate any artifacts below the heel (anatomical human foot has zero structures inferior to the calcaneus)
+      if (cY0 > mainY1) {
+        return;
+      }
+
+      // Check spatial proximity to main foot (confined superiorly and laterally)
       const inX = cX0 >= (mainX0 - padX) && cX1 <= (mainX1 + padX);
-      const inY = cY0 >= (mainY0 - padYTop) && cY1 <= (mainY1 + padYBot);
+      const inY = cY0 >= (mainY0 - padYTop) && cY1 <= mainY1;
 
       if (inX && inY) {
         validRoots.add(root);
@@ -536,7 +551,7 @@ export async function processHarrisMatScan(
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
       // Zero out perimeter edge artifacts from scanner frame/glass
-      if (x <= 4 || x >= width - 5 || y <= 4 || y >= height - 5) {
+      if (x <= 6 || x >= width - 7 || y <= 6 || y >= height - 7) {
         rawDark[y * width + x] = 0;
         continue;
       }
