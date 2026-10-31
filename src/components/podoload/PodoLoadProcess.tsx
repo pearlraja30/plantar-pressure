@@ -123,17 +123,11 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
                   overflow: 'hidden',
                 }}
               >
-                {/* 4 Corner Markers */}
-                <div className="podoload-marker podoload-marker-tl" style={{ width: '8px', height: '8px', top: '4px', left: '4px' }} />
-                <div className="podoload-marker podoload-marker-tr" style={{ width: '8px', height: '8px', top: '4px', right: '4px' }} />
-                <div className="podoload-marker podoload-marker-bl" style={{ width: '8px', height: '8px', bottom: '4px', left: '4px' }} />
-                <div className="podoload-marker podoload-marker-br" style={{ width: '8px', height: '8px', bottom: '4px', right: '4px' }} />
-
                 {leftFoot?.rawDataUrl && (
                   <img
                     src={leftFoot.rawDataUrl}
-                    alt="Left Raw"
-                    style={{ width: '85%', height: '90%', objectFit: 'contain' }}
+                    alt="Left Foot Impression"
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 )}
               </div>
@@ -197,17 +191,11 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
                   overflow: 'hidden',
                 }}
               >
-                {/* 4 Corner Markers */}
-                <div className="podoload-marker podoload-marker-tl" style={{ width: '8px', height: '8px', top: '4px', left: '4px' }} />
-                <div className="podoload-marker podoload-marker-tr" style={{ width: '8px', height: '8px', top: '4px', right: '4px' }} />
-                <div className="podoload-marker podoload-marker-bl" style={{ width: '8px', height: '8px', bottom: '4px', left: '4px' }} />
-                <div className="podoload-marker podoload-marker-br" style={{ width: '8px', height: '8px', bottom: '4px', right: '4px' }} />
-
                 {rightFoot?.rawDataUrl && (
                   <img
                     src={rightFoot.rawDataUrl}
-                    alt="Right Raw"
-                    style={{ width: '85%', height: '90%', objectFit: 'contain' }}
+                    alt="Right Foot Impression"
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 )}
               </div>
