@@ -94,8 +94,8 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
         rightRawScanDataUrl: rightRawScan || '',
         rightProcessedHeatMapDataUrl: rightHeatmap || '',
         scanMetadata: {
-          scannerModel: 'Epson Perfection V39 II / High-Res Camera',
-          scannerDriver: 'TWAIN 2.4 / Optical Homography Engine',
+          scannerModel: leftFoot?.scannerModel || rightFoot?.scannerModel || 'Optical Flatbed Scanner (Original File)',
+          scannerDriver: 'Direct Digital Acquisition',
           dpi: 300,
           colorMode: 'Grayscale',
           orientationDeg: 0,

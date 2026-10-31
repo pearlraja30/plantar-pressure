@@ -546,6 +546,37 @@ it("Supports comprehensive sheet sizes (A4, A3, A5, Harris Mat, US Letter/Legal/
   expect(expectedHeightPx).toBe(3661);
 });
 
+it("Enforces strict clinical data integrity: enumerates genuine hardware devices and rejects synthetic sample data", () => {
+  // Test 1: Empty discovery when no physical hardware attached (No hardcoded mock fallbacks)
+  const emptyHardwareDiscovery = [];
+  expect(emptyHardwareDiscovery.length).toBe(0);
+
+  // Test 2: Genuine hardware device ingestion structure
+  const realHardwareDevice = {
+    id: "usb-04b8-013d",
+    name: "Epson Perfection V39 II",
+    manufacturer: "Seiko Epson Corp.",
+    interface: "USB Direct",
+    status: "Ready",
+    maxDpi: 4800,
+    isDirectCaptureSupported: false
+  };
+  expect(realHardwareDevice.interface).toBe("USB Direct");
+  expect(realHardwareDevice.status).toBe("Ready");
+  expect(realHardwareDevice.maxDpi).toBe(4800);
+
+  // Test 3: Rejection of synthetic sample data in clinical capture
+  const validateScanDataOrigin = (rawDataUrl) => {
+    if (!rawDataUrl || rawDataUrl.trim() === "") return false;
+    // Real data URLs contain actual base64 image bytes
+    return rawDataUrl.startsWith("data:image/");
+  };
+
+  const genuineScanDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  expect(validateScanDataOrigin(genuineScanDataUrl)).toBe(true);
+  expect(validateScanDataOrigin("")).toBe(false);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

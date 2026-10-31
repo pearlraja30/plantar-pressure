@@ -27,7 +27,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ScannerDevice, QualityControlResult, FootSide } from '../types';
-import { MOCK_SCANNER_DEVICES } from '../services/sampleDataService';
+import { hardwareScannerService, DiscoveredScanner } from '../services/hardwareScannerService';
 import { performQualityControl } from '../services/imageProcessingService';
 import {
   warpCustomPerspective,
@@ -104,8 +104,16 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   // Bilateral multi-foot scan accumulation
   const [completedScans, setCompletedScans] = useState<CompletedScanItem[]>([]);
 
-  // Scanner state
-  const [selectedScanner] = useState<ScannerDevice>(MOCK_SCANNER_DEVICES[0]);
+  // Scanner state (real hardware discovery)
+  const [discoveredScanners, setDiscoveredScanners] = useState<DiscoveredScanner[]>([]);
+  const [selectedScanner, setSelectedScanner] = useState<DiscoveredScanner | null>(null);
+
+  useEffect(() => {
+    hardwareScannerService.enumerateAttachedScanners().then((list) => {
+      setDiscoveredScanners(list);
+      if (list.length > 0) setSelectedScanner(list[0]);
+    });
+  }, []);
   const [selectedDpi] = useState<number>(300);
   const [colorMode, setColorMode] = useState<'Grayscale' | 'RGB'>('Grayscale');
   const [footSide, setFootSide] = useState<FootSide>(initialFootSide || 'Right');
@@ -1227,7 +1235,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
           ? isCameraActive
             ? `High-Res Optical Camera (${cameraResolution.toUpperCase()})`
             : 'Phone Camera Sensor'
-          : selectedScanner.name,
+          : selectedScanner?.name || 'Optical Scanner (Original Data)',
       scannerDriver: 'Enhanced Clinical Optical Homography Engine',
       colorMode,
       orientationDeg: rotationDeg,
@@ -1266,7 +1274,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
           ? isCameraActive
             ? `High-Res Optical Camera (${cameraResolution.toUpperCase()})`
             : 'Phone Camera Sensor'
-          : selectedScanner.name,
+          : selectedScanner?.name || 'Optical Scanner (Original Data)',
       scannerDriver: 'Enhanced Clinical Optical Homography Engine',
       colorMode,
       orientationDeg: rotationDeg,

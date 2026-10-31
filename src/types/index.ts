@@ -168,11 +168,13 @@ export interface AnalysisCase {
 export interface ScannerDevice {
   id: string;
   name: string;
-  interface: 'TWAIN' | 'WIA' | 'SANE' | 'AirScan/eSCL' | 'USB Direct' | 'Virtual Simulation';
-  status: 'Ready' | 'Busy' | 'Disconnected';
+  interface: 'TWAIN' | 'WIA' | 'SANE' | 'AirScan/eSCL' | 'USB Direct' | 'Direct Optical / UVC' | 'WebUSB' | 'USB' | 'Virtual Simulation';
+  status: 'Ready' | 'Busy' | 'Disconnected' | 'Connected' | 'Offline';
   maxDpi: number;
   supportsColor: boolean;
   supportsDuplex: boolean;
+  manufacturer?: string;
+  isDirectCaptureSupported?: boolean;
 }
 
 export interface AuditEvent {

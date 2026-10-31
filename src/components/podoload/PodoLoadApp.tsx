@@ -15,10 +15,10 @@ import { PodoLoadSettings } from './PodoLoadSettings';
 import { Patient, AnalysisCase } from '../../types';
 import { cloudSyncService, CloudSyncStatus } from '../../services/cloudSyncService';
 import { logAuditEvent } from '../../services/auditService';
-import { generateHarrisMatFootprint } from '../../services/sampleDataService';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { ScannerWizardModal } from '../ScannerWizardModal';
 import { dbService } from '../../services/dbService';
+import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
 
 // Purge all legacy stale/demo data and ensure fresh clean state
 const PURE_STORAGE_KEY = 'podoload_fresh_v2';
@@ -82,8 +82,15 @@ export function PodoLoadApp() {
     return localStorage.getItem('ppa-selected-case-id') || '';
   });
 
+  // Real hardware scanner state
+  const [activeScanners, setActiveScanners] = useState<DiscoveredScanner[]>([]);
+
   // Hydrate patients and clinical cases from Inbuilt Database (IndexedDB)
   useEffect(() => {
+    hardwareScannerService.enumerateAttachedScanners().then((list) => {
+      setActiveScanners(list);
+    });
+
     dbService.getAllPatients().then((dbPatients) => {
       if (dbPatients && dbPatients.length > 0) {
         setPatients(dbPatients);
@@ -273,8 +280,14 @@ export function PodoLoadApp() {
         rightRawScanDataUrl: rightFoot?.rawDataUrl || '',
         rightProcessedHeatMapDataUrl: rUrl || '',
         scanMetadata: {
-          scannerModel: 'Epson Perfection V39 II / High-Res Camera',
-          scannerDriver: 'TWAIN 2.4 / Optical Homography Engine',
+          scannerModel:
+            leftFoot?.scannerModel ||
+            rightFoot?.scannerModel ||
+            (activeScanners.length > 0 ? activeScanners[0].name : 'Optical Flatbed Scanner (Original File)'),
+          scannerDriver:
+            activeScanners.length > 0
+              ? activeScanners[0].interface
+              : 'Direct Optical Acquisition',
           dpi: 300,
           colorMode: 'Grayscale',
           orientationDeg: 0,
@@ -529,8 +542,8 @@ export function PodoLoadApp() {
 
         {/* Persistent Bottom Status Bar */}
         <PodoLoadFooter
-          scannerModel="Epson Perfection V39 II"
-          scannerConnected={true}
+          scannerModel={activeScanners.length > 0 ? activeScanners[0].name : undefined}
+          scannerConnected={activeScanners.length > 0}
           resolutionDpi={300}
           lastSyncTime="Just now"
         />

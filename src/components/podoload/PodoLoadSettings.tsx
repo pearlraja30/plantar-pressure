@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Database, Download, Upload, Check, Settings as SettingsIcon } from 'lucide-react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { PatientIdConfig, PatientIdMode } from '../../types';
+import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
 
 interface VerificationResult {
   id: string;
@@ -35,7 +36,51 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
   >('scanner');
 
   // Scanner settings matching Screenshot 5
-  const [selectedDevice, setSelectedDevice] = useState<'camera' | 'usb' | 'network'>('camera');
+  const [attachedScanners, setAttachedScanners] = useState<DiscoveredScanner[]>([]);
+  const [selectedScannerDeviceId, setSelectedScannerDeviceId] = useState<string>('');
+  const [isRefreshingScanners, setIsRefreshingScanners] = useState<boolean>(false);
+  const [isPairingUsb, setIsPairingUsb] = useState<boolean>(false);
+
+  const refreshScanners = async (force = false) => {
+    setIsRefreshingScanners(true);
+    try {
+      const list = await hardwareScannerService.enumerateAttachedScanners(force);
+      setAttachedScanners(list);
+      if (list.length > 0) {
+        setSelectedScannerDeviceId((prev) => {
+          const match = list.find((s) => s.id === prev);
+          return match ? match.id : list[0].id;
+        });
+      } else {
+        setSelectedScannerDeviceId('');
+      }
+    } catch (e) {
+      console.warn('Error refreshing scanners:', e);
+    } finally {
+      setIsRefreshingScanners(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshScanners();
+  }, []);
+
+  const handlePairUsb = async () => {
+    try {
+      setIsPairingUsb(true);
+      const paired = await hardwareScannerService.requestUsbScanner();
+      if (paired) {
+        await refreshScanners(true);
+        setSelectedScannerDeviceId(paired.id);
+      }
+    } catch (err: any) {
+      alert(`USB Scanner pairing notice: ${err.message}`);
+    } finally {
+      setIsPairingUsb(false);
+    }
+  };
+
+  const [selectedDevice, setSelectedDevice] = useState<'camera' | 'usb' | 'network'>('usb');
   const [resolution, setResolution] = useState<150 | 300 | 600 | 1200>(300);
   const [colorMode, setColorMode] = useState<'Grayscale' | 'Colour'>('Grayscale');
   const [sheetSize, setSheetSize] = useState('A4');
@@ -437,80 +482,94 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
             </div>
           ) : (
             <>
-              {/* Card 1: CHOOSE SCANNER matching Screenshot 5 */}
+              {/* Card 1: CHOOSE SCANNER (Genuine Hardware Discovery) */}
               <div className="podoload-card" style={{ padding: '0.85rem' }}>
-                <h4 className="podoload-card-title" style={{ marginBottom: '0.65rem' }}>
-                  CHOOSE SCANNER
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                  <h4 className="podoload-card-title" style={{ margin: 0 }}>
+                    ATTACHED SCANNER HARDWARE
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', color: attachedScanners.length > 0 ? '#16a34a' : '#f59e0b', fontWeight: 600 }}>
+                    {attachedScanners.length > 0 ? `${attachedScanners.length} Device(s) Detected` : '0 Devices Attached'}
+                  </span>
+                </div>
 
-                <table className="podoload-device-table" style={{ marginBottom: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '28px' }}></th>
-                      <th>DEVICE</th>
-                      <th>TYPE</th>
-                      <th>STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <input
-                          type="radio"
-                          name="scanner-device"
-                          checked={selectedDevice === 'camera'}
-                          onChange={() => setSelectedDevice('camera')}
-                          style={{ accentColor: 'var(--podo-primary)' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 600 }}>Camera (built-in)</td>
-                      <td>Camera</td>
-                      <td>
-                        <span className="podo-badge podo-badge-green">Connected</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <input
-                          type="radio"
-                          name="scanner-device"
-                          checked={selectedDevice === 'usb'}
-                          onChange={() => setSelectedDevice('usb')}
-                          style={{ accentColor: 'var(--podo-primary)' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 600 }}>Epson Perfection V39 II</td>
-                      <td>USB flatbed</td>
-                      <td>
-                        <span className="podo-badge podo-badge-green">Connected</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <input
-                          type="radio"
-                          name="scanner-device"
-                          checked={selectedDevice === 'network'}
-                          onChange={() => setSelectedDevice('network')}
-                          style={{ accentColor: 'var(--podo-primary)' }}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 600 }}>HP ScanJet Enterprise</td>
-                      <td>Network</td>
-                      <td>
-                        <span className="podo-badge podo-badge-failed">Offline</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                {attachedScanners.length > 0 ? (
+                  <table className="podoload-device-table" style={{ marginBottom: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '28px' }}></th>
+                        <th>DEVICE</th>
+                        <th>INTERFACE</th>
+                        <th>STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attachedScanners.map((dev) => (
+                        <tr key={dev.id}>
+                          <td>
+                            <input
+                              type="radio"
+                              name="scanner-device"
+                              checked={selectedScannerDeviceId === dev.id}
+                              onChange={() => setSelectedScannerDeviceId(dev.id)}
+                              style={{ accentColor: 'var(--podo-primary)' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{dev.name}</td>
+                          <td>{dev.interface}</td>
+                          <td>
+                            <span className="podo-badge podo-badge-green">{dev.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div
+                    style={{
+                      padding: '1.25rem 0.85rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '6px',
+                      border: '1px dashed #cbd5e1',
+                      marginBottom: '0.85rem',
+                      fontSize: '0.8rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    <p style={{ fontWeight: 600, color: '#334155', marginBottom: '0.25rem' }}>
+                      No physical scanner hardware detected
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      Connect your USB flatbed scanner or network scanner, then click Refresh below.
+                    </p>
+                  </div>
+                )}
 
-                <div style={{ display: 'flex', gap: '0.65rem' }}>
-                  <button type="button" className="podoload-btn-secondary podoload-btn-sm">
-                    Refresh devices
+                <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={() => refreshScanners(true)}
+                    disabled={isRefreshingScanners}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingScanners ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshingScanners ? 'Scanning Ports...' : 'Refresh Devices'}</span>
                   </button>
-                  <button type="button" className="podoload-btn-primary podoload-btn-sm">
-                    Test scan
-                  </button>
+
+                  {'usb' in navigator && (
+                    <button
+                      type="button"
+                      className="podoload-btn-primary podoload-btn-sm"
+                      onClick={handlePairUsb}
+                      disabled={isPairingUsb}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Usb className="w-3.5 h-3.5" />
+                      <span>Pair USB Scanner</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
