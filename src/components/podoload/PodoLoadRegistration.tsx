@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Sparkles, Check } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { Patient, PatientIdConfig, PatientIdMode } from '../../types';
 import { dbService } from '../../services/dbService';
 
@@ -541,7 +542,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
           className="podoload-btn-primary"
           onClick={handleSaveAndContinue}
         >
-          Save and continue to capture
+          {Capacitor.isNativePlatform() ? 'Save and continue to capture' : 'Save and continue to scan'}
         </button>
       </div>
     </div>

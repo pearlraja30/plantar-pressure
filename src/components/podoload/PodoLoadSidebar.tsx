@@ -2,6 +2,7 @@ import React from 'react';
 import {
   UserPlus,
   Camera,
+  Scan,
   BarChart2,
   FileText,
   Search,
@@ -9,6 +10,7 @@ import {
   Sliders,
   X,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 export type PodoLoadNavSection =
   | 'registration'
@@ -35,6 +37,12 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
   isOpenMobile = false,
   onCloseMobile,
 }) => {
+  const isMobileDevice =
+    Capacitor.isNativePlatform() ||
+    (typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
+
   const handleItemClick = (section: PodoLoadNavSection) => {
     onNavigate(section);
     if (onCloseMobile) onCloseMobile();
@@ -98,8 +106,12 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
               className={`podoload-nav-item ${currentSection === 'capture' || currentSection === 'process' ? 'active' : ''}`}
               onClick={() => handleItemClick('capture')}
             >
-              <Camera className="podoload-nav-item-icon" />
-              <span>Capture and process</span>
+              {isMobileDevice ? (
+                <Camera className="podoload-nav-item-icon" />
+              ) : (
+                <Scan className="podoload-nav-item-icon" />
+              )}
+              <span>{isMobileDevice ? 'Capture and process' : 'Scan and process'}</span>
             </button>
 
             <button

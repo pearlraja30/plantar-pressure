@@ -1,5 +1,6 @@
 import React from 'react';
 import { Cloud, Globe, Menu } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
 
@@ -28,6 +29,12 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   doctorName = 'Dr. Specialist',
   onOpenMobileMenu,
 }) => {
+  const isMobileDevice =
+    Capacitor.isNativePlatform() ||
+    (typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
+
   // Compute breadcrumb title based on current view/step
   const getHeaderTitle = () => {
     if (currentSection === 'patient_search') return 'Patient records · Search directory';
@@ -38,7 +45,9 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
       case 1:
         return 'New exam · Patient registration';
       case 2:
-        return 'New exam · Capture left and right foot';
+        return isMobileDevice
+          ? 'New exam · Capture left and right foot'
+          : 'New exam · Scan left and right foot';
       case 3:
         return 'New exam · Process images';
       case 4:
