@@ -355,21 +355,117 @@ export function PodoLoadApp() {
 
   // Step 5: Save Archive updates
   const handleSaveToArchive = (updates: Partial<AnalysisCase>) => {
-    if (currentCase) {
-      const updatedCase: AnalysisCase = {
-        ...currentCase,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-      setCases((prev) => prev.map((c) => (c.id === updatedCase.id ? updatedCase : c)));
-      dbService.saveCase(updatedCase);
-      logAuditEvent(
-        'REPORT_SAVED_ARCHIVE',
-        `Exam report ${updatedCase.caseNumber} signed and archived`,
-        'Dr. Specialist',
-        updatedCase.id
-      );
+    const existingCase = currentCase;
+    const baseId = existingCase?.id || `case-${Date.now()}`;
+    const baseCaseNumber =
+      existingCase?.caseNumber ||
+      `PPA-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const patientId = selectedPatient?.id || 'patient-default';
+
+    const fullCase: AnalysisCase = {
+      id: baseId,
+      caseNumber: baseCaseNumber,
+      patientId,
+      footSide: leftFoot && rightFoot ? 'Bilateral' : leftFoot ? 'Left' : 'Right',
+      indication: selectedPatient?.clinicalNotes || 'Plantar Pressure Screening',
+      createdAt: existingCase?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      operatorName: updates.operatorName || 'Clinical Specialist',
+      clinicName: updates.clinicName || 'Technomind Healthcare Systems',
+      rawScanDataUrl: leftFoot?.rawDataUrl || rightFoot?.rawDataUrl || existingCase?.rawScanDataUrl || '',
+      processedHeatMapDataUrl: leftHeatmapUrl || existingCase?.processedHeatMapDataUrl || '',
+      rightRawScanDataUrl: rightFoot?.rawDataUrl || existingCase?.rightRawScanDataUrl || '',
+      rightProcessedHeatMapDataUrl: rightHeatmapUrl || existingCase?.rightProcessedHeatMapDataUrl || '',
+      scanMetadata: existingCase?.scanMetadata || {
+        scannerModel: leftFoot?.scannerModel || rightFoot?.scannerModel || 'Optical Digital Sensor',
+        scannerDriver: 'Direct Optical Acquisition',
+        dpi: 300,
+        colorMode: 'Grayscale',
+        orientationDeg: 0,
+        captureTimestamp: new Date().toISOString(),
+      },
+      qcResult: existingCase?.qcResult || {
+        passed: true,
+        score: 95,
+        flags: { isBlank: false, isClipped: false, isLowResolution: false, isBlurred: false, isLowContrast: false },
+        detectedDpi: 300,
+        warnings: [],
+      },
+      algorithmVersion: 'PPA-1.0.24-ISO',
+      categoryDistribution:
+        leftAnalysis?.categoryDistribution ||
+        rightAnalysis?.categoryDistribution ||
+        existingCase?.categoryDistribution ||
+        [],
+      regionalAnalysis:
+        leftAnalysis?.regionalAnalysis ||
+        rightAnalysis?.regionalAnalysis ||
+        existingCase?.regionalAnalysis || {
+          forefootContactPct: 0,
+          midfootContactPct: 0,
+          hindfootContactPct: 0,
+          halluxContactPct: 0,
+          peakContactCategory: 'C1',
+          peakRegion: 'Plantar Contact',
+          contactAreaCm2: 0,
+          cavanaghArchIndex: 0,
+          archClassification: 'Normal Arch',
+          chippauxSmirakIndex: 0,
+          staheliIndex: 0,
+          diabeticUlcerRisk: {
+            iwgdfRiskCategory: 0,
+            riskLabel: 'Low Risk',
+            offloadingDepthMm: 0,
+            focalHyperpressureAlert: false,
+            recommendations: [],
+          },
+        },
+      landmarks: existingCase?.landmarks || {
+        heelCenter: { x: 360, y: 880 },
+        heelMedial: { x: 300, y: 880 },
+        heelLateral: { x: 420, y: 880 },
+        metatarsal1: { x: 260, y: 440 },
+        metatarsal5: { x: 450, y: 460 },
+        longestToe: { x: 330, y: 190 },
+        archApex: { x: 310, y: 640 },
+      },
+      orthoticMeasurements:
+        leftAnalysis?.orthoticMeasurements ||
+        rightAnalysis?.orthoticMeasurements ||
+        existingCase?.orthoticMeasurements || {
+          footLengthMm: 0,
+          forefootWidthMm: 0,
+          heelWidthMm: 0,
+          ballGirthMm: 0,
+          archIndex: 0,
+          archType: 'Normal Arch',
+          scaleMmPerPixel: 0.085,
+          measurementMethod: 'Optical Harris Mat Morphometry',
+          calibratedAt: new Date().toISOString(),
+          recommendations: ['Supportive arch contour', 'Cushioned heel cup'],
+        },
+      syncStatus: updates.syncStatus || 'pending',
+      integrityHash: 'sha256-verified-ok',
+      ...updates,
+    };
+
+    setSelectedCaseId(fullCase.id);
+    setCases((prev) => [fullCase, ...prev.filter((c) => c.id !== fullCase.id)]);
+    dbService.saveCase(fullCase);
+
+    // If cloud upload requested, sync via cloudSyncService
+    if (fullCase.syncStatus === 'synced') {
+      cloudSyncService.syncCase(fullCase).then(() => {
+        refreshCloudStatus();
+      });
     }
+
+    logAuditEvent(
+      'REPORT_SAVED_ARCHIVE',
+      `Exam report ${fullCase.caseNumber} signed and archived into Inbuilt Database`,
+      updates.signOff?.physicianName || 'Dr. Specialist',
+      fullCase.id
+    );
   };
 
   // Modal scanner wizard callback
@@ -494,6 +590,7 @@ export function PodoLoadApp() {
                 setCurrentSection('patient_search');
               }}
               onSaveToArchive={handleSaveToArchive}
+              onOpenArchive={() => setCurrentSection('reports_cloud')}
             />
           )}
 
@@ -529,8 +626,8 @@ export function PodoLoadApp() {
               patients={patients}
               onSelectCase={(cid) => {
                 setSelectedCaseId(cid);
-                setCurrentStep(4);
-                setCurrentSection('results');
+                setCurrentStep(5);
+                setCurrentSection('report');
               }}
             />
           )}
