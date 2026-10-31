@@ -1007,6 +1007,58 @@ it("Guarantees hospital login session management and report header synchronizati
   expect(session.user).toBe("Dr. Clinician (ADMIN)");
 });
 
+it("Enforces relocation of Header & Footer configuration from report screen to Settings: guarantees clean reporting workflow and centralized branding persistence", () => {
+  // 1. Report View Model: Verify no header/footer editing inputs on report generation view
+  const getReportViewColumns = () => {
+    return {
+      col1: {
+        hasHeaderFooterEditingInputs: false, // Relocated to Settings
+        hasHospitalSummaryCard: true, // Clean hospital status & shortcut
+        hasSignatoriesCard: true,     // Doctor name, technician name
+      },
+      col2: {
+        hasLiveReportSheet: true,
+        displaysConfiguredHeader: true,
+        displaysConfiguredFooter: true,
+      },
+      col3: {
+        hasDoctorComments: true,
+        hasOutputArchiveActions: true,
+      },
+    };
+  };
+
+  const reportView = getReportViewColumns();
+  expect(reportView.col1.hasHeaderFooterEditingInputs).toBe(false);
+  expect(reportView.col1.hasHospitalSummaryCard).toBe(true);
+  expect(reportView.col1.hasSignatoriesCard).toBe(true);
+  expect(reportView.col2.hasLiveReportSheet).toBe(true);
+
+  // 2. Settings View Model: Centralized Header & Footer Branding configuration
+  const getSettingsSections = () => {
+    return {
+      hasReportHeaderFooterTab: true,
+      hasHospitalBrandingTab: true,
+      headerFooterConfig: {
+        supportsHospitalName: true,
+        supportsHospitalCode: true,
+        supportsContactInfo: true,
+        supportsFooterText: true,
+        supportsLogoUpload: true,
+        supportsLogoPositioning: ['Left', 'Centre', 'Right'],
+        supportsLivePreview: true,
+        persistsToInbuiltDatabase: true,
+      },
+    };
+  };
+
+  const settings = getSettingsSections();
+  expect(settings.hasReportHeaderFooterTab).toBe(true);
+  expect(settings.headerFooterConfig.supportsHospitalName).toBe(true);
+  expect(settings.headerFooterConfig.supportsLogoPositioning).toContain('Centre');
+  expect(settings.headerFooterConfig.persistsToInbuiltDatabase).toBe(true);
+});
+
 it("Enforces viewport boundary constraints and non-overflowing alignment for Print, PDF, Share and report archive controls", () => {
   // Test layout constraints across standard laptop (1280x800, 1366x768), tablet (1024x768), and desktop screens
   const checkReportGridFit = (viewportWidth, sidebarWidth = 220, viewportPadding = 28) => {

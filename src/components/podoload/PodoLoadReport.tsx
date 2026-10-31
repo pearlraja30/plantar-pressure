@@ -3,7 +3,7 @@ import { Patient, AnalysisCase } from '../../types';
 import { generateBilateralClubbedReportPdf } from '../../services/reportPdfService';
 import { FootCaptureData } from './PodoLoadCapture';
 import { dbService } from '../../services/dbService';
-import { Download, Printer, Share2, FolderArchive } from 'lucide-react';
+import { Download, Printer, Share2, FolderArchive, Sliders, Building2 } from 'lucide-react';
 
 interface PodoLoadReportProps {
   selectedPatient?: Patient;
@@ -19,6 +19,7 @@ interface PodoLoadReportProps {
   onSaveToArchive: (updatedCase: Partial<AnalysisCase>) => void;
   onOpenArchive?: () => void;
   onOpenAdmin?: () => void;
+  onOpenSettings?: () => void;
 }
 
 /**
@@ -139,53 +140,26 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   onSaveToArchive,
   onOpenArchive,
   onOpenAdmin,
+  onOpenSettings,
 }) => {
   const savedSettings = dbService.getSettingsSync();
+  const activeHospital = dbService.getActiveHospitalSync();
   // Hospital branding state (clean defaults from Inbuilt DB)
   const [clinicName, setClinicName] = useState(
-    currentCase?.clinicName || savedSettings.clinical?.clinicName || 'Technomind Healthcare Systems'
+    currentCase?.clinicName || activeHospital?.name || savedSettings.clinical?.clinicName || 'Technomind Healthcare Systems'
   );
-  const [clinicContact, setClinicContact] = useState(savedSettings.clinical?.clinicContact || '');
+  const [clinicContact, setClinicContact] = useState(
+    activeHospital?.contact || [activeHospital?.address, activeHospital?.contact, activeHospital?.email].filter(Boolean).join(' · ') || savedSettings.clinical?.clinicContact || ''
+  );
   const [logoPosition, setLogoPosition] = useState<'Left' | 'Centre' | 'Right'>(
-    savedSettings.clinical?.logoPosition || 'Left'
+    activeHospital?.logoPosition || savedSettings.clinical?.logoPosition || 'Left'
   );
-  const [customFooter, setCustomFooter] = useState(savedSettings.clinical?.clinicFooterText || '');
-  const [logoUrl, setLogoUrl] = useState<string | null>(savedSettings.clinical?.clinicLogoUrl || null);
-  const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const [hospitalSaveFeedback, setHospitalSaveFeedback] = useState<string | null>(null);
-
-  const handleSaveHospitalDefault = async () => {
-    const settings = dbService.getSettingsSync();
-    settings.clinical = {
-      ...settings.clinical,
-      clinicName,
-      clinicLogoUrl: logoUrl || '',
-      logoPosition,
-      clinicContact,
-      clinicFooterText: customFooter,
-      defaultDoctor: doctorName,
-      defaultTechnician: technicianName,
-    };
-    await dbService.saveSettings(settings);
-
-    // Also update active hospital profile
-    const active = dbService.getActiveHospitalSync();
-    if (active) {
-      await dbService.saveHospitalProfile({
-        ...active,
-        name: clinicName,
-        logoUrl: logoUrl || '',
-        logoPosition,
-        contact: clinicContact,
-        footerText: customFooter,
-        defaultDoctor: doctorName,
-        defaultTechnician: technicianName,
-      });
-    }
-
-    setHospitalSaveFeedback('✓ Hospital name and logo saved as default for all future reports!');
-    setTimeout(() => setHospitalSaveFeedback(null), 3500);
-  };
+  const [customFooter, setCustomFooter] = useState(
+    activeHospital?.footerText || savedSettings.clinical?.clinicFooterText || ''
+  );
+  const [logoUrl, setLogoUrl] = useState<string | null>(
+    activeHospital?.logoUrl || savedSettings.clinical?.clinicLogoUrl || null
+  );
 
   // Signatories
   const [doctorName, setDoctorName] = useState(savedSettings.clinical?.defaultDoctor || 'Dr. Specialist');
@@ -238,20 +212,6 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   const hasAnyLeft = Boolean(leftImg);
   const hasAnyRight = Boolean(rightImg);
   const hasBothTypes = Boolean((leftHeatmap || rightHeatmap) && (leftRawScan || rightRawScan));
-
-  // Logo file upload handler
-  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setLogoUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // PDF Export using authentic measurements
   const handleDownloadPdf = async () => {
@@ -448,124 +408,48 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
       <div className="podoload-report-grid">
         {/* ================= COLUMN 1: HEADER/FOOTER & SIGNATORIES ================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', minWidth: 0 }}>
-          {/* Card 1: Header and Footer */}
+          {/* Card 1: Hospital Profile Status & Settings Shortcut */}
           <div className="podoload-card" style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.2rem', fontSize: '0.74rem' }}>
-              HEADER AND FOOTER
-            </h4>
-
-            {/* Logo Upload Box */}
-            <div
-              className="podoload-upload-box"
-              onClick={() => logoInputRef.current?.click()}
-              title="Click to upload clinic logo from device"
-              style={{ cursor: 'pointer', textAlign: 'center', padding: '0.45rem 0.5rem', fontSize: '0.7rem' }}
-            >
-              {logoUrl ? '✓ Clinic Logo Loaded (Click to change)' : 'Upload hospital / clinic logo'}
-            </div>
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleLogoFileChange}
-            />
-
-            {/* Logo Position */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
-              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Logo position</label>
-              <div className="podoload-segmented-buttons">
-                <button
-                  type="button"
-                  className={`podoload-seg-btn ${logoPosition === 'Left' ? 'active' : ''}`}
-                  onClick={() => setLogoPosition('Left')}
-                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
-                >
-                  Left
-                </button>
-                <button
-                  type="button"
-                  className={`podoload-seg-btn ${logoPosition === 'Centre' ? 'active' : ''}`}
-                  onClick={() => setLogoPosition('Centre')}
-                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
-                >
-                  Centre
-                </button>
-                <button
-                  type="button"
-                  className={`podoload-seg-btn ${logoPosition === 'Right' ? 'active' : ''}`}
-                  onClick={() => setLogoPosition('Right')}
-                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
-                >
-                  Right
-                </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.74rem' }}>
+                  HOSPITAL PROFILE
+                </h4>
               </div>
+              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>Configured</span>
             </div>
 
-            {/* Hospital Name */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
-              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Hospital / clinic name</label>
-              <input
-                type="text"
-                className="podoload-input"
-                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
-                value={clinicName}
-                onChange={(e) => setClinicName(e.target.value)}
-              />
+            <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0c2328' }}>
+              {clinicName || 'Technomind Healthcare Systems'}
             </div>
+            {clinicContact && (
+              <div style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {clinicContact}
+              </div>
+            )}
 
-            {/* Address, Phone, Email */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
-              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Address, phone, email</label>
-              <input
-                type="text"
-                className="podoload-input"
-                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
-                value={clinicContact}
-                onChange={(e) => setClinicContact(e.target.value)}
-              />
-            </div>
-
-            {/* Footer Text */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.15rem' }}>
-              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Footer text</label>
-              <input
-                type="text"
-                className="podoload-input"
-                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
-                value={customFooter}
-                onChange={(e) => setCustomFooter(e.target.value)}
-              />
-            </div>
-
-            {/* Save as Hospital Default & Admin Panel Link */}
-            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.2rem' }}>
+            {onOpenSettings && (
               <button
                 type="button"
-                className="podoload-btn-primary podoload-btn-sm"
-                style={{ flex: 1, fontSize: '0.66rem', padding: '0.35rem 0.4rem' }}
-                onClick={handleSaveHospitalDefault}
-                title="Save current hospital name, logo and contacts as defaults in Inbuilt Database"
+                className="podoload-btn-secondary podoload-btn-sm"
+                style={{
+                  marginTop: '0.2rem',
+                  fontSize: '0.68rem',
+                  padding: '0.35rem 0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem',
+                  color: '#0e7477',
+                  borderColor: '#cbd5e1',
+                }}
+                onClick={onOpenSettings}
+                title="Configure Hospital Logo, Header, and Footer in Settings"
               >
-                💾 Save Hospital Defaults
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Configure in Settings</span>
               </button>
-              {onOpenAdmin && (
-                <button
-                  type="button"
-                  className="podoload-btn-secondary podoload-btn-sm"
-                  style={{ fontSize: '0.66rem', padding: '0.35rem 0.45rem' }}
-                  onClick={onOpenAdmin}
-                  title="Open Hospital Admin Panel"
-                >
-                  🏥 Admin Panel
-                </button>
-              )}
-            </div>
-
-            {hospitalSaveFeedback && (
-              <div style={{ fontSize: '0.66rem', color: '#0d9488', fontWeight: 600 }}>
-                {hospitalSaveFeedback}
-              </div>
             )}
           </div>
 

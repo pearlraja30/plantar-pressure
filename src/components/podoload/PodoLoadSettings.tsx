@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye, Building2, Sliders, FileText } from 'lucide-react';
 import { dbService } from '../../services/dbService';
-import { PatientIdConfig, PatientIdMode } from '../../types';
+import { PatientIdConfig, PatientIdMode, HospitalProfile } from '../../types';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
 
 interface VerificationResult {
@@ -107,6 +107,68 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
   const [dbStats, setDbStats] = useState({ patientCount: 0, casesCount: 0 });
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [schemaTab, setSchemaTab] = useState<'patients' | 'cases' | 'settings' | 'audit_logs'>('patients');
+
+  // Hospital Branding & Report Header/Footer Settings
+  const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());
+  const [hospitalName, setHospitalName] = useState(activeHospital?.name || 'Technomind Healthcare Systems');
+  const [hospitalCode, setHospitalCode] = useState(activeHospital?.code || 'TMH-CENTRAL');
+  const [hospitalRegNo, setHospitalRegNo] = useState(activeHospital?.registrationNo || 'Accredited');
+  const [hospitalLogoUrl, setHospitalLogoUrl] = useState<string>(activeHospital?.logoUrl || '');
+  const [hospitalLogoPos, setHospitalLogoPos] = useState<'Left' | 'Centre' | 'Right'>(activeHospital?.logoPosition || 'Left');
+  const [hospitalContact, setHospitalContact] = useState(activeHospital?.contact || '+1(800) 555-PODO · contact@technomind.health');
+  const [hospitalFooter, setHospitalFooter] = useState(activeHospital?.footerText || '');
+  const [defaultDoctor, setDefaultDoctor] = useState(activeHospital?.defaultDoctor || 'Dr. Specialist');
+  const [defaultTechnician, setDefaultTechnician] = useState(activeHospital?.defaultTechnician || '');
+  const [brandingSaveSuccess, setBrandingSaveSuccess] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setHospitalLogoUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveHospitalBranding = async () => {
+    const updated: HospitalProfile = {
+      ...activeHospital,
+      name: hospitalName,
+      code: hospitalCode,
+      registrationNo: hospitalRegNo,
+      logoUrl: hospitalLogoUrl,
+      logoPosition: hospitalLogoPos,
+      contact: hospitalContact,
+      footerText: hospitalFooter,
+      defaultDoctor,
+      defaultTechnician,
+    };
+    dbService.saveHospitalProfile(updated);
+    dbService.setActiveHospital(updated.id);
+    setActiveHospital(updated);
+
+    // Also update settings.clinical for full backwards compatibility
+    const currSettings = dbService.getSettingsSync();
+    currSettings.clinical = {
+      ...currSettings.clinical,
+      clinicName: hospitalName,
+      clinicContact: hospitalContact,
+      logoPosition: hospitalLogoPos,
+      clinicLogoUrl: hospitalLogoUrl,
+      clinicFooterText: hospitalFooter,
+      defaultDoctor,
+      defaultTechnician,
+    };
+    await dbService.saveSettings(currSettings);
+
+    setBrandingSaveSuccess('✓ Hospital branding and report header/footer successfully saved into Inbuilt Database!');
+    setTimeout(() => setBrandingSaveSuccess(null), 3500);
+  };
 
   // Verification battery
   const [tests, setTests] = useState<VerificationResult[]>(DEFAULT_VERIFICATION_TESTS);
@@ -253,7 +315,7 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
               className={`podoload-settings-menu-item ${activeMenu === 'report' ? 'active' : ''}`}
               onClick={() => setActiveMenu('report')}
             >
-              Report
+              Report header & footer
             </button>
             <button
               type="button"
@@ -267,7 +329,7 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
               className={`podoload-settings-menu-item ${activeMenu === 'hospital' ? 'active' : ''}`}
               onClick={() => setActiveMenu('hospital')}
             >
-              Hospital info
+              Hospital branding
             </button>
             <button
               type="button"
@@ -597,73 +659,272 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                 </table>
               </div>
             </div>
-          ) : activeMenu === 'hospital' ? (
-            <div className="podoload-card" style={{ padding: '0.85rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          ) : activeMenu === 'hospital' || activeMenu === 'report' ? (
+            <div className="podoload-card" style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Building2 className="w-5 h-5 text-teal-600" />
-                  <h4 className="podoload-card-title" style={{ margin: 0 }}>
-                    HOSPITAL & CLINIC BRANDING CONFIGURATION
-                  </h4>
+                  <div>
+                    <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.9rem' }}>
+                      REPORT HEADER, FOOTER & HOSPITAL BRANDING
+                    </h4>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Configure hospital logo, header alignment, contact credentials, and footer statement applied across all generated reports.
+                    </span>
+                  </div>
                 </div>
                 {onOpenAdmin && (
                   <button
                     type="button"
-                    className="podoload-btn-primary podoload-btn-sm"
+                    className="podoload-btn-secondary podoload-btn-sm"
                     onClick={onOpenAdmin}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem' }}
                   >
                     <Building2 className="w-3.5 h-3.5" />
-                    <span>Open Full Admin Panel</span>
+                    <span>Multi-Hospital Admin Panel</span>
                   </button>
                 )}
               </div>
 
-              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
-                Manage hospital name, logo, accreditation, and default clinician sign-offs applied across all patient reports.
-              </p>
+              {/* Form Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {/* Column 1: Hospital Identity & Contact Details */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.76rem', fontWeight: 700, color: '#0c2328', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+                    HOSPITAL IDENTITY & CONTACTS
+                  </h5>
 
-              {(() => {
-                const activeHosp = dbService.getActiveHospitalSync();
-                return (
-                  <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Active Hospital Name:</span>
-                      <strong style={{ color: '#0c2328' }}>{activeHosp.name}</strong>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Hospital / Clinic Name</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={hospitalName}
+                      onChange={(e) => setHospitalName(e.target.value)}
+                      placeholder="e.g. Technomind Healthcare Systems"
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div className="podoload-form-group">
+                      <label className="podoload-label">Hospital Code / Branch</label>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        value={hospitalCode}
+                        onChange={(e) => setHospitalCode(e.target.value)}
+                        placeholder="e.g. TMH-CENTRAL"
+                      />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Hospital Code / Branch:</span>
-                      <strong style={{ color: '#0c2328' }}>{activeHosp.code}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Accreditation / Reg No:</span>
-                      <strong style={{ color: '#0c2328' }}>{activeHosp.registrationNo || 'Accredited'}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Default Attending Clinician:</span>
-                      <strong style={{ color: '#0c2328' }}>{activeHosp.defaultDoctor}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Logo Status:</span>
-                      <span className="podo-badge podo-badge-green">
-                        {activeHosp.logoUrl ? '✓ Custom Logo Configured' : 'Default Hospital Seal'}
-                      </span>
+                    <div className="podoload-form-group">
+                      <label className="podoload-label">Accreditation / Reg No</label>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        value={hospitalRegNo}
+                        onChange={(e) => setHospitalRegNo(e.target.value)}
+                        placeholder="e.g. NABH-2026-09"
+                      />
                     </div>
                   </div>
-                );
-              })()}
 
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                {onOpenAdmin && (
-                  <button
-                    type="button"
-                    className="podoload-btn-primary"
-                    style={{ flex: 1 }}
-                    onClick={onOpenAdmin}
-                  >
-                    Manage Hospital Profiles, Multi-Clinic Login & Staff Directory →
-                  </button>
-                )}
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Address, Phone, Email (Header subtext)</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={hospitalContact}
+                      onChange={(e) => setHospitalContact(e.target.value)}
+                      placeholder="e.g. +1(800) 555-PODO · contact@technomind.health"
+                    />
+                  </div>
+
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Report Footer Text (Legal / Affiliation statement)</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={hospitalFooter}
+                      onChange={(e) => setHospitalFooter(e.target.value)}
+                      placeholder="e.g. Affiliated with National Institute of Orthopaedics · Confidential Diagnostic Document"
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div className="podoload-form-group">
+                      <label className="podoload-label">Default Attending Doctor</label>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        value={defaultDoctor}
+                        onChange={(e) => setDefaultDoctor(e.target.value)}
+                        placeholder="Dr. Specialist"
+                      />
+                    </div>
+                    <div className="podoload-form-group">
+                      <label className="podoload-label">Default Technician</label>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        value={defaultTechnician}
+                        onChange={(e) => setDefaultTechnician(e.target.value)}
+                        placeholder="Clinical Technician"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Logo Upload & Positioning */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.76rem', fontWeight: 700, color: '#0c2328', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem' }}>
+                    LOGO & PRESENTATION
+                  </h5>
+
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Hospital / Clinic Logo</label>
+                    <div
+                      style={{
+                        border: '2px dashed #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '0.75rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                        backgroundColor: '#f8fafc',
+                        cursor: 'pointer',
+                        minHeight: '75px',
+                      }}
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      {hospitalLogoUrl ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <img
+                            src={hospitalLogoUrl}
+                            alt="Hospital Logo"
+                            style={{ maxHeight: '42px', maxWidth: '110px', objectFit: 'contain' }}
+                          />
+                          <span style={{ fontSize: '0.72rem', color: '#0d9488', fontWeight: 600 }}>
+                            ✓ Logo Active (Click to replace)
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.72rem' }}>
+                          <Upload className="w-5 h-5 text-gray-400" style={{ margin: '0 auto 0.25rem auto' }} />
+                          <div>Click to upload clinic logo (PNG, JPG, SVG)</div>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleLogoUpload}
+                    />
+
+                    {hospitalLogoUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setHospitalLogoUrl('');
+                        }}
+                        style={{
+                          marginTop: '0.2rem',
+                          fontSize: '0.68rem',
+                          color: '#dc2626',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          textAlign: 'left',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✕ Remove custom logo
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Logo Position in Report Header</label>
+                    <div className="podoload-segmented-buttons">
+                      {(['Left', 'Centre', 'Right'] as const).map((pos) => (
+                        <button
+                          key={pos}
+                          type="button"
+                          className={`podoload-seg-btn ${hospitalLogoPos === pos ? 'active' : ''}`}
+                          onClick={() => setHospitalLogoPos(pos)}
+                        >
+                          {pos}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Header Live Preview Box */}
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Report Header Preview</label>
+                    <div
+                      style={{
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '0.55rem 0.65rem',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          justifyContent: hospitalLogoPos === 'Centre' ? 'center' : hospitalLogoPos === 'Right' ? 'flex-end' : 'flex-start',
+                          flexDirection: hospitalLogoPos === 'Right' ? 'row-reverse' : 'row',
+                        }}
+                      >
+                        {hospitalLogoUrl ? (
+                          <img src={hospitalLogoUrl} alt="Logo" style={{ maxHeight: '26px', maxWidth: '55px', objectFit: 'contain' }} />
+                        ) : (
+                          <div style={{ width: '38px', height: '26px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', color: '#94a3b8' }}>Logo</div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.78rem', color: '#0c2328' }}>
+                            [{hospitalName || 'Hospital Name'}]
+                          </div>
+                          <div style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                            {hospitalContact || '+1(800) 555-PODO · contact@technomind.health'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ height: '1.5px', backgroundColor: '#0d9488', width: '100%', margin: '0.15rem 0' }} />
+                      <div style={{ fontSize: '0.6rem', color: '#64748b', fontStyle: 'italic', textAlign: 'center' }}>
+                        {hospitalFooter || 'Confidential Plantar Diagnostic Report'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save & Feedback Row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', paddingTop: '0.65rem', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: '0.74rem', color: '#0d9488', fontWeight: 600 }}>
+                  {brandingSaveSuccess}
+                </div>
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={handleSaveHospitalBranding}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 1.25rem' }}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Header & Footer Defaults</span>
+                </button>
               </div>
             </div>
           ) : (

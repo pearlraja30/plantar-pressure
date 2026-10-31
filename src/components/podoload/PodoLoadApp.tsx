@@ -664,6 +664,7 @@ export function PodoLoadApp() {
               onSaveToArchive={handleSaveToArchive}
               onOpenArchive={() => setCurrentSection('reports_cloud')}
               onOpenAdmin={() => setCurrentSection('admin')}
+              onOpenSettings={() => setCurrentSection('settings')}
             />
           )}
 
