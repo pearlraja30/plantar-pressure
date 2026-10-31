@@ -443,14 +443,14 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
     'Metatarsal 1';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.65rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       {/* 3-Column Report Layout */}
       <div className="podoload-report-grid">
         {/* ================= COLUMN 1: HEADER/FOOTER & SIGNATORIES ================= */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', minWidth: 0 }}>
           {/* Card 1: Header and Footer */}
-          <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-card" style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
+            <h4 className="podoload-card-title" style={{ marginBottom: '0.2rem', fontSize: '0.74rem' }}>
               HEADER AND FOOTER
             </h4>
 
@@ -459,7 +459,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               className="podoload-upload-box"
               onClick={() => logoInputRef.current?.click()}
               title="Click to upload clinic logo from device"
-              style={{ cursor: 'pointer', textAlign: 'center' }}
+              style={{ cursor: 'pointer', textAlign: 'center', padding: '0.45rem 0.5rem', fontSize: '0.7rem' }}
             >
               {logoUrl ? '✓ Clinic Logo Loaded (Click to change)' : 'Upload hospital / clinic logo'}
             </div>
@@ -472,13 +472,14 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
             />
 
             {/* Logo Position */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
-              <label className="podoload-label">Logo position</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Logo position</label>
               <div className="podoload-segmented-buttons">
                 <button
                   type="button"
                   className={`podoload-seg-btn ${logoPosition === 'Left' ? 'active' : ''}`}
                   onClick={() => setLogoPosition('Left')}
+                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
                 >
                   Left
                 </button>
@@ -486,6 +487,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                   type="button"
                   className={`podoload-seg-btn ${logoPosition === 'Centre' ? 'active' : ''}`}
                   onClick={() => setLogoPosition('Centre')}
+                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
                 >
                   Centre
                 </button>
@@ -493,6 +495,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                   type="button"
                   className={`podoload-seg-btn ${logoPosition === 'Right' ? 'active' : ''}`}
                   onClick={() => setLogoPosition('Right')}
+                  style={{ padding: '0.25rem 0.4rem', fontSize: '0.68rem' }}
                 >
                   Right
                 </button>
@@ -500,44 +503,47 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
             </div>
 
             {/* Hospital Name */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
-              <label className="podoload-label">Hospital / clinic name</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Hospital / clinic name</label>
               <input
                 type="text"
                 className="podoload-input"
+                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
                 value={clinicName}
                 onChange={(e) => setClinicName(e.target.value)}
               />
             </div>
 
             {/* Address, Phone, Email */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
-              <label className="podoload-label">Address, phone, email</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Address, phone, email</label>
               <input
                 type="text"
                 className="podoload-input"
+                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
                 value={clinicContact}
                 onChange={(e) => setClinicContact(e.target.value)}
               />
             </div>
 
             {/* Footer Text */}
-            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
-              <label className="podoload-label">Footer text</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.15rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Footer text</label>
               <input
                 type="text"
                 className="podoload-input"
+                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
                 value={customFooter}
                 onChange={(e) => setCustomFooter(e.target.value)}
               />
             </div>
 
             {/* Save as Hospital Default & Admin Panel Link */}
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.2rem' }}>
               <button
                 type="button"
                 className="podoload-btn-primary podoload-btn-sm"
-                style={{ flex: 1, fontSize: '0.68rem' }}
+                style={{ flex: 1, fontSize: '0.66rem', padding: '0.35rem 0.4rem' }}
                 onClick={handleSaveHospitalDefault}
                 title="Save current hospital name, logo and contacts as defaults in Inbuilt Database"
               >
@@ -547,7 +553,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 <button
                   type="button"
                   className="podoload-btn-secondary podoload-btn-sm"
-                  style={{ fontSize: '0.68rem' }}
+                  style={{ fontSize: '0.66rem', padding: '0.35rem 0.45rem' }}
                   onClick={onOpenAdmin}
                   title="Open Hospital Admin Panel"
                 >
@@ -557,39 +563,41 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
             </div>
 
             {hospitalSaveFeedback && (
-              <div style={{ fontSize: '0.68rem', color: '#0d9488', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.66rem', color: '#0d9488', fontWeight: 600 }}>
                 {hospitalSaveFeedback}
               </div>
             )}
           </div>
 
           {/* Card 2: Signatories */}
-          <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-card" style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
+            <h4 className="podoload-card-title" style={{ marginBottom: '0.2rem', fontSize: '0.74rem' }}>
               SIGNATORIES
             </h4>
 
-            <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
-              <label className="podoload-label">Doctor name</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Doctor name</label>
               <input
                 type="text"
                 className="podoload-input"
+                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
                 value={doctorName}
                 onChange={(e) => setDoctorName(e.target.value)}
               />
             </div>
 
-            <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
-              <label className="podoload-label">Technician name</label>
+            <div className="podoload-form-group" style={{ marginBottom: '0.2rem' }}>
+              <label className="podoload-label" style={{ fontSize: '0.68rem', marginBottom: '0.15rem' }}>Technician name</label>
               <input
                 type="text"
                 className="podoload-input"
+                style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem' }}
                 value={technicianName}
                 onChange={(e) => setTechnicianName(e.target.value)}
               />
             </div>
 
-            <div style={{ fontSize: '0.72rem', color: '#556f75', marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.68rem', color: '#556f75', marginTop: '0.1rem' }}>
               Contents: <span style={{ color: '#0c2328', fontWeight: 600 }}>Map · measurements · interpretation</span>
             </div>
           </div>
@@ -606,16 +614,16 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           >
             <div className="podoload-report-logo-box">
               {logoUrl ? (
-                <img src={logoUrl} alt="Clinic Logo" style={{ maxHeight: '38px', maxWidth: '75px', objectFit: 'contain' }} />
+                <img src={logoUrl} alt="Clinic Logo" style={{ maxHeight: '34px', maxWidth: '65px', objectFit: 'contain' }} />
               ) : (
                 'Logo'
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0c2328' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0c2328', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 [{clinicName || 'Hospital / clinic name'}]
               </span>
-              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {clinicContact}
               </span>
             </div>
@@ -624,12 +632,12 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           <div className="podoload-report-divider" />
 
           {/* Report Title */}
-          <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.04em', color: '#0c2328', marginBottom: '0.65rem' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.04em', color: '#0c2328', marginBottom: '0.45rem' }}>
             PLANTAR PRESSURE REPORT
           </div>
 
           {/* Patient Details Meta Grid */}
-          <div className="podoload-report-meta-grid">
+          <div className="podoload-report-meta-grid" style={{ marginBottom: '0.45rem', paddingBottom: '0.35rem' }}>
             <div>Name: <strong>{patientName}</strong></div>
             <div>ID: <strong>[{patientId}]</strong></div>
             <div>Age / gender: <strong>[{patientAge}] / [{patientGender}]</strong></div>
@@ -637,11 +645,11 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Presentation Mode Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', padding: '0 2px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.35rem', padding: '0 2px' }}>
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Plantar Imaging Presentation
             </span>
-            <div className="podoload-segmented-buttons" style={{ transform: 'scale(0.85)', transformOrigin: 'right center' }}>
+            <div className="podoload-segmented-buttons" style={{ transform: 'scale(0.82)', transformOrigin: 'right center' }}>
               <button
                 type="button"
                 className={`podoload-seg-btn ${reportViewMode === 'heatmap' ? 'active' : ''}`}
@@ -677,72 +685,72 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               backgroundColor: '#f8fafc',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
-              minHeight: '175px',
+              minHeight: '135px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '1.2rem',
-              padding: '0.65rem',
-              marginBottom: '0.75rem',
+              gap: '1rem',
+              padding: '0.5rem',
+              marginBottom: '0.45rem',
               position: 'relative',
               overflow: 'hidden',
             }}
           >
             {reportViewMode === 'dual' ? (
               // 4-Pane Dual Comparison View
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', width: '100%', height: '100%' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>LEFT SCAN</span>
-                  <img src={leftRawScan || leftHeatmap || ''} alt="Left Raw Scan" style={{ maxHeight: '130px', objectFit: 'contain' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%', height: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span style={{ color: '#475569', fontSize: '0.6rem', fontWeight: 700 }}>LEFT SCAN</span>
+                  <img src={leftRawScan || leftHeatmap || ''} alt="Left Raw Scan" style={{ maxHeight: '115px', objectFit: 'contain' }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#0284c7', fontSize: '0.62rem', fontWeight: 700 }}>LEFT HEATMAP</span>
-                  <img src={leftHeatmap || leftRawScan || ''} alt="Left Heatmap" style={{ maxHeight: '130px', objectFit: 'contain' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span style={{ color: '#0284c7', fontSize: '0.6rem', fontWeight: 700 }}>LEFT HEATMAP</span>
+                  <img src={leftHeatmap || leftRawScan || ''} alt="Left Heatmap" style={{ maxHeight: '115px', objectFit: 'contain' }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT SCAN</span>
-                  <img src={rightRawScan || rightHeatmap || ''} alt="Right Raw Scan" style={{ maxHeight: '130px', objectFit: 'contain' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span style={{ color: '#475569', fontSize: '0.6rem', fontWeight: 700 }}>RIGHT SCAN</span>
+                  <img src={rightRawScan || rightHeatmap || ''} alt="Right Raw Scan" style={{ maxHeight: '115px', objectFit: 'contain' }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: '#0284c7', fontSize: '0.62rem', fontWeight: 700 }}>RIGHT HEATMAP</span>
-                  <img src={rightHeatmap || rightRawScan || ''} alt="Right Heatmap" style={{ maxHeight: '130px', objectFit: 'contain' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span style={{ color: '#0284c7', fontSize: '0.6rem', fontWeight: 700 }}>RIGHT HEATMAP</span>
+                  <img src={rightHeatmap || rightRawScan || ''} alt="Right Heatmap" style={{ maxHeight: '115px', objectFit: 'contain' }} />
                 </div>
               </div>
             ) : (
               // Standard Bilateral Left & Right Foot View
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2.5rem', width: '100%', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', width: '100%', height: '100%' }}>
                 {hasAnyLeft || hasAnyRight ? (
                   <>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.05em' }}>LEFT</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.05em' }}>LEFT</span>
                       {leftImg ? (
                         <img
                           src={leftImg}
                           alt="Left Footprint Scan"
-                          style={{ maxHeight: '150px', maxWidth: '140px', objectFit: 'contain' }}
+                          style={{ maxHeight: '125px', maxWidth: '120px', objectFit: 'contain' }}
                         />
                       ) : (
-                        <div style={{ color: '#64748b', fontSize: '0.68rem', fontStyle: 'italic', padding: '1rem' }}>No Left Scan</div>
+                        <div style={{ color: '#64748b', fontSize: '0.65rem', fontStyle: 'italic', padding: '0.75rem' }}>No Left Scan</div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.05em' }}>RIGHT</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.05em' }}>RIGHT</span>
                       {rightImg ? (
                         <img
                           src={rightImg}
                           alt="Right Footprint Scan"
-                          style={{ maxHeight: '150px', maxWidth: '140px', objectFit: 'contain' }}
+                          style={{ maxHeight: '125px', maxWidth: '120px', objectFit: 'contain' }}
                         />
                       ) : (
-                        <div style={{ color: '#64748b', fontSize: '0.68rem', fontStyle: 'italic', padding: '1rem' }}>No Right Scan</div>
+                        <div style={{ color: '#64748b', fontSize: '0.65rem', fontStyle: 'italic', padding: '0.75rem' }}>No Right Scan</div>
                       )}
                     </div>
                   </>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', color: '#94a3b8', padding: '1.5rem' }}>
-                    <span style={{ fontSize: '1.3rem' }}>👣</span>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 600 }}>No Scanned Footprint Available</span>
-                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Return to Step 2 (Capture) to capture or import Harris Mat paper</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', color: '#94a3b8', padding: '0.85rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>👣</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>No Scanned Footprint Available</span>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Return to Step 2 (Capture) to capture or import Harris Mat paper</span>
                   </div>
                 )}
               </div>
@@ -822,7 +830,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Doctor Comments (Full Clinical Assessment) */}
-          <div style={{ fontSize: '0.72rem', marginBottom: 'auto' }}>
+          <div style={{ fontSize: '0.68rem', marginBottom: 'auto' }}>
             <span style={{ fontWeight: 700 }}>Doctor comments: </span>
             <span style={{ color: '#334155' }}>
               {deduplicateSentences(comments) || 'Plantar screening completed.'}
@@ -830,10 +838,10 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Signatures */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '0.45rem', paddingTop: '0.35rem', borderTop: '1px solid #e2e8f0' }}>
             <div>
               Doctor: <strong>{doctorName}</strong>
-              <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>Signature Verified</div>
+              <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>Signature Verified</div>
             </div>
             <div>
               Technician: <strong>{technicianName || 'Clinical Specialist'}</strong>
@@ -841,38 +849,39 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Footer Note */}
-          <div style={{ textAlign: 'center', fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.75rem' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.35rem' }}>
             {customFooter ? `${customFooter} · ` : ''}Software supported by Technomind Healthcare
           </div>
         </div>
 
         {/* ================= COLUMN 3: COMMENTS & OUTPUT ================= */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', minWidth: 0 }}>
           {/* Card 1: Doctor Comments */}
-          <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          <div className="podoload-card" style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h4 className="podoload-card-title" style={{ margin: 0 }}>
+              <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.74rem' }}>
                 DOCTOR COMMENTS
               </h4>
-              <span className="podo-badge" style={{ backgroundColor: '#e2ecee', color: '#334e54', fontSize: '0.65rem' }}>
+              <span className="podo-badge" style={{ backgroundColor: '#e2ecee', color: '#334e54', fontSize: '0.62rem', padding: '0.15rem 0.35rem' }}>
                 Auto-generated
               </span>
             </div>
 
             <textarea
               className="podoload-textarea"
-              rows={8}
+              rows={4}
+              style={{ minHeight: '60px', maxHeight: '105px', fontSize: '0.72rem', padding: '0.4rem 0.5rem', resize: 'vertical' }}
               placeholder="Write comments for the report"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
             />
 
             {/* Quick Action Tags */}
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
+            <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.1rem' }}>
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: '0.25rem 0.35rem', fontSize: '0.68rem' }}
                 onClick={() =>
                   setComments(
                     deduplicateSentences(
@@ -887,7 +896,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: '0.25rem 0.35rem', fontSize: '0.68rem' }}
                 onClick={() =>
                   setComments(
                     deduplicateSentences(
@@ -902,7 +911,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: '0.25rem 0.35rem', fontSize: '0.68rem' }}
                 onClick={() =>
                   setComments(
                     deduplicateSentences(
@@ -917,19 +926,21 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Card 2: Output & Database Archive Options */}
-          <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-card" style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
+            <h4 className="podoload-card-title" style={{ marginBottom: '0.2rem', fontSize: '0.74rem' }}>
               OUTPUT & ARCHIVE
             </h4>
 
             <button
               type="button"
               className="podoload-btn-primary"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              style={{ width: '100%', padding: '0.45rem 0.5rem', fontSize: '0.74rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', boxSizing: 'border-box' }}
               onClick={handleSaveArchive}
             >
-              <FolderArchive className="w-4 h-4" />
-              {isSaved ? '✓ Saved to Database & Queued for Cloud!' : 'Save to archive'}
+              <FolderArchive className="w-3.5 h-3.5 flex-shrink-0" />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isSaved ? '✓ Saved to Archive!' : 'Save to archive'}
+              </span>
             </button>
 
             {isSaved && (
@@ -938,16 +949,16 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                   backgroundColor: '#ecfdf5',
                   border: '1px solid #a7f3d0',
                   color: '#065f46',
-                  padding: '0.5rem',
+                  padding: '0.35rem 0.45rem',
                   borderRadius: '4px',
-                  fontSize: '0.7rem',
+                  fontSize: '0.68rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.25rem',
+                  gap: '0.15rem',
                 }}
               >
                 <span>
-                  <strong>Saved in Inbuilt Database (IndexedDB).</strong>
+                  <strong>Saved in Inbuilt Database.</strong>
                 </span>
                 <span>
                   {uploadToCloud ? 'Queued for Cloud synchronization.' : 'Stored locally on device.'}
@@ -965,6 +976,7 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                       cursor: 'pointer',
                       padding: 0,
                       textDecoration: 'underline',
+                      fontSize: '0.66rem',
                     }}
                   >
                     View in Records & Cloud →
@@ -973,15 +985,16 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem' }}>
+            {/* Print, PDF, Share Button Row */}
+            <div className="podoload-action-btn-row">
               <button
                 type="button"
                 className="podoload-btn-secondary"
                 onClick={handlePrint}
                 title="Print report document"
               >
-                <Printer className="w-3.5 h-3.5 mr-1 inline" />
-                Print
+                <Printer className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Print</span>
               </button>
 
               <button
@@ -990,8 +1003,8 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 onClick={handleDownloadPdf}
                 title="Download high-resolution PDF report"
               >
-                <Download className="w-3.5 h-3.5 mr-1 inline" />
-                PDF
+                <Download className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>PDF</span>
               </button>
 
               <button
@@ -1000,13 +1013,13 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 onClick={handleShareReport}
                 title="Share report via device or copy link"
               >
-                <Share2 className="w-3.5 h-3.5 mr-1 inline" />
-                Share
+                <Share2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Share</span>
               </button>
             </div>
 
             {shareSuccess && (
-              <div style={{ fontSize: '0.68rem', color: '#0d9488', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.66rem', color: '#0d9488', fontWeight: 600 }}>
                 {shareSuccess}
               </div>
             )}
@@ -1015,24 +1028,24 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                fontSize: '0.72rem',
+                gap: '0.35rem',
+                fontSize: '0.7rem',
                 color: '#0c2328',
                 fontWeight: 600,
                 cursor: 'pointer',
-                marginTop: '0.25rem',
+                marginTop: '0.15rem',
               }}
             >
               <input
                 type="checkbox"
                 checked={uploadToCloud}
                 onChange={(e) => setUploadToCloud(e.target.checked)}
-                style={{ accentColor: 'var(--podo-primary)', width: '15px', height: '15px' }}
+                style={{ accentColor: 'var(--podo-primary)', width: '14px', height: '14px' }}
               />
               Upload to cloud
             </label>
 
-            <span style={{ fontSize: '0.65rem', color: '#657e84' }}>
+            <span style={{ fontSize: '0.64rem', color: '#657e84', lineHeight: 1.3, wordBreak: 'break-word' }}>
               Saved offline in Inbuilt Database (IndexedDB) and uploaded when connected.
             </span>
 
@@ -1040,11 +1053,13 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                style={{ width: '100%', marginTop: '0.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                style={{ width: '100%', marginTop: '0.15rem', padding: '0.35rem 0.45rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', boxSizing: 'border-box' }}
                 onClick={onOpenArchive}
               >
-                <FolderArchive className="w-3.5 h-3.5" />
-                Retrieve archived reports
+                <FolderArchive className="w-3.5 h-3.5 flex-shrink-0" />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Retrieve archived reports
+                </span>
               </button>
             )}
           </div>

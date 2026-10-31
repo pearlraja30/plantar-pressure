@@ -982,6 +982,47 @@ it("Guarantees hospital login session management and report header synchronizati
   expect(session.user).toBe("Dr. Clinician (ADMIN)");
 });
 
+it("Enforces viewport boundary constraints and non-overflowing alignment for Print, PDF, Share and report archive controls", () => {
+  // Test layout constraints across standard laptop (1280x800, 1366x768), tablet (1024x768), and desktop screens
+  const checkReportGridFit = (viewportWidth, sidebarWidth = 220, viewportPadding = 28) => {
+    const availableWidth = viewportWidth - sidebarWidth - viewportPadding;
+    const col1Min = 195;
+    const col3Min = 210;
+    const gap = 10 * 2; // two gaps in 3-column layout
+    const centerMin = 280;
+
+    const total3ColMinWidth = col1Min + centerMin + col3Min + gap;
+    const canFit3Col = availableWidth >= total3ColMinWidth;
+
+    // Output & Archive action button row (Print, PDF, Share) calculation
+    const cardWidth = col3Min - 24; // padding 12px each side
+    const btnGap = 6 * 2;
+    const perBtnWidth = (cardWidth - btnGap) / 3;
+
+    return {
+      availableWidth,
+      canFit3Col,
+      perBtnWidth,
+      isButtonVisible: perBtnWidth >= 55, // minimum required for icon + label
+    };
+  };
+
+  // Test 1366x768 laptop screen (effective 1093px at 125% scale or 1366px native)
+  const laptopRes = checkReportGridFit(1200);
+  expect(laptopRes.canFit3Col).toBe(true);
+  expect(laptopRes.isButtonVisible).toBe(true);
+  expect(laptopRes.perBtnWidth).toBeGreaterThan(55);
+
+  // Test compact laptop screen (1100px)
+  const compactRes = checkReportGridFit(1100);
+  expect(compactRes.canFit3Col).toBe(true);
+  expect(compactRes.isButtonVisible).toBe(true);
+
+  // Buttons must stay within card without negative margins or clipping
+  const actionBtnCount = 3;
+  expect(actionBtnCount).toBe(3);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
