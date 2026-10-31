@@ -24,7 +24,7 @@ export const PodoLoadFooter: React.FC<PodoLoadFooterProps> = ({
       </div>
 
       <div className="podoload-status-right">
-        PodoLoad · Technomind Healthcare
+        PodoPress · Technomind Healthcare
       </div>
     </footer>
   );

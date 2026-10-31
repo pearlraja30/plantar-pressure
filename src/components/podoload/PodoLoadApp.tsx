@@ -18,6 +18,7 @@ import { logAuditEvent } from '../../services/auditService';
 import { generateHarrisMatFootprint } from '../../services/sampleDataService';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { ScannerWizardModal } from '../ScannerWizardModal';
+import { dbService } from '../../services/dbService';
 
 // Purge all legacy stale/demo data and ensure fresh clean state
 const PURE_STORAGE_KEY = 'podoload_fresh_v2';
@@ -80,6 +81,20 @@ export function PodoLoadApp() {
   const [selectedCaseId, setSelectedCaseId] = useState<string>(() => {
     return localStorage.getItem('ppa-selected-case-id') || '';
   });
+
+  // Hydrate patients and clinical cases from Inbuilt Database (IndexedDB)
+  useEffect(() => {
+    dbService.getAllPatients().then((dbPatients) => {
+      if (dbPatients && dbPatients.length > 0) {
+        setPatients(dbPatients);
+      }
+    });
+    dbService.getAllCases().then((dbCases) => {
+      if (dbCases && dbCases.length > 0) {
+        setCases(dbCases);
+      }
+    });
+  }, []);
 
   // Save to local storage
   useEffect(() => {
@@ -164,13 +179,7 @@ export function PodoLoadApp() {
 
   // Full purge of all data to start completely fresh
   const handlePurgeAllStaleData = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('ppa-patients');
-      localStorage.removeItem('ppa-cases');
-      localStorage.removeItem('ppa-selected-patient-id');
-      localStorage.removeItem('ppa-selected-case-id');
-      localStorage.removeItem('ppa_audit_log_v1');
-    }
+    dbService.purgeAllData();
     setPatients([]);
     setCases([]);
     setSelectedPatientId('');
@@ -222,6 +231,7 @@ export function PodoLoadApp() {
     }
     setPatients(updated);
     setSelectedPatientId(patientRecord.id);
+    dbService.savePatient(patientRecord);
 
     logAuditEvent(
       'PATIENT_REGISTERED',
@@ -326,6 +336,7 @@ export function PodoLoadApp() {
 
       setCases((prev) => [newCase, ...prev.filter((c) => c.id !== newCase.id)]);
       setSelectedCaseId(newCase.id);
+      dbService.saveCase(newCase);
     }
   };
 
@@ -338,6 +349,7 @@ export function PodoLoadApp() {
         updatedAt: new Date().toISOString(),
       };
       setCases((prev) => prev.map((c) => (c.id === updatedCase.id ? updatedCase : c)));
+      dbService.saveCase(updatedCase);
       logAuditEvent(
         'REPORT_SAVED_ARCHIVE',
         `Exam report ${updatedCase.caseNumber} signed and archived`,

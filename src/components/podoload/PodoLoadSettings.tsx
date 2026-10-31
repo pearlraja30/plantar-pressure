@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Play } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon } from 'lucide-react';
+import { dbService } from '../../services/dbService';
+import { PatientIdConfig, PatientIdMode } from '../../types';
 
 interface VerificationResult {
   id: string;
@@ -29,7 +31,7 @@ interface PodoLoadSettingsProps {
 
 export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllData }) => {
   const [activeMenu, setActiveMenu] = useState<
-    'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital'
+    'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital' | 'database_id'
   >('scanner');
 
   // Scanner settings matching Screenshot 5
@@ -54,10 +56,52 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
   const [serverAddress, setServerAddress] = useState('https://cloud.technomind.clinic/v1');
   const [account, setAccount] = useState('clinic-admin@technomind.health');
 
+  // Patient ID & Inbuilt Database Settings
+  const [idConfig, setIdConfig] = useState<PatientIdConfig>(() => dbService.getPatientIdConfigSync());
+  const [dbStats, setDbStats] = useState({ patientCount: 0, casesCount: 0 });
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
   // Verification battery
   const [tests, setTests] = useState<VerificationResult[]>(DEFAULT_VERIFICATION_TESTS);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSavedMessage, setIsSavedMessage] = useState<boolean>(false);
+
+  // Load from Inbuilt Database on mount
+  useEffect(() => {
+    dbService.getSettings().then((saved) => {
+      if (saved) {
+        if (saved.scanner) {
+          setSelectedDevice(saved.scanner.selectedDevice || 'camera');
+          setResolution(saved.scanner.resolutionDpi || 300);
+          setColorMode(saved.scanner.colorMode || 'Grayscale');
+          setSheetSize(saved.scanner.sheetSize || 'A4');
+          setWidthMm(saved.scanner.widthMm || '210');
+          setHeightMm(saved.scanner.heightMm || '297');
+          setAutoDetectMarkers(saved.scanner.autoDetectMarkers ?? true);
+          setAutoCropSheet(saved.scanner.autoCropSheet ?? true);
+          setLensDistortion(saved.scanner.lensDistortion ?? true);
+        }
+        if (saved.region) {
+          setAppLanguage(saved.region.appLanguage || 'English');
+          setReportLanguage(saved.region.reportLanguage || 'English');
+          setUnit(saved.region.unit || 'mm');
+          setDateFormat(saved.region.dateFormat || 'dd-mm-yyyy');
+        }
+        if (saved.cloud) {
+          setAutoSyncReports(saved.cloud.autoSyncReports ?? true);
+          setServerAddress(saved.cloud.serverAddress || 'https://cloud.technomind.clinic/v1');
+          setAccount(saved.cloud.account || 'clinic-admin@technomind.health');
+        }
+      }
+    });
+
+    dbService.getPatientIdConfig().then(setIdConfig);
+
+    // Fetch database stats
+    Promise.all([dbService.getAllPatients(), dbService.getAllCases()]).then(([pats, cases]) => {
+      setDbStats({ patientCount: pats.length, casesCount: cases.length });
+    });
+  }, []);
 
   const handleRunBattery = () => {
     setIsRunning(true);
@@ -67,9 +111,66 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
     }, 1200);
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    await dbService.saveSettings({
+      scanner: {
+        selectedDevice,
+        resolutionDpi: resolution,
+        colorMode,
+        sheetSize,
+        widthMm,
+        heightMm,
+        autoDetectMarkers,
+        autoCropSheet,
+        lensDistortion,
+      },
+      region: {
+        appLanguage,
+        reportLanguage,
+        unit,
+        dateFormat,
+      },
+      cloud: {
+        autoSyncReports,
+        serverAddress,
+        account,
+      },
+    });
+
+    await dbService.savePatientIdConfig(idConfig);
+
     setIsSavedMessage(true);
-    setTimeout(() => setIsSavedMessage(false), 2000);
+    setTimeout(() => setIsSavedMessage(false), 2500);
+  };
+
+  const handleExportBackup = async () => {
+    const jsonStr = await dbService.exportDatabaseBackup();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PodoPress-Database-Backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const content = evt.target?.result as string;
+      const ok = await dbService.importDatabaseBackup(content);
+      if (ok) {
+        setImportStatus('Database successfully restored from backup!');
+        const [pats, cases] = await Promise.all([dbService.getAllPatients(), dbService.getAllCases()]);
+        setDbStats({ patientCount: pats.length, casesCount: cases.length });
+        setTimeout(() => setImportStatus(null), 3000);
+      } else {
+        alert('Failed to import database backup. Invalid JSON file format.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -121,12 +222,179 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
             >
               Hospital info
             </button>
+            <button
+              type="button"
+              className={`podoload-settings-menu-item ${activeMenu === 'database_id' ? 'active' : ''}`}
+              onClick={() => setActiveMenu('database_id')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Database className="w-3.5 h-3.5 text-teal-600" />
+              <span>Patient ID & Database</span>
+            </button>
           </div>
         </div>
 
         {/* ================= COLUMN 2: CENTER PANEL ================= */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {activeMenu === 'processing' ? (
+          {activeMenu === 'database_id' ? (
+            <>
+              {/* Card 1: ALPHANUMERIC PATIENT ID CONFIGURATION */}
+              <div className="podoload-card" style={{ padding: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <h4 className="podoload-card-title" style={{ margin: 0 }}>
+                    ALPHANUMERIC PATIENT ID CONFIGURATION
+                  </h4>
+                  <span className="podo-badge podo-badge-green">Inbuilt DB</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                  <div className="podoload-form-group" style={{ flex: 1 }}>
+                    <label className="podoload-label">Patient ID Prefix</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. PP-, PAT-, HOSP-"
+                      value={idConfig.prefix}
+                      onChange={(e) =>
+                        setIdConfig((prev) => ({
+                          ...prev,
+                          prefix: e.target.value.toUpperCase(),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="podoload-form-group" style={{ width: '130px' }}>
+                    <label className="podoload-label">Random Length</label>
+                    <select
+                      className="podoload-input"
+                      value={idConfig.randomLength}
+                      onChange={(e) =>
+                        setIdConfig((prev) => ({
+                          ...prev,
+                          randomLength: parseInt(e.target.value, 10),
+                        }))
+                      }
+                    >
+                      <option value={4}>4 characters</option>
+                      <option value={5}>5 characters</option>
+                      <option value={6}>6 characters</option>
+                      <option value={8}>8 characters</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Scheme */}
+                <div className="podoload-form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="podoload-label">ID Generation Scheme</label>
+                  <div className="podoload-segmented-buttons" style={{ display: 'flex', gap: '0.35rem' }}>
+                    {(
+                      [
+                        { id: 'alphanumeric', label: 'Alphanumeric (A-Z, 0-9)' },
+                        { id: 'numeric', label: 'Numeric (0-9)' },
+                        { id: 'date_alphanumeric', label: 'Date Code (YYMM-XXX)' },
+                      ] as const
+                    ).map((scheme) => (
+                      <button
+                        key={scheme.id}
+                        type="button"
+                        className={`podoload-seg-btn ${idConfig.mode === scheme.id ? 'active' : ''}`}
+                        style={{ fontSize: '0.72rem', flex: 1, minHeight: '34px' }}
+                        onClick={() =>
+                          setIdConfig((prev) => ({
+                            ...prev,
+                            mode: scheme.id as PatientIdMode,
+                          }))
+                        }
+                      >
+                        {scheme.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Uppercase toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.74rem', color: '#0c2328', fontWeight: 600, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={idConfig.autoUppercase}
+                      onChange={(e) =>
+                        setIdConfig((prev) => ({
+                          ...prev,
+                          autoUppercase: e.target.checked,
+                        }))
+                      }
+                      style={{ accentColor: 'var(--podo-primary)', width: '15px', height: '15px' }}
+                    />
+                    Force uppercase on clinical input
+                  </label>
+
+                  <div style={{ fontSize: '0.75rem', color: '#556f75' }}>
+                    Live Preview: <strong style={{ color: 'var(--podo-primary)' }}>{dbService.generatePatientId(idConfig)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: INBUILT DATABASE STORAGE */}
+              <div className="podoload-card" style={{ padding: '0.85rem', flex: 1 }}>
+                <h4 className="podoload-card-title" style={{ marginBottom: '0.65rem' }}>
+                  INBUILT DATABASE & STORAGE STATUS
+                </h4>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Active Database</span>
+                    <strong style={{ color: '#0c2328' }}>PodoPressDB (IndexedDB v1)</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Stored Patients</span>
+                    <strong style={{ color: '#0c2328' }}>{dbStats.patientCount} records</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Stored Clinical Reports & Scans</span>
+                    <strong style={{ color: '#0c2328' }}>{dbStats.casesCount} exam cases</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Storage Engine</span>
+                    <span className="podo-badge podo-badge-green">Local Safe & Offline Capable</span>
+                  </div>
+                </div>
+
+                {importStatus && (
+                  <div style={{ padding: '0.5rem', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '4px', color: '#166534', fontSize: '0.74rem', marginBottom: '0.75rem' }}>
+                    ✓ {importStatus}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={handleExportBackup}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Database Backup (JSON)</span>
+                  </button>
+
+                  <label className="podoload-btn-secondary podoload-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', margin: 0 }}>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Import Backup</span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportBackup}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </>
+          ) : activeMenu === 'processing' ? (
             /* Regulatory Verification Battery when Image processing is selected */
             <div className="podoload-card" style={{ padding: '0.85rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

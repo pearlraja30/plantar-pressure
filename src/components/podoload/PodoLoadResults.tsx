@@ -81,7 +81,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
     if (leftHeatmapUrl) {
       const a = document.createElement('a');
       a.href = leftHeatmapUrl;
-      a.download = 'PodoLoad-Bilateral-Heatmap.png';
+      a.download = 'PodoPress-Bilateral-Heatmap.png';
       a.click();
     }
   };

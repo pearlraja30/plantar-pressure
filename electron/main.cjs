@@ -10,7 +10,7 @@ function createWindow() {
     height: 960,
     minWidth: 1080,
     minHeight: 720,
-    title: 'Technomind Healthcare - Plantar Pressure Analysis System',
+    title: 'Technomind Healthcare - PodoPress Plantar Pressure Analysis System',
     backgroundColor: '#0b1120',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

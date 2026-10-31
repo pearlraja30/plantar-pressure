@@ -66,7 +66,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              PodoLoad
+              PodoPress
             </h1>
             {onCloseMobile && (
               <button

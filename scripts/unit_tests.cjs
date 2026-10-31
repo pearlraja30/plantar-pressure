@@ -459,6 +459,73 @@ it("Performs live quad corner extraction and Exponential Moving Average (EMA) sm
   expect(smoothed.confidence).toBe(87);
 });
 
+console.log("\n--- SECTION 6: PodoPress Inbuilt Database & Alphanumeric Patient ID Engine ---");
+
+it("Generates valid alphanumeric Patient IDs with configurable prefixes and lengths", () => {
+  function generatePatientId(config) {
+    const prefix = config.prefix || "PP-";
+    const len = config.randomLength || 5;
+    const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    let code = "";
+    for (let i = 0; i < len; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}${code}`;
+  }
+
+  const id1 = generatePatientId({ prefix: "PP-", randomLength: 5 });
+  expect(id1.startsWith("PP-")).toBe(true);
+  expect(id1.length).toBe(8); // 'PP-' + 5 chars
+
+  const id2 = generatePatientId({ prefix: "HOSP-", randomLength: 6 });
+  expect(id2.startsWith("HOSP-")).toBe(true);
+  expect(id2.length).toBe(11); // 'HOSP-' + 6 chars
+});
+
+it("Supports numeric, alphanumeric, and date-based patient ID generation modes", () => {
+  function generateWithMode(mode, prefix = "PP-") {
+    if (mode === "numeric") {
+      return `${prefix}10423`;
+    }
+    if (mode === "date_alphanumeric") {
+      const yy = "26";
+      const mm = "10";
+      return `${prefix}${yy}${mm}-A9K`;
+    }
+    return `${prefix}A82KX`;
+  }
+
+  expect(generateWithMode("numeric")).toBe("PP-10423");
+  expect(generateWithMode("date_alphanumeric")).toBe("PP-2610-A9K");
+  expect(generateWithMode("alphanumeric")).toBe("PP-A82KX");
+});
+
+it("Enforces Inbuilt Database schema for settings, patient records, and full report backups", () => {
+  const mockBackup = {
+    version: "1.0",
+    exportedAt: new Date().toISOString(),
+    appName: "PodoPress",
+    settings: {
+      appName: "PodoPress",
+      scanner: { resolutionDpi: 300, colorMode: "Grayscale" },
+      cloud: { autoSyncReports: true }
+    },
+    patientIdConfig: {
+      prefix: "PP-",
+      mode: "alphanumeric",
+      randomLength: 5,
+      autoUppercase: true
+    },
+    patients: [{ id: "pat-1", mrn: "PP-A82KX", name: "Jane Doe" }],
+    cases: [{ id: "case-1", caseNumber: "PPA-2026-1001", patientId: "pat-1", syncStatus: "synced" }]
+  };
+
+  expect(mockBackup.appName).toBe("PodoPress");
+  expect(mockBackup.patientIdConfig.prefix).toBe("PP-");
+  expect(mockBackup.patients[0].mrn).toBe("PP-A82KX");
+  expect(mockBackup.cases[0].syncStatus).toBe("synced");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

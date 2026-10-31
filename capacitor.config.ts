@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.technomind.plantarpressure',
-  appName: 'Plantar Pressure Analysis',
+  appName: 'PodoPress',
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {

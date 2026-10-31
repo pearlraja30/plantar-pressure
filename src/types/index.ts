@@ -184,3 +184,45 @@ export interface AuditEvent {
   details: string;
   algorithmVersion: string;
 }
+
+export type PatientIdMode = 'alphanumeric' | 'numeric' | 'date_alphanumeric';
+
+export interface PatientIdConfig {
+  prefix: string;
+  mode: PatientIdMode;
+  randomLength: number;
+  autoUppercase: boolean;
+  nextSequentialNumber: number;
+}
+
+export interface SystemSettings {
+  appName: string;
+  patientIdConfig: PatientIdConfig;
+  scanner: {
+    selectedDevice: 'camera' | 'usb' | 'network';
+    resolutionDpi: 150 | 300 | 600 | 1200;
+    colorMode: 'Grayscale' | 'Colour';
+    sheetSize: string;
+    widthMm: string;
+    heightMm: string;
+    autoDetectMarkers: boolean;
+    autoCropSheet: boolean;
+    lensDistortion: boolean;
+  };
+  region: {
+    appLanguage: string;
+    reportLanguage: string;
+    unit: 'mm' | 'cm';
+    dateFormat: string;
+  };
+  cloud: {
+    autoSyncReports: boolean;
+    serverAddress: string;
+    account: string;
+  };
+  clinical: {
+    clinicName: string;
+    defaultDoctor: string;
+    defaultTechnician: string;
+  };
+}

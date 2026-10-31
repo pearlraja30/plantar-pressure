@@ -80,7 +80,7 @@ export async function generateClinicalReportPdf(
 
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text('PLANTAR PRESSURE ANALYSIS SYSTEM', pageWidth - margin, 13, { align: 'right' });
+    doc.text('PODOPRESS · PLANTAR PRESSURE ANALYSIS SYSTEM', pageWidth - margin, 13, { align: 'right' });
 
     // Sub-bar
     doc.setFillColor(13, 148, 136); // teal-600

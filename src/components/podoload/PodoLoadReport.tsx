@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Patient, AnalysisCase } from '../../types';
 import { generateBilateralClubbedReportPdf } from '../../services/reportPdfService';
 import { FootCaptureData } from './PodoLoadCapture';
+import { dbService } from '../../services/dbService';
 
 interface PodoLoadReportProps {
   selectedPatient?: Patient;
@@ -30,14 +31,15 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   onFinishExam,
   onSaveToArchive,
 }) => {
-  // Hospital branding state (clean defaults)
-  const [clinicName, setClinicName] = useState('');
+  const savedSettings = dbService.getSettingsSync();
+  // Hospital branding state (clean defaults from Inbuilt DB)
+  const [clinicName, setClinicName] = useState(savedSettings.clinical?.clinicName || 'Technomind Healthcare Systems');
   const [clinicContact, setClinicContact] = useState('');
   const [logoPosition, setLogoPosition] = useState<'Left' | 'Centre' | 'Right'>('Left');
   const [customFooter, setCustomFooter] = useState('');
 
   // Signatories
-  const [doctorName, setDoctorName] = useState('Dr. Specialist');
+  const [doctorName, setDoctorName] = useState(savedSettings.clinical?.defaultDoctor || 'Dr. Specialist');
   const [technicianName, setTechnicianName] = useState('');
 
   // Doctor comments & quick tags
@@ -168,7 +170,7 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
       };
 
       const doc = await generateBilateralClubbedReportPdf(leftCaseForPdf, rightCaseForPdf, selectedPatient);
-      doc.save(`PodoLoad-Clinical-Report-${selectedPatient.mrn || '00000'}.pdf`);
+      doc.save(`PodoPress-Clinical-Report-${selectedPatient.mrn || '00000'}.pdf`);
     } catch (err) {
       console.warn('PDF download error:', err);
     }
