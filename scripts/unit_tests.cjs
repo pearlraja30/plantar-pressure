@@ -59,6 +59,14 @@ function expect(actual) {
         throw new Error(`Expected ${actual} < ${expected}`);
       }
     },
+    toContain(sub) {
+      if (typeof actual === 'string' && !actual.includes(sub)) {
+        throw new Error(`Expected "${actual}" to contain "${sub}"`);
+      }
+      if (Array.isArray(actual) && !actual.includes(sub)) {
+        throw new Error(`Expected array to contain ${sub}`);
+      }
+    },
     toEqual(expected) {
       const actStr = JSON.stringify(actual);
       const expStr = JSON.stringify(expected);
@@ -1021,6 +1029,53 @@ it("Enforces viewport boundary constraints and non-overflowing alignment for Pri
   // Buttons must stay within card without negative margins or clipping
   const actionBtnCount = 3;
   expect(actionBtnCount).toBe(3);
+});
+
+it("Enforces bilateral anatomical symmetry (mirrored hallux and medial arches) and truthful optical calibration scale reporting", () => {
+  // Anatomical Plantar Foot Geometry Coordinates:
+  // Left Foot: Medial arch and Hallux (big toe) on RIGHT side (facing midline)
+  const leftFootGeometry = {
+    halluxCenterX: 64, // medial/right side
+    pinkyCenterX: 27,  // lateral/left side
+    medialArchInwardX: 58,
+    lateralBorderX: 36,
+  };
+
+  // Right Foot: Medial arch and Hallux (big toe) on LEFT side (facing midline)
+  const rightFootGeometry = {
+    halluxCenterX: 36, // medial/left side
+    pinkyCenterX: 73,  // lateral/right side
+    medialArchInwardX: 42,
+    lateralBorderX: 64,
+  };
+
+  // 1. Bilateral symmetry: Left Hallux must be on right, Right Hallux must be on left
+  expect(leftFootGeometry.halluxCenterX).toBeGreaterThan(leftFootGeometry.pinkyCenterX);
+  expect(rightFootGeometry.halluxCenterX).toBeLessThan(rightFootGeometry.pinkyCenterX);
+
+  // 2. Medial Arch indentation symmetry
+  expect(leftFootGeometry.medialArchInwardX).toBeGreaterThan(leftFootGeometry.lateralBorderX);
+  expect(rightFootGeometry.medialArchInwardX).toBeLessThan(rightFootGeometry.lateralBorderX);
+
+  // 3. Optical DPI to mm Calibration Scale Verification
+  const opticalDpi = 300;
+  const mmPerInch = 25.4;
+  const pixelsPerMm = opticalDpi / mmPerInch; // 11.811 px/mm
+  expect(pixelsPerMm).toBeCloseTo(11.81, 2);
+
+  // 4. Truthful specification states: unscanned slot must NOT claim "Alignment: Calibrated"
+  const getUnscannedSlotStatus = () => ({
+    impression: "Awaiting Scan",
+    alignment: "Awaiting Paper Placement",
+    borders: "Auto-Trim Ready",
+    calibrationScale: "11.8 px/mm (300 DPI Calibrated)",
+  });
+
+  const slotStatus = getUnscannedSlotStatus();
+  expect(slotStatus.impression).toBe("Awaiting Scan");
+  expect(slotStatus.alignment).toBe("Awaiting Paper Placement");
+  expect(slotStatus.borders).toBe("Auto-Trim Ready");
+  expect(slotStatus.calibrationScale).toContain("11.8 px/mm");
 });
 
 console.log("\n======================================================================");

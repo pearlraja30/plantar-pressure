@@ -631,6 +631,12 @@
   color: var(--podo-badge-amber-text);
 }
 
+.podo-badge-neutral {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
 /* ----------------------------------------------------
    PATIENT LIST (EXISTING PATIENTS PANEL)
    ---------------------------------------------------- */
@@ -837,13 +843,74 @@
   width: 200px;
   height: 290px;
   background-color: #ffffff;
-  border: 1px dashed #94a3b8;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: 8px;
+}
+
+.podoload-foot-silhouette {
+  width: 120px;
+  height: 175px;
+  display: block;
+}
+
+.podoload-orientation-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 8px;
+  margin-top: 2px;
+}
+
+.podoload-calibration-guide-banner {
+  background-color: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-left: 4px solid var(--podo-primary);
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.podoload-calibration-guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.podoload-calibration-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid #99f6e4;
+  font-size: 0.72rem;
+}
+
+.podoload-calibration-step-card {
+  background: #ffffff;
+  border: 1px solid #e0f2fe;
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .podoload-marker {

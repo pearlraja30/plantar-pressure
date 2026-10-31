@@ -10,6 +10,9 @@ import {
   Camera,
   RefreshCw,
   Usb,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -77,6 +80,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const [sheetSize, setSheetSize] = useState('A4');
   const [customWidthMm, setCustomWidthMm] = useState('210');
   const [customHeightMm, setCustomHeightMm] = useState('297');
+  const [showCalibrationGuide, setShowCalibrationGuide] = useState<boolean>(false);
 
   // Foot acquisition modes: On Web and Windows, default to 'scanner'. Camera is only for mobile.
   const [leftMode, setLeftMode] = useState<'camera' | 'scanner' | 'import'>(
@@ -551,6 +555,75 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
         )}
       </div>
 
+      {/* Clinical Calibration & Alignment Instructions Banner */}
+      <div className="podoload-calibration-guide-banner">
+        <div
+          className="podoload-calibration-guide-header"
+          onClick={() => setShowCalibrationGuide((prev) => !prev)}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.05rem' }}>📐</span>
+            <div>
+              <span style={{ fontWeight: 700, color: '#0f766e', fontSize: '0.8rem' }}>
+                Hardware Scanner Calibration & Alignment Guide
+              </span>
+              <span style={{ color: '#475569', fontSize: '0.72rem', marginLeft: '0.5rem' }}>
+                (What does Calibration mean? How to place Harris Mat paper?)
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="podoload-btn-secondary podoload-btn-sm"
+            style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            {showCalibrationGuide ? (
+              <>
+                Hide Instructions <ChevronUp className="w-3 h-3 inline" />
+              </>
+            ) : (
+              <>
+                Detailed Instructions <ChevronDown className="w-3 h-3 inline" />
+              </>
+            )}
+          </button>
+        </div>
+
+        {showCalibrationGuide && (
+          <div className="podoload-calibration-steps-grid">
+            <div className="podoload-calibration-step-card">
+              <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ backgroundColor: '#0f766e', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem' }}>1</span>
+                What is Optical Calibration?
+              </span>
+              <p style={{ margin: 0, color: '#334155', lineHeight: 1.4, fontSize: '0.72rem' }}>
+                The flatbed optical sensor is calibrated at <strong>300 DPI (11.81 pixels per mm)</strong>. This constant scale maps every sensor pixel directly to physical millimeters ($mm$) with zero distortion, ensuring truthful foot length, ball breadth, heel width, and Cavanagh Arch Index derivation.
+              </p>
+            </div>
+
+            <div className="podoload-calibration-step-card">
+              <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ backgroundColor: '#0f766e', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem' }}>2</span>
+                How to Place Paper on the Glass
+              </span>
+              <p style={{ margin: 0, color: '#334155', lineHeight: 1.4, fontSize: '0.72rem' }}>
+                Place the Harris Mat paper with the ink imprint <strong>facing DOWN against the scanner glass</strong>. Align the top edge flush with the scanner's top-left corner origin arrow. The medial arch naturally faces inward towards the body midline (Left foot arch faces right, Right foot arch faces left).
+              </p>
+            </div>
+
+            <div className="podoload-calibration-step-card">
+              <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ backgroundColor: '#0f766e', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem' }}>3</span>
+                Automated Alignment & Auto-Deskew
+              </span>
+              <p style={{ margin: 0, color: '#334155', lineHeight: 1.4, fontSize: '0.72rem' }}>
+                When you click <strong>Scan</strong>, the system performs automatic deskew (correcting paper tilt up to ±5°), auto-detects the dark ink footprint boundaries, trims away white margins and scanner lid edges, and isolates the genuine plantar contact area.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main Grid: Left Foot & Right Foot Acquisition Cards */}
       <div className="podoload-capture-grid">
         {/* ===================== LEFT FOOT CARD ===================== */}
@@ -680,31 +753,40 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </div>
               ) : (
                 <div className="podoload-sheet-preview">
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                    Left Foot Bed (1:1)
+                  </div>
                   <div className="podoload-empty-target">
-                    {/* Anatomical Left Foot Silhouette */}
+                    {/* Anatomical Left Foot Silhouette (Plantar View: Medial Arch & Hallux on Right) */}
                     <svg
                       viewBox="0 0 100 160"
                       className="podoload-foot-silhouette"
                       aria-label="Left foot anatomical placement guide"
                     >
                       <path
-                        d="M 45 15 C 38 15 32 20 32 30 C 32 40 38 48 45 52 C 40 60 38 72 40 85 C 42 98 40 115 36 130 C 36 142 42 150 50 150 C 58 150 64 142 64 130 C 60 115 58 98 60 85 C 62 72 65 60 68 50 C 72 42 75 32 70 24 C 65 16 52 15 45 15 Z"
+                        d="M 62 26 C 70 32 74 42 70 52 C 64 62 60 74 58 86 C 56 98 58 114 62 130 C 62 142 56 150 48 150 C 40 150 34 142 34 130 C 36 114 38 98 38 86 C 36 74 34 62 30 52 C 26 42 28 32 34 26 C 42 20 54 20 62 26 Z"
                         fill="none"
                         stroke="#94a3b8"
                         strokeWidth="1.5"
                         strokeDasharray="3 3"
                       />
-                      <circle cx="36" cy="18" r="4.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="48" cy="13" r="3.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="58" cy="15" r="3.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="67" cy="20" r="2.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="74" cy="27" r="2.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      {/* Left foot toes: Hallux (Big Toe) on Medial/Right, Pinky on Lateral/Left */}
+                      <circle cx="64" cy="18" r="4.8" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="53" cy="14" r="3.6" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="43" cy="16" r="3.1" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="34" cy="22" r="2.6" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="27" cy="30" r="2.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
                     </svg>
+
+                    <div className="podoload-orientation-labels">
+                      <span>← Lateral</span>
+                      <span>Medial (Arch) →</span>
+                    </div>
 
                     <div className="podoload-target-label">
                       {leftMode === 'scanner'
                         ? isScannerAttached
-                          ? `Ready on ${activeDevice?.name || 'Scanner'}`
+                          ? `Place Left Foot Sheet Face Down`
                           : 'Connect Scanner or Import Scanned Image'
                         : leftMode === 'camera'
                         ? 'Position sheet in frame'
@@ -737,7 +819,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             {/* Quality & Calibration Sidebar Panel */}
             <div className="podoload-qc-sidebar">
               <span className="podoload-sidebar-heading">
-                {leftFoot ? 'ORIGINAL SCAN ACQUIRED' : 'SCAN SPECIFICATIONS'}
+                {leftFoot ? 'ORIGINAL SCAN ACQUIRED' : 'SCAN & CALIBRATION SPECIFICATIONS'}
               </span>
               <div>
                 Size:{' '}
@@ -746,15 +828,15 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </span>
               </div>
               <div>
-                Scale:{' '}
-                <span style={{ color: '#0c2328', fontWeight: 600 }}>
-                  {leftFoot?.scalePxMm || '11.8 px/mm (300 DPI)'}
+                DPI Scale:{' '}
+                <span style={{ color: '#0c2328', fontWeight: 600 }} title="Calibrated Optical Scale: 11.8 pixels per millimeter">
+                  {leftFoot?.scalePxMm || '11.8 px/mm (300 DPI Calibrated)'}
                 </span>
               </div>
               <div>
                 Captured:{' '}
                 <span style={{ color: '#0c2328', fontWeight: 600 }}>
-                  {leftFoot?.capturedAt || 'Ready'}
+                  {leftFoot?.capturedAt || 'Ready for Scan'}
                 </span>
               </div>
 
@@ -766,14 +848,14 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   marginTop: '0.25rem',
                 }}
               >
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Impression: {leftFoot ? (leftFoot.isShowingImpressionOnly ? 'Autodetected (1:1)' : 'Full Sheet') : 'Awaiting Input'}
+                <span className={`podo-badge ${leftFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Impression: {leftFoot ? (leftFoot.isShowingImpressionOnly ? 'Autodetected (1:1)' : 'Full Sheet') : 'Awaiting Scan'}
                 </span>
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Alignment: {leftFoot ? 'True Natural Aspect' : 'Calibrated'}
+                <span className={`podo-badge ${leftFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Foot Alignment: {leftFoot ? 'Natural Longitudinal Axis' : 'Awaiting Paper Placement'}
                 </span>
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Borders: {leftFoot ? 'Edges Trimmed Clean' : 'Calibrated'}
+                <span className={`podo-badge ${leftFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Sheet Borders: {leftFoot ? 'Edges Trimmed Clean' : 'Auto-Trim Ready'}
                 </span>
               </div>
 
@@ -782,6 +864,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 <span style={{ color: '#0c2328' }}>
                   {leftFoot ? `${leftFoot.confidence}%` : '---'}
                 </span>
+              </div>
+
+              <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', lineHeight: 1.35 }}>
+                {leftFoot
+                  ? '✓ Calibrated 300 DPI scale applied. Measured metrics derived directly from impression.'
+                  : 'ℹ️ Sensor calibrated to 300 DPI. Place Harris Mat paper ink-side down against glass.'}
               </div>
             </div>
           </div>
@@ -991,31 +1079,40 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </div>
               ) : (
                 <div className="podoload-sheet-preview">
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                    Right Foot Bed (1:1)
+                  </div>
                   <div className="podoload-empty-target">
-                    {/* Anatomical Right Foot Silhouette */}
+                    {/* Anatomical Right Foot Silhouette (Plantar View: Medial Arch & Hallux on Left) */}
                     <svg
                       viewBox="0 0 100 160"
                       className="podoload-foot-silhouette"
                       aria-label="Right foot anatomical placement guide"
                     >
                       <path
-                        d="M 55 15 C 62 15 68 20 68 30 C 68 40 62 48 55 52 C 60 60 62 72 60 85 C 58 98 60 115 64 130 C 64 142 58 150 50 150 C 42 150 36 142 36 130 C 40 115 42 98 40 85 C 38 72 35 60 32 50 C 28 42 25 32 30 24 C 35 16 48 15 55 15 Z"
+                        d="M 38 26 C 30 32 26 42 30 52 C 36 62 40 74 42 86 C 44 98 42 114 38 130 C 38 142 44 150 52 150 C 60 150 66 142 66 130 C 64 114 62 98 62 86 C 64 74 66 62 70 52 C 74 42 72 32 66 26 C 58 20 46 20 38 26 Z"
                         fill="none"
                         stroke="#94a3b8"
                         strokeWidth="1.5"
                         strokeDasharray="3 3"
                       />
-                      <circle cx="64" cy="18" r="4.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="52" cy="13" r="3.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="42" cy="15" r="3.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="33" cy="20" r="2.5" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
-                      <circle cx="26" cy="27" r="2.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      {/* Right foot toes: Hallux (Big Toe) on Medial/Left, Pinky on Lateral/Right */}
+                      <circle cx="36" cy="18" r="4.8" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="47" cy="14" r="3.6" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="57" cy="16" r="3.1" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="66" cy="22" r="2.6" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
+                      <circle cx="73" cy="30" r="2.0" fill="none" stroke="#94a3b8" strokeWidth="1.2" />
                     </svg>
+
+                    <div className="podoload-orientation-labels">
+                      <span>← Medial (Arch)</span>
+                      <span>Lateral (Outside) →</span>
+                    </div>
 
                     <div className="podoload-target-label">
                       {rightMode === 'scanner'
                         ? isScannerAttached
-                          ? `Ready on ${activeDevice?.name || 'Scanner'}`
+                          ? `Place Right Foot Sheet Face Down`
                           : 'Connect Scanner or Import Scanned Image'
                         : rightMode === 'camera'
                         ? 'Position sheet in frame'
@@ -1048,7 +1145,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             {/* Quality & Calibration Sidebar Panel */}
             <div className="podoload-qc-sidebar">
               <span className="podoload-sidebar-heading">
-                {rightFoot ? 'ORIGINAL SCAN ACQUIRED' : 'SCAN SPECIFICATIONS'}
+                {rightFoot ? 'ORIGINAL SCAN ACQUIRED' : 'SCAN & CALIBRATION SPECIFICATIONS'}
               </span>
               <div>
                 Size:{' '}
@@ -1057,15 +1154,15 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 </span>
               </div>
               <div>
-                Scale:{' '}
-                <span style={{ color: '#0c2328', fontWeight: 600 }}>
-                  {rightFoot?.scalePxMm || '11.8 px/mm (300 DPI)'}
+                DPI Scale:{' '}
+                <span style={{ color: '#0c2328', fontWeight: 600 }} title="Calibrated Optical Scale: 11.8 pixels per millimeter">
+                  {rightFoot?.scalePxMm || '11.8 px/mm (300 DPI Calibrated)'}
                 </span>
               </div>
               <div>
                 Captured:{' '}
                 <span style={{ color: '#0c2328', fontWeight: 600 }}>
-                  {rightFoot?.capturedAt || 'Ready'}
+                  {rightFoot?.capturedAt || 'Ready for Scan'}
                 </span>
               </div>
 
@@ -1077,14 +1174,14 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   marginTop: '0.25rem',
                 }}
               >
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Impression: {rightFoot ? (rightFoot.isShowingImpressionOnly ? 'Autodetected (1:1)' : 'Full Sheet') : 'Awaiting Input'}
+                <span className={`podo-badge ${rightFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Impression: {rightFoot ? (rightFoot.isShowingImpressionOnly ? 'Autodetected (1:1)' : 'Full Sheet') : 'Awaiting Scan'}
                 </span>
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Alignment: {rightFoot ? 'True Natural Aspect' : 'Calibrated'}
+                <span className={`podo-badge ${rightFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Foot Alignment: {rightFoot ? 'Natural Longitudinal Axis' : 'Awaiting Paper Placement'}
                 </span>
-                <span className="podo-badge podo-badge-green" style={{ width: 'fit-content' }}>
-                  Borders: {rightFoot ? 'Edges Trimmed Clean' : 'Calibrated'}
+                <span className={`podo-badge ${rightFoot ? 'podo-badge-green' : 'podo-badge-neutral'}`} style={{ width: 'fit-content' }}>
+                  Sheet Borders: {rightFoot ? 'Edges Trimmed Clean' : 'Auto-Trim Ready'}
                 </span>
               </div>
 
@@ -1093,6 +1190,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 <span style={{ color: '#0c2328' }}>
                   {rightFoot ? `${rightFoot.confidence}%` : '---'}
                 </span>
+              </div>
+
+              <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', lineHeight: 1.35 }}>
+                {rightFoot
+                  ? '✓ Calibrated 300 DPI scale applied. Measured metrics derived directly from impression.'
+                  : 'ℹ️ Sensor calibrated to 300 DPI. Place Harris Mat paper ink-side down against glass.'}
               </div>
             </div>
           </div>
