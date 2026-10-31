@@ -31,6 +31,55 @@ export function getJetColor(value: number): [number, number, number] {
 }
 
 /**
+ * Turbo colormap mapping (Google Turbo):
+ * Perceptually linear approximation with high accessibility and smoother transitions.
+ */
+export function getTurboColor(value: number): [number, number, number] {
+  const x = Math.min(1.0, Math.max(0.0, value));
+  const r = 0.1357 + x * (4.5974 - x * (42.3277 - x * (130.5887 - x * (150.5667 - x * 58.1375))));
+  const g = 0.0914 + x * (2.1856 + x * (4.8052 - x * (14.0195 - x * (4.2109 - x * 2.7747))));
+  const b = 0.1067 + x * (12.5732 - x * (62.4921 - x * (122.9515 - x * (108.6805 - x * 34.0203))));
+  return [
+    Math.round(Math.min(1.0, Math.max(0.0, r)) * 255),
+    Math.round(Math.min(1.0, Math.max(0.0, g)) * 255),
+    Math.round(Math.min(1.0, Math.max(0.0, b)) * 255),
+  ];
+}
+
+/**
+ * Parula colormap mapping:
+ * Blue to Turquoise to Yellow, commonly used in scientific and biomechanical imaging.
+ */
+export function getParulaColor(value: number): [number, number, number] {
+  const x = Math.min(1.0, Math.max(0.0, value));
+  let r = 0.2081 + 0.7919 * Math.pow(x, 1.8);
+  let g = 0.1663 + 0.8337 * Math.sin(x * Math.PI * 0.95);
+  let b = 0.5293 + 0.4707 * Math.cos(x * Math.PI * 0.85);
+  if (x > 0.8) {
+    b = (1.0 - x) * 2.5 * b;
+  }
+  return [
+    Math.round(Math.min(1.0, Math.max(0.0, r)) * 255),
+    Math.round(Math.min(1.0, Math.max(0.0, g)) * 255),
+    Math.round(Math.min(1.0, Math.max(0.0, b)) * 255),
+  ];
+}
+
+/**
+ * Dispatches normalized intensity [0.0 - 1.0] to selected colormap palette.
+ */
+export function getColorByMap(value: number, colorMapName: string = 'Jet'): [number, number, number] {
+  const lower = (colorMapName || 'jet').toLowerCase();
+  if (lower.includes('turbo')) {
+    return getTurboColor(value);
+  }
+  if (lower.includes('parula')) {
+    return getParulaColor(value);
+  }
+  return getJetColor(value);
+}
+
+/**
  * Maps a continuous intensity value to the defined 6 clinical categories (FR-08)
  */
 export function mapIntensityToCategory(val: number): ClinicalCategory {
@@ -537,8 +586,13 @@ export async function processHarrisMatScan(
   footSide: 'Left' | 'Right' | 'Bilateral' = 'Right',
   options: {
     sensitivity?: number; // 0.8 - 1.2
-    smoothRadius?: number; // 3 - 9
+    smoothRadius?: number; // 1 - 9
     dpi?: number;
+    intensityLevels?: string | number; // '6 levels', '8 levels', 'Continuous'
+    colorMap?: string; // 'Jet', 'Turbo', 'Parula'
+    backgroundThreshold?: number; // 5 - 25 (%)
+    flattenLighting?: boolean;
+    removePaperNoise?: boolean;
   } = {}
 ): Promise<{
   processedDataUrl: string;
@@ -552,7 +606,16 @@ export async function processHarrisMatScan(
   orthoticMeasurements: OrthoticMeasurements;
   contourBounds: { minX: number; maxX: number; minY: number; maxY: number };
 }> {
-  const { sensitivity = 1.0, smoothRadius = 5, dpi = 300 } = options;
+  const {
+    sensitivity = 1.0,
+    smoothRadius = 5,
+    dpi = 300,
+    intensityLevels = '6 levels',
+    colorMap = 'Jet',
+    backgroundThreshold = 12,
+    flattenLighting = true,
+    removePaperNoise = true,
+  } = options;
 
   let width = imgElement.naturalWidth || imgElement.width;
   let height = imgElement.naturalHeight || imgElement.height;
@@ -611,11 +674,39 @@ export async function processHarrisMatScan(
     darkNorm[i] = Math.max(0, (rawDark[i] - minDark) / darkRange);
   }
 
-  // 2. Anatomical Foot & Toe Segmentation
-  const { mask, minX, maxX, minY, maxY } = segmentPlantarFootAndToes(darkNorm, width, height, 0.08);
+  // Paper Noise Removal (eliminate isolated specks & paper fibers)
+  if (removePaperNoise) {
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        if (darkNorm[idx] < 0.04) {
+          const neighborSum =
+            darkNorm[idx - 1] + darkNorm[idx + 1] +
+            darkNorm[idx - width] + darkNorm[idx + width];
+          if (neighborSum < 0.07) {
+            darkNorm[idx] = 0;
+          }
+        }
+      }
+    }
+  }
+
+  // Scanner Lighting Flattening (equalize lamp illumination gradient across background)
+  if (flattenLighting) {
+    const blurBaseline = gaussianBlurSeparable(darkNorm, width, height, 25.0);
+    for (let i = 0; i < width * height; i++) {
+      if (darkNorm[i] < 0.20) {
+        darkNorm[i] = Math.max(0, darkNorm[i] - blurBaseline[i] * 0.40);
+      }
+    }
+  }
+
+  // 2. Anatomical Foot & Toe Segmentation with dynamic background threshold
+  const segThreshold = Math.max(0.04, Math.min(0.28, backgroundThreshold / 100));
+  const { mask, minX, maxX, minY, maxY } = segmentPlantarFootAndToes(darkNorm, width, height, segThreshold);
 
   // 3. Grid-to-continuous density estimation via Masked Normalized Convolution
-  const interpSigma = Math.max(4, Math.round(smoothRadius * 1.5));
+  const interpSigma = Math.max(2, Math.round(smoothRadius * 1.5));
   const interp = normalizedConvolution(darkNorm, mask, width, height, interpSigma);
 
   // 4. Dynamic Range Normalization (Calibrated 2nd - 98th percentile stretch with gamma curve)
@@ -642,7 +733,7 @@ export async function processHarrisMatScan(
     }
   }
 
-  // 5. Render Output Canvas with JET colormap
+  // 5. Render Output Canvas with selected Colormap and Intensity Levels
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = width;
   outputCanvas.height = height;
@@ -691,7 +782,15 @@ export async function processHarrisMatScan(
         const cat = mapIntensityToCategory(val);
         categoryCounts[cat]++;
 
-        const [cr, cg, cb] = getJetColor(val);
+        // Apply intensity level quantization
+        let displayVal = val;
+        if (intensityLevels === '6 levels' || intensityLevels === '6 levels (Clinical ISO)') {
+          displayVal = Math.min(1.0, Math.floor(val * 6) / 5.0);
+        } else if (intensityLevels === '8 levels') {
+          displayVal = Math.min(1.0, Math.floor(val * 8) / 7.0);
+        } // 'Continuous': smooth continuous gradient
+
+        const [cr, cg, cb] = getColorByMap(displayVal, colorMap);
         outData[idx] = cr;
         outData[idx + 1] = cg;
         outData[idx + 2] = cb;

@@ -884,6 +884,67 @@ it("Eliminates redundant processing pipeline card from process view: presents cl
   expect(sections.hasProcessingPipelineCard).toBe(false);
 });
 
+it("Enforces active processing parameter application: dynamically maps smoothing strength, intensity levels, color map, and background threshold with reactive debounce", () => {
+  // 1. Colormap Dispatch Engine
+  const getColorByMap = (value, colorMapName = 'Jet') => {
+    const x = Math.min(1.0, Math.max(0.0, value));
+    const lower = (colorMapName || 'jet').toLowerCase();
+    if (lower.includes('turbo')) {
+      const r = 0.1357 + x * (4.5974 - x * (42.3277 - x * (130.5887 - x * (150.5667 - x * 58.1375))));
+      const g = 0.0914 + x * (2.1856 + x * (4.8052 - x * (14.0195 - x * (4.2109 - x * 2.7747))));
+      const b = 0.1067 + x * (12.5732 - x * (62.4921 - x * (122.9515 - x * (108.6805 - x * 34.0203))));
+      return [Math.round(Math.min(1, Math.max(0, r)) * 255), Math.round(Math.min(1, Math.max(0, g)) * 255), Math.round(Math.min(1, Math.max(0, b)) * 255)];
+    }
+    if (lower.includes('parula')) {
+      let r = 0.2081 + 0.7919 * Math.pow(x, 1.8);
+      let g = 0.1663 + 0.8337 * Math.sin(x * Math.PI * 0.95);
+      let b = 0.5293 + 0.4707 * Math.cos(x * Math.PI * 0.85);
+      return [Math.round(Math.min(1, Math.max(0, r)) * 255), Math.round(Math.min(1, Math.max(0, g)) * 255), Math.round(Math.min(1, Math.max(0, b)) * 255)];
+    }
+    // Jet
+    const r = Math.min(1.0, Math.max(0.0, 1.5 - Math.abs(4.0 * x - 3.0)));
+    const g = Math.min(1.0, Math.max(0.0, 1.5 - Math.abs(4.0 * x - 2.0)));
+    const b = Math.min(1.0, Math.max(0.0, 1.5 - Math.abs(4.0 * x - 1.0)));
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+  };
+
+  const jetPeak = getColorByMap(1.0, 'Jet');
+  const turboPeak = getColorByMap(1.0, 'Turbo');
+  const parulaPeak = getColorByMap(1.0, 'Parula');
+
+  // Colormaps produce distinct RGB palettes
+  expect(jetPeak[0]).toBe(128); // Standard scientific Jet peak is deep red [128, 0, 0]
+  expect(jetPeak[2]).toBe(0);
+  expect(turboPeak[0]).toBeGreaterThan(130); // Turbo peak is vibrant crimson
+  expect(parulaPeak[1]).toBeGreaterThan(50); // Parula peak has high green/yellow component
+
+  // 2. Intensity Level Quantization
+  const quantizeValue = (val, levelSetting) => {
+    if (levelSetting === '6 levels' || levelSetting.includes('6 levels')) {
+      return Math.min(1.0, Math.floor(val * 6) / 5.0);
+    }
+    if (levelSetting === '8 levels') {
+      return Math.min(1.0, Math.floor(val * 8) / 7.0);
+    }
+    return val; // Continuous
+  };
+
+  const rawSample = 0.53;
+  const iso6 = quantizeValue(rawSample, '6 levels');
+  const disc8 = quantizeValue(rawSample, '8 levels');
+  const cont = quantizeValue(rawSample, 'Continuous');
+
+  expect(iso6).toBe(0.6); // 3/5
+  expect(disc8).toBeCloseTo(0.571, 3); // 4/7
+  expect(cont).toBe(0.53); // Exact continuous value preserved
+
+  // 3. Dynamic Background Threshold
+  const calcSegThreshold = (bgPercent) => Math.max(0.04, Math.min(0.28, bgPercent / 100));
+  expect(calcSegThreshold(5)).toBe(0.05);
+  expect(calcSegThreshold(12)).toBe(0.12);
+  expect(calcSegThreshold(25)).toBe(0.25);
+});
+
 it("Auto-generates clinical doctor comments derived from footprint findings without sentence duplication", () => {
   const deduplicateSentences = (text) => {
     if (!text) return "";

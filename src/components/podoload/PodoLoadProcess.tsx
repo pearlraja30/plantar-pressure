@@ -51,6 +51,11 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
 
         leftResult = await processHarrisMatScan(leftImg, 'Left', {
           smoothRadius: smoothingStrength,
+          intensityLevels,
+          colorMap,
+          backgroundThreshold,
+          flattenLighting,
+          removePaperNoise,
           sensitivity: 1.0,
         });
         leftUrl = leftResult.processedDataUrl;
@@ -63,6 +68,11 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
 
         rightResult = await processHarrisMatScan(rightImg, 'Right', {
           smoothRadius: smoothingStrength,
+          intensityLevels,
+          colorMap,
+          backgroundThreshold,
+          flattenLighting,
+          removePaperNoise,
           sensitivity: 1.0,
         });
         rightUrl = rightResult.processedDataUrl;
@@ -89,6 +99,24 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
       runProcessingPipeline();
     }
   }, [leftFoot, rightFoot]);
+
+  // Live real-time reactive debounce: reprocesses heatmaps whenever any parameter changes
+  useEffect(() => {
+    if (!leftFoot?.rawDataUrl && !rightFoot?.rawDataUrl) return;
+
+    const timer = setTimeout(() => {
+      runProcessingPipeline();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [
+    smoothingStrength,
+    intensityLevels,
+    colorMap,
+    backgroundThreshold,
+    flattenLighting,
+    removePaperNoise,
+  ]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>
@@ -218,9 +246,9 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
               value={colorMap}
               onChange={(e) => setColorMap(e.target.value)}
             >
-              <option value="Jet">Jet (Diagnostic colormap)</option>
-              <option value="Parula">Parula</option>
-              <option value="Turbo">Turbo</option>
+              <option value="Jet">Jet (Diagnostic standard)</option>
+              <option value="Turbo">Turbo (High-contrast accessible)</option>
+              <option value="Parula">Parula (Blue to Yellow)</option>
             </select>
           </div>
 
