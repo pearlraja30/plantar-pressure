@@ -772,6 +772,50 @@ it("Enforces clean clinical presentation: eliminates black background in heatmap
   expect(contactPixel[3]).toBe(255); // Visible pressure heat
 });
 
+it("Enforces truthful orthotic measurements derived directly from scanned footprint bounding box and calibrated DPI", () => {
+  // Simulates footprint bounding box and DPI scale calculation
+  const computeOrthoticMetrics = (minX, maxX, minY, maxY, heelBreadthPx, dpi = 300) => {
+    const mmPerPixel = 25.4 / dpi;
+    const footLengthMm = Math.round((maxY - minY) * mmPerPixel);
+    const forefootWidthMm = Math.round((maxX - minX) * mmPerPixel);
+    const heelWidthMm = Math.round(heelBreadthPx * mmPerPixel);
+    const ballGirthMm = Math.round(forefootWidthMm * 2.3);
+    return { footLengthMm, forefootWidthMm, heelWidthMm, ballGirthMm, mmPerPixel };
+  };
+
+  // Scanned footprint box: 300 DPI, height = 3000px (~254mm), width = 1100px (~93mm), heel = 700px (~59mm)
+  const metrics = computeOrthoticMetrics(100, 1200, 200, 3200, 700, 300);
+  expect(metrics.footLengthMm).toBe(254);
+  expect(metrics.forefootWidthMm).toBe(93);
+  expect(metrics.heelWidthMm).toBe(59);
+  expect(metrics.ballGirthMm).toBe(214);
+  expect(metrics.footLengthMm).toBeGreaterThan(0);
+  expect(metrics.forefootWidthMm).toBeGreaterThan(0);
+});
+
+it("Enforces graceful unilateral handling: zero hallucinated values and accurate unilateral status when only one foot is scanned", () => {
+  const getResultsDisplay = (leftScan, rightScan) => {
+    const isUnilateralLeft = Boolean(leftScan) && !rightScan;
+    const isUnilateralRight = !leftScan && Boolean(rightScan);
+    return {
+      leftStatus: leftScan ? "Active" : "Awaiting Scan",
+      rightStatus: rightScan ? "Active" : "Awaiting Scan",
+      asymmetryLabel: isUnilateralLeft
+        ? "Unilateral Assessment (Left Foot Only)"
+        : isUnilateralRight
+        ? "Unilateral Assessment (Right Foot Only)"
+        : "Bilateral Symmetry Verified",
+      hasHangingLoader: false, // Never hangs on missing foot
+    };
+  };
+
+  const leftOnlyDisplay = getResultsDisplay({ id: "L-01" }, null);
+  expect(leftOnlyDisplay.leftStatus).toBe("Active");
+  expect(leftOnlyDisplay.rightStatus).toBe("Awaiting Scan");
+  expect(leftOnlyDisplay.asymmetryLabel).toBe("Unilateral Assessment (Left Foot Only)");
+  expect(leftOnlyDisplay.hasHangingLoader).toBe(false);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

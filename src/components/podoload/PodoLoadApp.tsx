@@ -301,19 +301,19 @@ export function PodoLoadApp() {
           warnings: [],
         },
         algorithmVersion: 'PPA-1.0.24-ISO',
-        categoryDistribution: lAnalysis?.categoryDistribution || [],
-        regionalAnalysis: lAnalysis?.regionalAnalysis || {
-          forefootContactPct: 40,
-          midfootContactPct: 15,
-          hindfootContactPct: 45,
-          halluxContactPct: 14,
-          peakContactCategory: 'C5',
-          peakRegion: 'Metatarsal 1',
-          contactAreaCm2: 112,
-          cavanaghArchIndex: 0.19,
+        categoryDistribution: lAnalysis?.categoryDistribution || rAnalysis?.categoryDistribution || [],
+        regionalAnalysis: lAnalysis?.regionalAnalysis || rAnalysis?.regionalAnalysis || {
+          forefootContactPct: 0,
+          midfootContactPct: 0,
+          hindfootContactPct: 0,
+          halluxContactPct: 0,
+          peakContactCategory: 'C1',
+          peakRegion: 'Plantar Contact',
+          contactAreaCm2: 0,
+          cavanaghArchIndex: 0,
           archClassification: 'Normal Arch',
-          chippauxSmirakIndex: 32,
-          staheliIndex: 0.65,
+          chippauxSmirakIndex: 0,
+          staheliIndex: 0,
           diabeticUlcerRisk: {
             iwgdfRiskCategory: 0,
             riskLabel: 'Low Risk',
@@ -331,15 +331,15 @@ export function PodoLoadApp() {
           longestToe: { x: 330, y: 190 },
           archApex: { x: 310, y: 640 },
         },
-        orthoticMeasurements: {
-          footLengthMm: 254,
-          forefootWidthMm: 98,
-          heelWidthMm: 62,
-          ballGirthMm: 235,
-          archIndex: 0.19,
+        orthoticMeasurements: lAnalysis?.orthoticMeasurements || rAnalysis?.orthoticMeasurements || {
+          footLengthMm: 0,
+          forefootWidthMm: 0,
+          heelWidthMm: 0,
+          ballGirthMm: 0,
+          archIndex: 0,
           archType: 'Normal Arch',
-          scaleMmPerPixel: 0.23,
-          measurementMethod: 'Calibrated A4 Paper Grid Reference',
+          scaleMmPerPixel: 0.085,
+          measurementMethod: 'Optical Harris Mat Morphometry',
           calibratedAt: new Date().toISOString(),
           recommendations: ['Supportive arch contour', 'Cushioned heel cup'],
         },
@@ -471,6 +471,7 @@ export function PodoLoadApp() {
               rightHeatmapUrl={rightHeatmapUrl}
               leftAnalysis={leftAnalysis}
               rightAnalysis={rightAnalysis}
+              onUpdateHeatmaps={handleUpdateHeatmaps}
               onBack={() => handleStepClick(3)}
               onContinue={() => handleStepClick(5)}
             />

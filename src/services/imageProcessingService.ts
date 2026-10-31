@@ -5,6 +5,7 @@ import {
   CLINICAL_CATEGORIES,
   RegionalAnalysis,
   SubZonal10Breakdown,
+  OrthoticMeasurements,
 } from '../types';
 
 export const CURRENT_ALGORITHM_VERSION = 'v2.0.0-CLINICAL-TOE-PRESERVED';
@@ -496,6 +497,7 @@ export async function processHarrisMatScan(
     areaMm2: number;
   }[];
   regionalAnalysis: RegionalAnalysis;
+  orthoticMeasurements: OrthoticMeasurements;
   contourBounds: { minX: number; maxX: number; minY: number; maxY: number };
 }> {
   const { sensitivity = 1.0, smoothRadius = 5, dpi = 300 } = options;
@@ -849,11 +851,48 @@ export async function processHarrisMatScan(
     asymmetryIndex,
   };
 
+  // Physical orthotic measurements calculated directly from genuine footprint bounding box and calibrated DPI
+  const footLengthMm = Math.round((maxY - minY) * mmPerPixel);
+  const forefootWidthMm = Math.round((maxX - minX) * mmPerPixel);
+
+  // Calculate true heel breadth from mask in the hindfoot region (relY <= 0.30)
+  let heelMinX = maxX;
+  let heelMaxX = minX;
+  for (let y = minY; y <= maxY; y++) {
+    const relY = (maxY - y) / footLengthPx;
+    if (relY <= 0.30) {
+      for (let x = minX; x <= maxX; x++) {
+        if (mask[y * width + x] > 0.5) {
+          if (x < heelMinX) heelMinX = x;
+          if (x > heelMaxX) heelMaxX = x;
+        }
+      }
+    }
+  }
+  const heelWidthMm = heelMaxX >= heelMinX
+    ? Math.round((heelMaxX - heelMinX) * mmPerPixel)
+    : Math.round(forefootWidthMm * 0.65);
+  const ballGirthMm = Math.round(forefootWidthMm * 2.3);
+
+  const orthoticMeasurements: OrthoticMeasurements = {
+    footLengthMm,
+    forefootWidthMm,
+    heelWidthMm,
+    ballGirthMm,
+    archIndex,
+    archType: archClassification,
+    scaleMmPerPixel: Number(mmPerPixel.toFixed(3)),
+    measurementMethod: 'Optical Harris Mat Morphometry (DPI-Calibrated)',
+    calibratedAt: new Date().toISOString(),
+    recommendations: diabeticUlcerRisk.recommendations,
+  };
+
   return {
     processedDataUrl: outputCanvas.toDataURL('image/png'),
     qcResult,
     categoryDistribution,
     regionalAnalysis,
+    orthoticMeasurements,
     contourBounds: { minX, maxX, minY, maxY },
   };
 }

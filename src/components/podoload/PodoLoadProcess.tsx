@@ -323,7 +323,13 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
           type="button"
           className="podoload-btn-primary"
           onClick={onContinue}
-          disabled={!leftHeatmapUrl || !rightHeatmapUrl || isProcessing}
+          disabled={
+            isProcessing ||
+            !(
+              (leftFoot ? Boolean(leftHeatmapUrl) : false) ||
+              (rightFoot ? Boolean(rightHeatmapUrl) : false)
+            )
+          }
         >
           Next: view results
         </button>
