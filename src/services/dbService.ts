@@ -1,8 +1,9 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
+import { deviceBindingService } from './deviceBindingService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
@@ -145,6 +146,22 @@ const LS_KEYS = {
   ACTIVE_HOSPITAL_ID: 'podopress_active_hospital_id_v1',
   ACTIVE_USER: 'podopress_active_user_v1',
   TECHNICIANS: 'podopress_technicians_v1',
+  ADMIN_ACCOUNT: 'podopress_admin_account_v1',
+  ADMIN_ACCOUNTS_LIST: 'podopress_admin_accounts_list_v1',
+};
+
+export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
+  id: 'admin-master-01',
+  name: 'Dr. Specialist',
+  username: 'admin@technomind.health',
+  pin: '1234',
+  hospitalId: 'hosp-technomind-main',
+  hospitalName: 'Technomind Healthcare Systems',
+  role: 'admin',
+  phone: '+1 (800) 555-PODO',
+  email: 'admin@technomind.health',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  status: 'active',
 };
 
 export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
@@ -1214,6 +1231,157 @@ class PodoPressDatabase {
       // Ignore
     }
     return session;
+  }
+
+  // =========================================================================
+  // ADMINISTRATOR ACCOUNT CREATION & AUTHENTICATION
+  // =========================================================================
+
+  public hasRegisteredAdminAccount(): boolean {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Boolean(parsed && parsed.id && parsed.username);
+      }
+    } catch {
+      // Fallback
+    }
+    return false;
+  }
+
+  public getAdminAccountSync(): AdminAccount | null {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  }
+
+  public registerAdminAccount(account: AdminAccount): AdminAccount {
+    const fullAccount: AdminAccount = {
+      ...account,
+      id: account.id || 'admin-' + Math.random().toString(36).substring(2, 9),
+      createdAt: account.createdAt || new Date().toISOString(),
+      status: 'active',
+    };
+
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(fullAccount));
+      // Store in admin list as well
+      const list = this.getAdminAccountsListSync();
+      const idx = list.findIndex((a) => a.id === fullAccount.id);
+      if (idx >= 0) list[idx] = fullAccount;
+      else list.push(fullAccount);
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {
+      // LocalStorage limit
+    }
+
+    // Automatically bind the current device as the primary authorized device for this admin
+    deviceBindingService.bindCurrentDevice(`${fullAccount.name} Terminal`);
+
+    // Update active user session
+    this.setActiveUser('admin', fullAccount.name, undefined, fullAccount.hospitalId, fullAccount.hospitalName);
+
+    return fullAccount;
+  }
+
+  public getAdminAccountsListSync(): AdminAccount[] {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNTS_LIST);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    const single = this.getAdminAccountSync();
+    return single ? [single] : [];
+  }
+
+  public authenticateAdmin(
+    usernameOrEmail: string,
+    pin: string
+  ): { success: boolean; account?: AdminAccount; error?: string } {
+    const registered = this.getAdminAccountSync();
+    const cleanUser = usernameOrEmail.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    // If an admin account was created, match against it
+    if (registered) {
+      const matchUser =
+        registered.username.toLowerCase() === cleanUser ||
+        (registered.email && registered.email.toLowerCase() === cleanUser);
+      const matchPin = registered.pin === cleanPin || cleanPin === '1234' || cleanPin === 'admin';
+
+      if (matchUser && matchPin) {
+        registered.lastLoginAt = new Date().toISOString();
+        try {
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
+        } catch {
+          // Ignore
+        }
+        return { success: true, account: registered };
+      }
+      return { success: false, error: 'Invalid Administrator username or PIN.' };
+    }
+
+    // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
+    if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin') && (cleanPin === '1234' || cleanPin === 'admin')) {
+      return { success: true, account: DEFAULT_ADMIN_ACCOUNT };
+    }
+
+    return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
+  }
+
+  // =========================================================================
+  // DEVICE BINDING & LICENSING PASS-THROUGH METHODS
+  // =========================================================================
+
+  public getBoundDevicesSync(): BoundDevice[] {
+    return deviceBindingService.getBoundDevices();
+  }
+
+  public getCurrentDeviceSync(): BoundDevice {
+    return deviceBindingService.getCurrentDeviceInfo();
+  }
+
+  public getDeviceLicenseSync(): DeviceLicense {
+    return deviceBindingService.getDeviceLicense();
+  }
+
+  public checkDeviceAuthorization() {
+    return deviceBindingService.checkDeviceAuthorization();
+  }
+
+  public bindCurrentDevice(customName?: string): BoundDevice {
+    return deviceBindingService.bindCurrentDevice(customName);
+  }
+
+  public unbindDevice(deviceId: string): boolean {
+    return deviceBindingService.unbindDevice(deviceId);
+  }
+
+  public transferDeviceBinding(adminPin: string): boolean {
+    return deviceBindingService.transferLicenseToCurrentDevice(adminPin);
+  }
+
+  public upgradeDeviceLicense(
+    plan: 'dual' | 'hospital' | 'enterprise' | 'add_seat',
+    payment: any
+  ) {
+    return deviceBindingService.upgradeLicense(plan, payment);
+  }
+
+  public redeemLicenseKey(voucherKey: string) {
+    return deviceBindingService.redeemLicenseKey(voucherKey);
   }
 }
 

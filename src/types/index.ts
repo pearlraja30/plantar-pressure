@@ -293,3 +293,55 @@ export interface HospitalProfile {
     loginTime: string;
   };
 }
+
+export interface AdminAccount {
+  id: string;
+  name: string;
+  username: string; // Login ID / Email, e.g. admin@technomind.health
+  pin: string; // Master Admin Password / PIN
+  hospitalId: string;
+  hospitalName: string;
+  role: 'admin';
+  phone?: string;
+  email?: string;
+  createdAt: string;
+  lastLoginAt?: string;
+  primaryDeviceId?: string;
+  status: 'active' | 'suspended';
+}
+
+export interface BoundDevice {
+  id: string; // e.g. DEV-8F29-4A1B
+  name: string; // e.g. "Main Podiatry Lab iMac"
+  platform: string; // e.g. "macOS / Chrome"
+  fingerprint: string;
+  ipAddress?: string;
+  boundAt: string;
+  lastActiveAt: string;
+  status: 'active' | 'revoked';
+  isCurrentDevice?: boolean;
+}
+
+export interface LicenseInvoice {
+  id: string;
+  date: string;
+  amount: number;
+  currency: string;
+  description: string;
+  status: 'paid' | 'pending';
+  receiptUrl?: string;
+  paymentMethod: string;
+}
+
+export interface DeviceLicense {
+  tier: 'single' | 'dual' | 'hospital' | 'enterprise';
+  tierName: string;
+  maxAllowedDevices: number;
+  activeDevicesCount: number;
+  licenseKey: string;
+  status: 'active' | 'expired' | 'grace_period';
+  billingCycle: 'monthly' | 'annual' | 'lifetime';
+  pricePerMonth: number;
+  nextBillingDate: string;
+  invoices: LicenseInvoice[];
+}

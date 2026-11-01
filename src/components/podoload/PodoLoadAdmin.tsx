@@ -21,9 +21,17 @@ import {
   Calendar,
   Check,
   AlertCircle,
+  Laptop,
+  CreditCard,
+  Download,
+  Key,
+  ShieldAlert,
+  X,
 } from 'lucide-react';
-import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase } from '../../types';
+import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
 import { dbService } from '../../services/dbService';
+import { deviceBindingService } from '../../services/deviceBindingService';
+import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
 interface PodoLoadAdminProps {
   patients?: Patient[];
@@ -55,8 +63,18 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [hospitals, setHospitals] = useState<HospitalProfile[]>(() => dbService.getHospitalProfilesSync());
   const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());
   const [activeTab, setActiveTab] = useState<
-    'branding' | 'technicians' | 'hospital_patients' | 'hospitals' | 'staff' | 'security'
+    'branding' | 'technicians' | 'hospital_patients' | 'devices' | 'hospitals' | 'staff' | 'security'
   >('branding');
+
+  // Device Binding & Multi-Device License State
+  const [boundDevices, setBoundDevices] = useState<BoundDevice[]>(() => dbService.getBoundDevicesSync());
+  const [deviceLicense, setDeviceLicense] = useState<DeviceLicense>(() => dbService.getDeviceLicenseSync());
+  const [currentDevice, setCurrentDevice] = useState<BoundDevice>(() => dbService.getCurrentDeviceSync());
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [showVoucherRedeem, setShowVoucherRedeem] = useState(false);
+  const [voucherInput, setVoucherInput] = useState('');
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState('');
 
   // Form states for the currently selected hospital
   const [name, setName] = useState(activeHospital.name);
@@ -355,6 +373,47 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setTimeout(() => setSaveSuccess(null), 3000);
   };
 
+  // =========================================================================
+  // DEVICE BINDING & LICENSING ACTIONS
+  // =========================================================================
+
+  const handleUnbindDevice = (id: string) => {
+    if (confirm(`Revoke device binding for station ${id}? This will free up 1 license seat.`)) {
+      dbService.unbindDevice(id);
+      setBoundDevices(dbService.getBoundDevicesSync());
+      setDeviceLicense(dbService.getDeviceLicenseSync());
+      setSaveSuccess('✓ Device binding revoked. License seat freed.');
+      setTimeout(() => setSaveSuccess(null), 3000);
+    }
+  };
+
+  const handleSaveDeviceName = () => {
+    if (editedName.trim() && editingDeviceId) {
+      deviceBindingService.setCustomDeviceName(editedName.trim());
+      setBoundDevices(dbService.getBoundDevicesSync());
+      setCurrentDevice(dbService.getCurrentDeviceSync());
+      setEditingDeviceId(null);
+      setEditedName('');
+      setSaveSuccess('✓ Station name updated.');
+      setTimeout(() => setSaveSuccess(null), 2500);
+    }
+  };
+
+  const handleRedeemKey = () => {
+    if (!voucherInput.trim()) return;
+    const res = dbService.redeemLicenseKey(voucherInput.trim());
+    if (res.success) {
+      setDeviceLicense(dbService.getDeviceLicenseSync());
+      setBoundDevices(dbService.getBoundDevicesSync());
+      setShowVoucherRedeem(false);
+      setVoucherInput('');
+      setSaveSuccess(res.message);
+      setTimeout(() => setSaveSuccess(null), 3500);
+    } else {
+      alert(res.message);
+    }
+  };
+
   // Get active hospital object for metrics
   const currentViewedHospital =
     selectedHospitalFilter === 'ALL'
@@ -452,6 +511,26 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
               </div>
               <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
                 {patients.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`podoload-settings-menu-item ${activeTab === 'devices' ? 'active' : ''}`}
+              onClick={() => setActiveTab('devices')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Laptop className="w-3.5 h-3.5 text-teal-600" />
+                <span>Device binding & license</span>
+              </div>
+              <span
+                className={`podo-badge ${
+                  boundDevices.length >= deviceLicense.maxAllowedDevices ? 'podo-badge-amber' : 'podo-badge-green'
+                }`}
+                style={{ fontSize: '0.62rem' }}
+              >
+                {boundDevices.length}/{deviceLicense.maxAllowedDevices}
               </span>
             </button>
 
@@ -1124,6 +1203,301 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
             </div>
           )}
 
+          {/* TAB: DEVICE BINDING & MULTI-DEVICE LICENSING */}
+          {activeTab === 'devices' && (
+            <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Header Title */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h4 className="podoload-card-title" style={{ margin: 0 }}>
+                    DEVICE HARDWARE BINDING & MULTI-STATION LICENSES
+                  </h4>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.68rem', color: '#64748b' }}>
+                    IEC 62304 / ISO 13485 cryptographic hardware binding. Single-device restriction with payment expansion provisions.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={() => setShowVoucherRedeem(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Key className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Redeem Activation Key</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="podoload-btn-primary podoload-btn-sm"
+                    onClick={() => setIsPaymentModalOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>+ Expand Device Seats (Payment)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Redeem Voucher Key Sub-Form */}
+              {showVoucherRedeem && (
+                <div style={{ backgroundColor: '#f0fdfa', padding: '0.85rem', borderRadius: '8px', border: '1px solid #99f6e4', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f766e' }}>
+                      Redeem Offline Cryptographic License Key
+                    </span>
+                    <button type="button" onClick={() => setShowVoucherRedeem(false)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
+                      <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. PODO-DEV2-MULTI-2026"
+                      value={voucherInput}
+                      onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                      style={{ fontSize: '0.78rem', fontFamily: 'monospace' }}
+                    />
+                    <button type="button" className="podoload-btn-primary podoload-btn-sm" onClick={handleRedeemKey}>
+                      Activate Key
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '0.66rem', color: '#64748b' }}>
+                    Demo keys: <code>PODO-DEV2-MULTI-2026</code> (+1 Seat), <code>PODO-HOSPITAL-5DEV-2026</code> (5 Seats), <code>PODO-ENTERPRISE-UNLIMITED-2026</code> (Unlimited).
+                  </span>
+                </div>
+              )}
+
+              {/* Current Station Hardware Identity Banner */}
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '0.85rem 1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      backgroundColor: '#ccfbf1',
+                      color: '#0f766e',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Laptop className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0c2328' }}>
+                        {currentDevice.name}
+                      </span>
+                      <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                        This Machine
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                      Terminal ID: <code>{currentDevice.id}</code> · {currentDevice.platform}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {editingDeviceId === currentDevice.id ? (
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        placeholder="New station name"
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.5rem' }}
+                      />
+                      <button type="button" className="podoload-btn-primary podoload-btn-sm" onClick={handleSaveDeviceName}>
+                        Save
+                      </button>
+                      <button type="button" className="podoload-btn-secondary podoload-btn-sm" onClick={() => setEditingDeviceId(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="podoload-btn-secondary podoload-btn-sm"
+                      onClick={() => {
+                        setEditingDeviceId(currentDevice.id);
+                        setEditedName(currentDevice.name);
+                      }}
+                      style={{ fontSize: '0.72rem' }}
+                    >
+                      Rename Station
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Multi-Device License Quota Overview */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ padding: '0.85rem', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#0f766e', fontWeight: 700 }}>ACTIVE CLINICAL TIER</span>
+                    <span className="podo-badge podo-badge-green">{deviceLicense.status.toUpperCase()}</span>
+                  </div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0c2328' }}>
+                    {deviceLicense.tierName}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    License Key: <code>{deviceLicense.licenseKey}</code> · Billing: {deviceLicense.billingCycle}
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>HARDWARE TERMINAL SEATS</span>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: boundDevices.length >= deviceLicense.maxAllowedDevices ? '#d97706' : '#16a34a' }}>
+                      {boundDevices.length} of {deviceLicense.maxAllowedDevices} Seats Used
+                    </span>
+                  </div>
+                  {/* Progress Bar */}
+                  <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.min(100, (boundDevices.length / deviceLicense.maxAllowedDevices) * 100)}%`,
+                        height: '100%',
+                        backgroundColor: boundDevices.length >= deviceLicense.maxAllowedDevices ? '#f59e0b' : '#0d9488',
+                        borderRadius: '4px',
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                    {boundDevices.length >= deviceLicense.maxAllowedDevices
+                      ? 'Single-device license limit reached. Upgrade to add more stations.'
+                      : `${deviceLicense.maxAllowedDevices - boundDevices.length} available terminal seat(s) remaining.`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Fleet Table */}
+              <div>
+                <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
+                  AUTHORIZED HARDWARE TERMINALS FLEET
+                </h5>
+                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>STATION NAME</th>
+                      <th style={{ textAlign: 'left' }}>HARDWARE ID</th>
+                      <th style={{ textAlign: 'left' }}>PLATFORM / OS</th>
+                      <th style={{ textAlign: 'left' }}>BOUND DATE</th>
+                      <th style={{ textAlign: 'center' }}>STATUS</th>
+                      <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {boundDevices.length > 0 ? (
+                      boundDevices.map((d) => (
+                        <tr key={d.id}>
+                          <td style={{ fontWeight: 700, color: '#0c2328' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <span>{d.name}</span>
+                              {d.isCurrentDevice && (
+                                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
+                                  Active Here
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td><code>{d.id}</code></td>
+                          <td>{d.platform}</td>
+                          <td>{d.boundAt?.slice(0, 10) || 'Today'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="podo-badge podo-badge-green">
+                              {d.status === 'active' ? 'Authorized' : 'Revoked'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="podoload-btn-secondary podoload-btn-sm"
+                              onClick={() => handleUnbindDevice(d.id)}
+                              style={{ color: '#dc2626', borderColor: '#fecaca', fontSize: '0.7rem' }}
+                              title="Unbind/Revoke device to free seat"
+                            >
+                              Revoke Seat
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                          No bound devices found. Create an Administrator account to bind this station.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Invoices & License Billing History */}
+              {deviceLicense.invoices && deviceLicense.invoices.length > 0 && (
+                <div>
+                  <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
+                    LICENSE INVOICES & PAYMENT RECEIPTS
+                  </h5>
+                  <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>INVOICE ID</th>
+                        <th style={{ textAlign: 'left' }}>DATE</th>
+                        <th style={{ textAlign: 'left' }}>LICENSE DESCRIPTION</th>
+                        <th style={{ textAlign: 'left' }}>PAYMENT METHOD</th>
+                        <th style={{ textAlign: 'center' }}>AMOUNT</th>
+                        <th style={{ textAlign: 'right' }}>RECEIPT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deviceLicense.invoices.map((inv) => (
+                        <tr key={inv.id}>
+                          <td><strong>{inv.id}</strong></td>
+                          <td>{inv.date}</td>
+                          <td>{inv.description}</td>
+                          <td>{inv.paymentMethod}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#16a34a' }}>
+                            ${inv.amount}.00 USD
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="podoload-btn-secondary podoload-btn-sm"
+                              onClick={() => alert(`Receipt #${inv.id} for $${inv.amount}.00 ready for printing.`)}
+                              style={{ fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>Receipt</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 4: ALL REGISTERED HOSPITALS & MULTI-TENANCY */}
           {activeTab === 'hospitals' && (
             <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -1376,6 +1750,19 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Multi-Device Payment & License Expansion Modal */}
+      <PodoLoadDevicePaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onSuccess={(updatedLicense) => {
+          setDeviceLicense(updatedLicense);
+          setBoundDevices(dbService.getBoundDevicesSync());
+          setIsPaymentModalOpen(false);
+          setSaveSuccess('✓ Multi-device license expanded successfully! Hardware station seat allocated.');
+          setTimeout(() => setSaveSuccess(null), 3500);
+        }}
+      />
     </div>
   );
 };

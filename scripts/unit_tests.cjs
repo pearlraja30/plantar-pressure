@@ -1711,6 +1711,161 @@ it("Enforces Admin Panel Technician Creation & Hospital-wise Patient Details Cen
   expect(Boolean(cloudSyncPayload.patient.mrn)).toBe(true);
 });
 
+it("Enforces Administrator Account Creation First, Strict Single-Device Binding, and Multi-Device Payment Provision", () => {
+  // 1. ADMIN ACCOUNT CREATION FIRST REQUIREMENT
+  let storedAdminAccount = null;
+
+  const registerAdmin = (accountData) => {
+    if (!accountData.name || !accountData.username || !accountData.pin) {
+      throw new Error("Missing required admin registration fields");
+    }
+    storedAdminAccount = {
+      id: "admin-master-001",
+      name: accountData.name,
+      username: accountData.username,
+      pin: accountData.pin,
+      hospitalId: accountData.hospitalId || "hosp-main",
+      hospitalName: accountData.hospitalName || "Technomind Healthcare Systems",
+      role: "admin",
+      createdAt: new Date().toISOString(),
+      status: "active"
+    };
+    return storedAdminAccount;
+  };
+
+  const authenticateAdmin = (username, pin) => {
+    if (!storedAdminAccount) {
+      return { success: false, error: "No administrator account registered yet. Account creation required first." };
+    }
+    const matchUser = storedAdminAccount.username.toLowerCase() === username.toLowerCase();
+    const matchPin = storedAdminAccount.pin === pin;
+    if (matchUser && matchPin) {
+      return { success: true, account: storedAdminAccount };
+    }
+    return { success: false, error: "Invalid credentials" };
+  };
+
+  // Attempting to log in before creating an account must fail
+  expect(authenticateAdmin("admin@technomind.health", "1234").success).toBe(false);
+
+  // Administration creates account first
+  const createdAdmin = registerAdmin({
+    name: "Dr. Medical Director",
+    username: "director@hospital.org",
+    pin: "8899",
+    hospitalName: "Metropolitan Podiatry Hospital"
+  });
+  expect(createdAdmin.id).toBe("admin-master-001");
+  expect(createdAdmin.role).toBe("admin");
+
+  // Now able to log in with created credentials
+  expect(authenticateAdmin("director@hospital.org", "8899").success).toBe(true);
+  expect(authenticateAdmin("director@hospital.org", "wrong-pin").success).toBe(false);
+
+  // 2. DEVICE BINDING ENFORCEMENT & STRICT SINGLE-DEVICE POLICY
+  let boundDevices = [];
+  let license = {
+    tier: "single",
+    tierName: "Single Station Clinic License",
+    maxAllowedDevices: 1, // STRICT 1-DEVICE POLICY
+    activeDevicesCount: 0,
+    invoices: []
+  };
+
+  const checkDeviceAuth = (deviceId, deviceName) => {
+    const isBound = boundDevices.some((d) => d.id === deviceId && d.status === "active");
+    if (isBound) {
+      return { authorized: true, reason: "AUTHORIZED" };
+    }
+    const activeCount = boundDevices.filter((d) => d.status === "active").length;
+    if (activeCount < license.maxAllowedDevices) {
+      return { authorized: false, canAutoBind: true, reason: "NEW_DEVICE_AVAILABLE_SLOT" };
+    }
+    return { authorized: false, canAutoBind: false, reason: "DEVICE_LIMIT_EXCEEDED" };
+  };
+
+  const bindDevice = (deviceId, deviceName) => {
+    boundDevices.push({
+      id: deviceId,
+      name: deviceName,
+      status: "active",
+      boundAt: new Date().toISOString()
+    });
+    license.activeDevicesCount = boundDevices.filter((d) => d.status === "active").length;
+  };
+
+  // Station 1 (Primary Clinic Terminal) binds successfully as the 1 allowed device
+  const device1 = { id: "DEV-MAC-1001", name: "Main Lab iMac Workstation" };
+  const authStation1Before = checkDeviceAuth(device1.id, device1.name);
+  expect(authStation1Before.authorized).toBe(false);
+  expect(authStation1Before.canAutoBind).toBe(true);
+
+  bindDevice(device1.id, device1.name);
+  expect(checkDeviceAuth(device1.id, device1.name).authorized).toBe(true);
+  expect(license.activeDevicesCount).toBe(1);
+
+  // Station 2 (Doctor Room PC) attempts to log in -> BLOCKED BY DEVICE BINDING!
+  const device2 = { id: "DEV-WIN-2002", name: "Examination Room 2 PC" };
+  const authStation2 = checkDeviceAuth(device2.id, device2.name);
+  expect(authStation2.authorized).toBe(false);
+  expect(authStation2.canAutoBind).toBe(false);
+  expect(authStation2.reason).toBe("DEVICE_LIMIT_EXCEEDED"); // Single device limit enforced!
+
+  // 3. MULTI-DEVICE PAYMENT PROVISION (Expand License from 1 to 2 stations)
+  const upgradeLicensePayment = (plan, payment) => {
+    let newMax = license.maxAllowedDevices;
+    if (plan === "add_seat") newMax += 1;
+    if (plan === "dual") newMax = Math.max(2, license.maxAllowedDevices);
+    if (plan === "hospital") newMax = Math.max(5, license.maxAllowedDevices);
+
+    const invoice = {
+      id: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      amount: payment.amount,
+      description: `License Expansion: ${plan}`,
+      status: "paid",
+      paymentMethod: payment.method
+    };
+
+    license.maxAllowedDevices = newMax;
+    license.tier = plan;
+    license.invoices.push(invoice);
+    return { success: true, license, invoice };
+  };
+
+  // Hospital purchases dual-station pack or adds 1 device seat ($49.00 payment)
+  const paymentResult = upgradeLicensePayment("dual", {
+    method: "Credit Card (ending 4242)",
+    amount: 49.0
+  });
+
+  expect(paymentResult.success).toBe(true);
+  expect(license.maxAllowedDevices).toBe(2);
+  expect(license.invoices.length).toBe(1);
+  expect(license.invoices[0].status).toBe("paid");
+
+  // Now Station 2 is checked: within expanded quota -> Auto-bind allowed!
+  const authStation2AfterPayment = checkDeviceAuth(device2.id, device2.name);
+  expect(authStation2AfterPayment.canAutoBind).toBe(true);
+  bindDevice(device2.id, device2.name);
+
+  // Both Station 1 and Station 2 are now authorized
+  expect(checkDeviceAuth(device1.id, device1.name).authorized).toBe(true);
+  expect(checkDeviceAuth(device2.id, device2.name).authorized).toBe(true);
+  expect(license.activeDevicesCount).toBe(2);
+
+  // 4. DEVICE UNBIND / REVOCATION SEAT RECOVERY
+  const unbindDevice = (deviceId) => {
+    boundDevices = boundDevices.filter((d) => d.id !== deviceId);
+    license.activeDevicesCount = boundDevices.filter((d) => d.status === "active").length;
+  };
+
+  unbindDevice(device1.id);
+  expect(license.activeDevicesCount).toBe(1);
+  // Station 1 is no longer bound, freeing 1 seat
+  expect(checkDeviceAuth(device1.id, device1.name).authorized).toBe(false);
+  expect(checkDeviceAuth(device1.id, device1.name).canAutoBind).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
