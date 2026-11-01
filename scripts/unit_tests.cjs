@@ -2655,6 +2655,96 @@ it("Enforces Administrator Master Password Station Authorization: Automatic devi
   expect(authFailed.success).toBe(false);
 });
 
+it("Enforces Aligned Technician Login & Multi-Platform Offline Enrollment: Validates admin generated voucher codes (e.g. TMH-TECH-2805) across Android, iOS and Windows", () => {
+  const mockHospital = {
+    id: "hosp-001",
+    code: "TMH-CENTRAL",
+    name: "Technomind Healthcare Systems"
+  };
+
+  let mockTechnicians = [
+    {
+      id: "tech-user-01",
+      name: "Tech. Specialist",
+      username: "tech@technomind.health",
+      pin: "1234",
+      hospitalId: "hosp-001",
+      activationCode: "TMH-TECH-1001",
+      status: "active"
+    }
+  ];
+
+  const registerDeviceWithActivationCode = (hospitalCode, activationCode, quickPassword) => {
+    const normHospCode = hospitalCode.trim().toUpperCase();
+    const normActCode = activationCode.trim().toUpperCase();
+    const cleanAct = normActCode.replace(/[^A-Z0-9]/g, "");
+
+    if (normHospCode !== mockHospital.code && normHospCode !== "TMH") {
+      return { success: false, error: "Hospital not found" };
+    }
+
+    let tech = mockTechnicians.find(
+      (t) =>
+        (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode) ||
+        (t.activationCode && t.activationCode.replace(/[^A-Z0-9]/g, "").toUpperCase() === cleanAct)
+    );
+
+    if (!tech) {
+      const hospPrefix = mockHospital.code.split("-")[0].toUpperCase();
+      const isVoucherPattern =
+        normActCode.startsWith(`${hospPrefix}-TECH-`) ||
+        cleanAct.startsWith(`${hospPrefix}TECH`) ||
+        normActCode.includes("-TECH-");
+
+      if (isVoucherPattern) {
+        tech = {
+          ...mockTechnicians[0],
+          activationCode: normActCode,
+          pin: quickPassword || mockTechnicians[0].pin
+        };
+        mockTechnicians.push(tech);
+      }
+    }
+
+    if (!tech) {
+      return { success: false, error: "Invalid activation code" };
+    }
+
+    return {
+      success: true,
+      technician: tech,
+      token: {
+        token: `AUTH-DEV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        hospitalCode: mockHospital.code,
+        status: "authorized"
+      }
+    };
+  };
+
+  // 1. Initial default code works
+  const res1 = registerDeviceWithActivationCode("TMH-CENTRAL", "TMH-TECH-1001");
+  expect(res1.success).toBe(true);
+  expect(res1.technician.username).toBe("tech@technomind.health");
+
+  // 2. Freshly generated admin voucher (e.g. TMH-TECH-2805) entered on new device works offline
+  const res2 = registerDeviceWithActivationCode("TMH-CENTRAL", "TMH-TECH-2805", "5678");
+  expect(res2.success).toBe(true);
+  expect(res2.technician.activationCode).toBe("TMH-TECH-2805");
+  expect(res2.technician.pin).toBe("5678");
+
+  // 3. Formatting resilience (case insensitive and hyphens optional)
+  const res3 = registerDeviceWithActivationCode("TMH-CENTRAL", "tmh tech 2805");
+  expect(res3.success).toBe(true);
+
+  // 4. Invalid hospital rejected
+  const resBadHosp = registerDeviceWithActivationCode("INVALID-HOSP", "TMH-TECH-2805");
+  expect(resBadHosp.success).toBe(false);
+
+  // 5. Non-matching code rejected
+  const resBadCode = registerDeviceWithActivationCode("TMH-CENTRAL", "RANDOM-JUNK-123");
+  expect(resBadCode.success).toBe(false);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

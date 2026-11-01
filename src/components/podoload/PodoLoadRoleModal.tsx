@@ -1449,6 +1449,12 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                 placeholder="e.g. TMH-TECH-1001"
                                 value={actActivationCode}
                                 onChange={(e) => setActActivationCode(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleActivateDevice(e);
+                                  }
+                                }}
                                 required
                               />
                             </div>
@@ -1466,7 +1472,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   style={{ fontSize: '0.76rem', paddingRight: '1.8rem' }}
                                   placeholder="Create or confirm PIN"
                                   value={actPassword}
+                                  autoComplete="new-password"
                                   onChange={(e) => setActPassword(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleActivateDevice(e);
+                                    }
+                                  }}
                                 />
                                 <button
                                   type="button"
@@ -1499,7 +1512,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   style={{ fontSize: '0.76rem', paddingRight: '1.8rem' }}
                                   placeholder="Re-enter password"
                                   value={actPasswordConfirm}
+                                  autoComplete="new-password"
                                   onChange={(e) => setActPasswordConfirm(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleActivateDevice(e);
+                                    }
+                                  }}
                                 />
                                 <button
                                   type="button"

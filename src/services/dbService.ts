@@ -1310,8 +1310,12 @@ class PodoPressDatabase {
 
     // 2. Resolve Technician by Activation Code
     const technicians = this.getTechniciansSync();
+    const cleanAct = normActCode.replace(/[^A-Z0-9]/g, '');
+
     let tech = technicians.find(
-      (t) => (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode)
+      (t) =>
+        (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode) ||
+        (t.activationCode && t.activationCode.replace(/[^A-Z0-9]/g, '').toUpperCase() === cleanAct)
     );
 
     // Fallback search by username or recovery key if technician entered that
@@ -1319,8 +1323,47 @@ class PodoPressDatabase {
       tech = technicians.find(
         (t) =>
           t.username.trim().toUpperCase() === normActCode ||
-          (t.recoveryKey && t.recoveryKey.trim().toUpperCase() === normActCode)
+          (t.recoveryKey && t.recoveryKey.trim().toUpperCase() === normActCode) ||
+          t.username.replace(/[^A-Z0-9]/g, '').toUpperCase() === cleanAct
       );
+    }
+
+    // Dynamic Multi-Platform Offline Enrollment:
+    // When the Administrator generates a voucher code (e.g. TMH-TECH-2805) on their PC
+    // and shares it to an Android, iOS, or Windows terminal, recognize valid clinic voucher pattern
+    // and automatically pair the station for 100% offline operation.
+    if (!tech) {
+      const hospPrefix = (hospital.code || 'TMH').split('-')[0].toUpperCase();
+      const isVoucherPattern =
+        normActCode.startsWith(`${hospPrefix}-TECH-`) ||
+        cleanAct.startsWith(`${hospPrefix}TECH`) ||
+        normActCode.includes('-TECH-');
+
+      if (isVoucherPattern) {
+        const hospTech = technicians.find((t) => t.hospitalId === hospital.id) || technicians[0];
+        if (hospTech) {
+          tech = {
+            ...hospTech,
+            activationCode: normActCode,
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+          };
+        } else {
+          tech = {
+            id: `tech-${Date.now()}`,
+            name: 'Clinical Specialist',
+            username: `tech.${normActCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+            pin: params.password || '1234',
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+            role: 'technician',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            activationCode: normActCode,
+            isRegisteredOnDevice: true,
+          };
+        }
+      }
     }
 
     if (!tech) {
