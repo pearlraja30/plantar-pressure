@@ -277,6 +277,8 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
     const numAge = parseInt(age, 10) || 40;
     const birthYear = new Date().getFullYear() - numAge;
 
+    const activeHospital = dbService.getActiveHospitalSync();
+
     return {
       id: activeRecordId || selectedPatient?.id || 'pat-' + Math.random().toString(36).substring(2, 9),
       mrn: finalId,
@@ -289,6 +291,8 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
       referringDoctor: referringDoctor,
       clinicalNotes: clinicalHistory,
       createdAt: activePatient?.createdAt || selectedPatient?.createdAt || new Date().toISOString(),
+      hospitalId: activePatient?.hospitalId || selectedPatient?.hospitalId || activeHospital.id,
+      hospitalName: activePatient?.hospitalName || selectedPatient?.hospitalName || activeHospital.name,
     };
   };
 

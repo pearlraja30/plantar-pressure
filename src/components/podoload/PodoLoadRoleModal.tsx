@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { ShieldCheck, UserCheck, Check, X, Lock, KeyRound } from 'lucide-react';
-import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
+import { ShieldCheck, UserCheck, Check, X, Lock, KeyRound, Building2 } from 'lucide-react';
+import { SystemUserSession, SYSTEM_ACCOUNTS, dbService } from '../../services/dbService';
+import { TechnicianUser } from '../../types';
 
 interface PodoLoadRoleModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: SystemUserSession;
-  onSelectRole: (role: 'admin' | 'technician', customName?: string) => void;
+  onSelectRole: (
+    role: 'admin' | 'technician',
+    customName?: string,
+    technicianId?: string,
+    hospitalId?: string,
+    hospitalName?: string
+  ) => void;
 }
 
 export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
@@ -15,23 +22,46 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   currentUser,
   onSelectRole,
 }) => {
+  const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(currentUser.role);
+  const [selectedTechId, setSelectedTechId] = useState<string>(
+    currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
+  );
   const [adminPin, setAdminPin] = useState<string>('');
+  const [techPin, setTechPin] = useState<string>('');
   const [pinError, setPinError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSwitchAccount = (role: 'admin' | 'technician') => {
-    if (role === 'admin' && currentUser.role !== 'admin') {
-      // Optional friendly PIN verification for switching to Admin
-      if (adminPin.trim() && adminPin.trim() !== '1234' && adminPin.trim() !== 'admin') {
-        setPinError('Incorrect Admin PIN. Default demo PIN is 1234');
-        return;
+  const currentActiveTech = technicians.find((t) => t.id === selectedTechId) || technicians[0];
+
+  const handleSwitchAccount = () => {
+    if (selectedRole === 'admin') {
+      if (currentUser.role !== 'admin') {
+        if (adminPin.trim() && adminPin.trim() !== '1234' && adminPin.trim() !== 'admin') {
+          setPinError('Incorrect Admin PIN. Default demo PIN is 1234');
+          return;
+        }
+      }
+      setPinError(null);
+      onSelectRole('admin');
+      onClose();
+    } else {
+      // Technician authentication
+      const techToAuth = technicians.find((t) => t.id === selectedTechId);
+      if (techToAuth) {
+        if (techToAuth.pin && techPin.trim() && techPin.trim() !== techToAuth.pin && techPin.trim() !== '1234') {
+          setPinError(`Incorrect Technician PIN for ${techToAuth.name}. (Default: ${techToAuth.pin || '1234'})`);
+          return;
+        }
+        setPinError(null);
+        onSelectRole('technician', techToAuth.name, techToAuth.id, techToAuth.hospitalId, techToAuth.hospitalName);
+        onClose();
+      } else {
+        onSelectRole('technician');
+        onClose();
       }
     }
-    setPinError(null);
-    onSelectRole(role);
-    onClose();
   };
 
   return (
@@ -50,7 +80,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 Account & Role Switcher
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
-                Select between Hospital Administrator (Full Access) or Clinical Technician (All Reports)
+                Select between Hospital Administrator (Full System Control) or Clinical Technician (All Reports)
               </p>
             </div>
           </div>
@@ -68,7 +98,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem 0' }}>
           {/* Account 1: Hospital Administrator */}
           <div
-            onClick={() => setSelectedRole('admin')}
+            onClick={() => {
+              setSelectedRole('admin');
+              setPinError(null);
+            }}
             style={{
               padding: '0.85rem 1rem',
               borderRadius: '8px',
@@ -125,7 +158,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             </div>
 
             <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
-              <strong>Holds Everything:</strong> Hospital profile, custom clinic logo & branding, hospital accounts directory, system settings & data maintenance, patient ID format engine, doctor staff credentials, plus all clinical reports.
+              <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, ID formats, system maintenance, and all clinical reports.
             </div>
 
             {selectedRole === 'admin' && currentUser.role !== 'admin' && (
@@ -160,9 +193,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   />
                   <span style={{ fontSize: '0.64rem', color: '#94a3b8' }}>(Default: 1234)</span>
                 </div>
-                {pinError && (
-                  <span style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 600 }}>{pinError}</span>
-                )}
               </div>
             )}
           </div>
@@ -203,10 +233,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 </div>
                 <div>
                   <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
-                    Clinical Technician
+                    Clinical Technician Login
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    {SYSTEM_ACCOUNTS.technician.username} · {SYSTEM_ACCOUNTS.technician.name}
+                    {currentActiveTech ? `${currentActiveTech.name} (${currentActiveTech.hospitalName || 'Assigned Hospital'})` : 'Clinical Operator'}
                   </div>
                 </div>
               </div>
@@ -229,9 +259,76 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             </div>
 
             <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
-              <strong>Clinical Reporting & Intake:</strong> Access to <strong>ALL historical reports</strong> (Patient Reports Hub, Patient Directory, Reports & Cloud archive), scanning, processing, report printing, PDF generation, and sharing. Safeguarded from modifying clinic legal settings or destructive data purge.
+              <strong>Clinical Reporting & Intake:</strong> Access to <strong>ALL historical reports</strong> (Patient Reports Hub, Patient Directory, Reports & Cloud archive), scanning, processing, report printing, PDF generation, and sharing.
             </div>
+
+            {selectedRole === 'technician' && (
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  paddingLeft: '2.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0c2328' }}>
+                    Select Technician Account:
+                  </label>
+                  <select
+                    className="podoload-input"
+                    style={{ fontSize: '0.74rem', padding: '0.25rem 0.5rem', width: 'auto', minWidth: '220px' }}
+                    value={selectedTechId}
+                    onChange={(e) => {
+                      setSelectedTechId(e.target.value);
+                      setPinError(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.hospitalName || 'Clinic'}) · {t.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Lock className="w-3.5 h-3.5 text-slate-500" />
+                    <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Login PIN:</span>
+                    <input
+                      type="password"
+                      placeholder="1234"
+                      value={techPin}
+                      onChange={(e) => {
+                        setTechPin(e.target.value);
+                        setPinError(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '80px',
+                        padding: '0.2rem 0.4rem',
+                        fontSize: '0.74rem',
+                        border: '1px solid #94a3b8',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.64rem', color: '#94a3b8' }}>
+                      (Default PIN: {currentActiveTech?.pin || '1234'})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
+          {pinError && (
+            <div style={{ padding: '0.5rem 0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>
+              {pinError}
+            </div>
+          )}
         </div>
 
         {/* Modal Actions */}
@@ -242,11 +339,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           <button
             type="button"
             className="podoload-btn-primary"
-            onClick={() => handleSwitchAccount(selectedRole)}
+            onClick={handleSwitchAccount}
             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
           >
             <Check className="w-4 h-4" />
-            <span>Switch to {selectedRole === 'admin' ? 'Administrator' : 'Technician'}</span>
+            <span>
+              {selectedRole === 'admin'
+                ? 'Log In as Hospital Administrator'
+                : `Log In as ${currentActiveTech?.name || 'Technician'}`}
+            </span>
           </button>
         </div>
       </div>

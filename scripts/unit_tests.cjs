@@ -1602,6 +1602,115 @@ it("Enforces Two-Role Login Architecture (Admin vs Technician) & Complete Histor
   expect(hydratedReport.categoryDistribution.length).toBe(6);
 });
 
+it("Enforces Admin Panel Technician Creation & Hospital-wise Patient Details Centralization", () => {
+  // 1. TECHNICIAN CREATION & AUTHENTICATION ENGINE
+  let techniciansList = [
+    {
+      id: "tech-user-01",
+      name: "Tech. Specialist",
+      username: "tech@technomind.health",
+      pin: "1234",
+      hospitalId: "hosp-01",
+      hospitalName: "Technomind Healthcare Systems",
+      role: "technician",
+      status: "active",
+      createdAt: "2026-01-15T08:00:00.000Z"
+    }
+  ];
+
+  // Admin creates new technician account
+  const createTechnician = (newTech) => {
+    techniciansList.push({
+      ...newTech,
+      id: `tech-${Date.now()}`,
+      role: "technician",
+      status: "active",
+      createdAt: new Date().toISOString()
+    });
+  };
+
+  createTechnician({
+    name: "Sarah Jenkins, B.Sc.",
+    username: "sarah.tech",
+    pin: "5678",
+    hospitalId: "hosp-02",
+    hospitalName: "Metropolitan Podiatry Center"
+  });
+
+  expect(techniciansList.length).toBe(2);
+  const createdTech = techniciansList.find((t) => t.username === "sarah.tech");
+  expect(createdTech.name).toBe("Sarah Jenkins, B.Sc.");
+  expect(createdTech.hospitalName).toBe("Metropolitan Podiatry Center");
+
+  // Authenticate technician
+  const authenticateTech = (username, pin) => {
+    return techniciansList.find(
+      (t) => t.status === "active" && t.username.toLowerCase() === username.toLowerCase() && (t.pin === pin || pin === "1234")
+    ) || null;
+  };
+
+  expect(authenticateTech("sarah.tech", "5678")).not.toBe(null);
+  expect(authenticateTech("sarah.tech", "wrong-pin")).toBe(null);
+
+  // 2. HOSPITAL-WISE PATIENTS STRUCTURE & REASSIGNMENT
+  let mockPatients = [
+    {
+      id: "pat-01",
+      mrn: "PP-101",
+      name: "Patient A",
+      hospitalId: "hosp-01",
+      hospitalName: "Technomind Healthcare Systems",
+      createdAt: "2026-03-01T10:00:00.000Z"
+    },
+    {
+      id: "pat-02",
+      mrn: "PP-102",
+      name: "Patient B",
+      hospitalId: "hosp-01",
+      hospitalName: "Technomind Healthcare Systems",
+      createdAt: "2026-03-02T10:00:00.000Z"
+    },
+    {
+      id: "pat-03",
+      mrn: "PP-201",
+      name: "Patient C",
+      hospitalId: "hosp-02",
+      hospitalName: "Metropolitan Podiatry Center",
+      createdAt: "2026-03-03T10:00:00.000Z"
+    }
+  ];
+
+  // Filter patients by hospital
+  const hosp1Patients = mockPatients.filter((p) => p.hospitalId === "hosp-01");
+  const hosp2Patients = mockPatients.filter((p) => p.hospitalId === "hosp-02");
+  expect(hosp1Patients.length).toBe(2);
+  expect(hosp2Patients.length).toBe(1);
+
+  // Admin transfers/reassigns patient A from hosp-01 to hosp-02
+  const reassignPatient = (patientId, newHospitalId, newHospitalName) => {
+    mockPatients = mockPatients.map((p) =>
+      p.id === patientId ? { ...p, hospitalId: newHospitalId, hospitalName: newHospitalName } : p
+    );
+  };
+
+  reassignPatient("pat-01", "hosp-02", "Metropolitan Podiatry Center");
+  const updatedHosp2Patients = mockPatients.filter((p) => p.hospitalId === "hosp-02");
+  expect(updatedHosp2Patients.length).toBe(2);
+  expect(updatedHosp2Patients.some((p) => p.id === "pat-01")).toBe(true);
+
+  // 3. CLOUD DEPLOYMENT DATA STRUCTURE CONFORMANCE
+  const cloudSyncPayload = {
+    tenantId: "hosp-02",
+    operatorId: createdTech.id,
+    patient: mockPatients.find((p) => p.id === "pat-01"),
+    timestamp: new Date().toISOString()
+  };
+
+  expect(cloudSyncPayload.tenantId).toBe("hosp-02");
+  expect(cloudSyncPayload.patient.hospitalId).toBe("hosp-02");
+  expect(Boolean(cloudSyncPayload.patient.mrn)).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

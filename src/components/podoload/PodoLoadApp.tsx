@@ -159,9 +159,22 @@ export function PodoLoadApp() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
 
-  const handleSelectRole = (role: 'admin' | 'technician', customName?: string) => {
-    const session = dbService.setActiveUser(role, customName);
+  const handleSelectRole = (
+    role: 'admin' | 'technician',
+    customName?: string,
+    technicianId?: string,
+    hospitalId?: string,
+    hospitalName?: string
+  ) => {
+    const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
+    if (hospitalId) {
+      const allHosps = dbService.getHospitalProfilesSync();
+      const targetHosp = allHosps.find((h) => h.id === hospitalId);
+      if (targetHosp) {
+        setActiveHospital(targetHosp);
+      }
+    }
   };
 
   // Selected patient & case (Active loaded case priority, strict matching)
@@ -324,20 +337,26 @@ export function PodoLoadApp() {
 
   // Step 1: Save Patient & Proceed
   const handleSavePatient = (patientRecord: Patient) => {
-    const exists = patients.some((p) => p.id === patientRecord.id);
+    const activeHosp = activeHospital || dbService.getActiveHospitalSync();
+    const fullPatient: Patient = {
+      ...patientRecord,
+      hospitalId: patientRecord.hospitalId || activeHosp.id,
+      hospitalName: patientRecord.hospitalName || activeHosp.name,
+    };
+    const exists = patients.some((p) => p.id === fullPatient.id);
     let updated: Patient[];
     if (exists) {
-      updated = patients.map((p) => (p.id === patientRecord.id ? patientRecord : p));
+      updated = patients.map((p) => (p.id === fullPatient.id ? fullPatient : p));
     } else {
-      updated = [patientRecord, ...patients];
+      updated = [fullPatient, ...patients];
     }
     setPatients(updated);
-    setSelectedPatientId(patientRecord.id);
-    dbService.savePatient(patientRecord);
+    setSelectedPatientId(fullPatient.id);
+    dbService.savePatient(fullPatient);
 
     logAuditEvent(
       'PATIENT_REGISTERED',
-      `Patient ${patientRecord.name} (${patientRecord.mrn}) created/updated`,
+      `Patient ${fullPatient.name} (${fullPatient.mrn}) registered under ${fullPatient.hospitalName}`,
       currentUser.name
     );
 
@@ -548,8 +567,9 @@ export function PodoLoadApp() {
         indication: selectedPatient.clinicalNotes || 'Plantar Pressure Screening',
         createdAt: currentCase?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        operatorName: 'Tech. Specialist',
-        clinicName: 'Technomind Healthcare',
+        operatorName: currentUser.role === 'technician' ? currentUser.name : (activeHospital.defaultTechnician || 'Tech. Specialist'),
+        clinicName: activeHospital.name || 'Technomind Healthcare Systems',
+        hospitalId: activeHospital.id,
         rawScanDataUrl: leftFoot?.rawDataUrl || rightFoot?.rawDataUrl || '',
         processedHeatMapDataUrl: lUrl || rUrl || '',
         rightRawScanDataUrl: rightFoot?.rawDataUrl || '',
@@ -645,8 +665,9 @@ export function PodoLoadApp() {
       indication: selectedPatient?.clinicalNotes || 'Plantar Pressure Screening',
       createdAt: existingCase?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      operatorName: updates.operatorName || 'Clinical Specialist',
-      clinicName: updates.clinicName || 'Technomind Healthcare Systems',
+      operatorName: updates.operatorName || (currentUser.role === 'technician' ? currentUser.name : (activeHospital.defaultTechnician || 'Clinical Specialist')),
+      clinicName: updates.clinicName || activeHospital.name || 'Technomind Healthcare Systems',
+      hospitalId: activeHospital.id,
       rawScanDataUrl: leftFoot?.rawDataUrl || rightFoot?.rawDataUrl || existingCase?.rawScanDataUrl || '',
       processedHeatMapDataUrl: leftHeatmapUrl || existingCase?.processedHeatMapDataUrl || '',
       rightRawScanDataUrl: rightFoot?.rawDataUrl || existingCase?.rightRawScanDataUrl || '',
@@ -918,6 +939,8 @@ export function PodoLoadApp() {
           {/* ADMINISTRATION: Hospital & Admin */}
           {currentSection === 'admin' && (
             <PodoLoadAdmin
+              patients={patients}
+              cases={cases}
               onHospitalChanged={(hosp) => {
                 setActiveHospital(hosp);
               }}
@@ -929,6 +952,9 @@ export function PodoLoadApp() {
                 setCurrentStep(1);
                 setCurrentSection('registration');
               }}
+              onSelectPatient={(p) => setSelectedPatientId(p.id)}
+              onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
+              onSwitchUser={handleSelectRole}
             />
           )}
 

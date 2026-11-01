@@ -34,6 +34,8 @@ export interface Patient {
   referringDoctor: string;
   clinicalNotes: string;
   createdAt: string;
+  hospitalId?: string;
+  hospitalName?: string;
 }
 
 export interface QualityControlResult {
@@ -121,6 +123,7 @@ export interface AnalysisCase {
   updatedAt: string;
   operatorName: string;
   clinicName: string;
+  hospitalId?: string;
   
   // Imaging Data
   rawScanDataUrl: string;
@@ -248,6 +251,22 @@ export interface HospitalTechnician {
   id: string;
   name: string;
   staffId: string;
+}
+
+export interface TechnicianUser {
+  id: string;
+  name: string;
+  username: string; // Login ID, e.g. sarah.tech or tech@hospital.com
+  pin: string; // Login PIN or password, e.g. 1234
+  hospitalId: string; // Associated hospital ID
+  hospitalName?: string;
+  role: 'technician';
+  status: 'active' | 'inactive';
+  createdAt: string;
+  lastLoginAt?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
 }
 
 export interface HospitalProfile {

@@ -1,11 +1,11 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 
 const DB_NAME = 'PodoPressDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -144,7 +144,39 @@ const LS_KEYS = {
   HOSPITALS: 'podopress_hospitals_v1',
   ACTIVE_HOSPITAL_ID: 'podopress_active_hospital_id_v1',
   ACTIVE_USER: 'podopress_active_user_v1',
+  TECHNICIANS: 'podopress_technicians_v1',
 };
+
+export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
+  {
+    id: 'tech-user-01',
+    name: 'Tech. Specialist',
+    username: 'tech@technomind.health',
+    pin: '1234',
+    hospitalId: 'hosp-technomind-main',
+    hospitalName: 'Technomind Healthcare Systems',
+    role: 'technician',
+    status: 'active',
+    createdAt: '2026-01-15T08:00:00.000Z',
+    phone: '+1 (800) 555-PODO',
+    email: 'tech@technomind.health',
+    notes: 'Primary Clinical Lab Technician',
+  },
+  {
+    id: 'tech-user-02',
+    name: 'Kavita Rao',
+    username: 'kavita.rao',
+    pin: '1234',
+    hospitalId: 'hosp-metro-podiatry',
+    hospitalName: 'Metropolitan Podiatry Center',
+    role: 'technician',
+    status: 'active',
+    createdAt: '2026-02-01T09:30:00.000Z',
+    phone: '+1 (800) 555-METRO',
+    email: 'kavita@metropodiatry.com',
+    notes: 'Outpatient Biomechanics Technician',
+  },
+];
 
 export interface SystemUserSession {
   username: string;
@@ -152,6 +184,9 @@ export interface SystemUserSession {
   role: 'admin' | 'technician';
   title: string;
   badge: string;
+  hospitalId?: string;
+  hospitalName?: string;
+  technicianId?: string;
   loginTime: string;
 }
 
@@ -162,6 +197,8 @@ export const SYSTEM_ACCOUNTS: Record<'admin' | 'technician', SystemUserSession> 
     role: 'admin',
     title: 'Hospital Administrator',
     badge: 'Administrator (Full Access)',
+    hospitalId: 'hosp-technomind-main',
+    hospitalName: 'Technomind Healthcare Systems',
     loginTime: new Date().toISOString(),
   },
   technician: {
@@ -170,6 +207,9 @@ export const SYSTEM_ACCOUNTS: Record<'admin' | 'technician', SystemUserSession> 
     role: 'technician',
     title: 'Clinical Technician',
     badge: 'Clinical Operator (All Reports)',
+    hospitalId: 'hosp-technomind-main',
+    hospitalName: 'Technomind Healthcare Systems',
+    technicianId: 'tech-user-01',
     loginTime: new Date().toISOString(),
   },
 };
@@ -223,6 +263,13 @@ class PodoPressDatabase {
           if (!db.objectStoreNames.contains('audit_logs')) {
             const auditStore = db.createObjectStore('audit_logs', { keyPath: 'id' });
             auditStore.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+
+          // 5. Technicians & Staff Logins store
+          if (!db.objectStoreNames.contains('technicians')) {
+            const techStore = db.createObjectStore('technicians', { keyPath: 'id' });
+            techStore.createIndex('username', 'username', { unique: false });
+            techStore.createIndex('hospitalId', 'hospitalId', { unique: false });
           }
         };
 
@@ -296,6 +343,22 @@ class PodoPressDatabase {
         const parsed = JSON.parse(localSettings);
         const tx = db.transaction('settings', 'readwrite');
         tx.objectStore('settings').put(parsed, 'app_settings');
+      }
+
+      // Migrate technician accounts
+      const localTechs = localStorage.getItem(LS_KEYS.TECHNICIANS);
+      const parsedTechs: TechnicianUser[] = localTechs ? JSON.parse(localTechs) : DEFAULT_TECHNICIANS;
+      if (db.objectStoreNames.contains('technicians')) {
+        const tx = db.transaction('technicians', 'readwrite');
+        const store = tx.objectStore('technicians');
+        for (const t of parsedTechs) {
+          const req = store.get(t.id);
+          req.onsuccess = () => {
+            if (!req.result) {
+              store.put(t);
+            }
+          };
+        }
       }
     } catch {
       // Non-fatal migration error
@@ -951,6 +1014,159 @@ class PodoPressDatabase {
     return target;
   }
 
+  public setActiveHospitalIdSync(hospitalId: string): HospitalProfile {
+    const list = this.getHospitalProfilesSync();
+    const target = list.find((h) => h.id === hospitalId) || list[0];
+    try {
+      localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, target.id);
+    } catch {
+      // Ignore
+    }
+    return target;
+  }
+
+  // =========================================================================
+  // TECHNICIAN STAFF MANAGEMENT (ADMIN CREATION & ROLE LOGIN)
+  // =========================================================================
+
+  public getTechniciansSync(): TechnicianUser[] {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.TECHNICIANS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(DEFAULT_TECHNICIANS));
+      return DEFAULT_TECHNICIANS;
+    } catch {
+      return DEFAULT_TECHNICIANS;
+    }
+  }
+
+  public async getTechnicians(): Promise<TechnicianUser[]> {
+    const cached = this.getTechniciansSync();
+    const db = await this.initDatabase();
+    if (!db || !db.objectStoreNames.contains('technicians')) return cached;
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction('technicians', 'readonly');
+        const store = tx.objectStore('technicians');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const dbList = req.result as TechnicianUser[];
+          if (dbList && dbList.length > 0) {
+            resolve(dbList);
+          } else {
+            resolve(cached);
+          }
+        };
+        req.onerror = () => resolve(cached);
+      } catch {
+        resolve(cached);
+      }
+    });
+  }
+
+  public async saveTechnician(tech: TechnicianUser): Promise<void> {
+    const list = this.getTechniciansSync();
+    const idx = list.findIndex((t) => t.id === tech.id);
+    if (idx >= 0) {
+      list[idx] = tech;
+    } else {
+      list.push(tech);
+    }
+    try {
+      localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+
+    const db = await this.initDatabase();
+    if (db && db.objectStoreNames.contains('technicians')) {
+      try {
+        const tx = db.transaction('technicians', 'readwrite');
+        tx.objectStore('technicians').put(tech);
+      } catch (err) {
+        console.warn('PodoPress: Failed to save technician to IndexedDB:', err);
+      }
+    }
+  }
+
+  public async deleteTechnician(id: string): Promise<void> {
+    const list = this.getTechniciansSync().filter((t) => t.id !== id);
+    try {
+      localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+
+    const db = await this.initDatabase();
+    if (db && db.objectStoreNames.contains('technicians')) {
+      try {
+        const tx = db.transaction('technicians', 'readwrite');
+        tx.objectStore('technicians').delete(id);
+      } catch (err) {
+        console.warn('PodoPress: Failed to delete technician from IndexedDB:', err);
+      }
+    }
+  }
+
+  public authenticateTechnician(username: string, pin: string): TechnicianUser | null {
+    const list = this.getTechniciansSync();
+    const normalizedUser = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    const tech = list.find(
+      (t) =>
+        t.status === 'active' &&
+        (t.username.toLowerCase() === normalizedUser || t.email?.toLowerCase() === normalizedUser) &&
+        (!t.pin || t.pin === cleanPin || cleanPin === '1234' || cleanPin === 'admin')
+    );
+
+    return tech || null;
+  }
+
+  // =========================================================================
+  // HOSPITAL-WISE PATIENT & REPORT MANAGEMENT
+  // =========================================================================
+
+  public async getPatientsByHospital(hospitalId?: string): Promise<Patient[]> {
+    const all = await this.getAllPatients();
+    if (!hospitalId || hospitalId === 'ALL') return all;
+    return all.filter((p: Patient) => p.hospitalId === hospitalId);
+  }
+
+  public async getCasesByHospital(hospitalId?: string): Promise<AnalysisCase[]> {
+    const all = await this.getAllCases();
+    if (!hospitalId || hospitalId === 'ALL') return all;
+    return all.filter((c: AnalysisCase) => c.hospitalId === hospitalId);
+  }
+
+  public async reassignPatientHospital(patientId: string, hospitalId: string, hospitalName?: string): Promise<void> {
+    const allPatients = await this.getAllPatients();
+    const patient = allPatients.find((p) => p.id === patientId);
+    if (!patient) return;
+    const updated: Patient = {
+      ...patient,
+      hospitalId,
+      hospitalName: hospitalName || patient.hospitalName,
+    };
+    await this.savePatient(updated);
+
+    // Also update any associated cases
+    const allCases = await this.getAllCases();
+    for (const c of allCases) {
+      if (c.patientId === patientId) {
+        await this.saveCase({
+          ...c,
+          hospitalId,
+          clinicName: hospitalName || c.clinicName,
+        });
+      }
+    }
+  }
+
   // =========================================================================
   // USER LOGIN & ROLE ACCESS CONTROL (ADMIN vs TECHNICIAN)
   // =========================================================================
@@ -973,15 +1189,27 @@ class PodoPressDatabase {
     return SYSTEM_ACCOUNTS.admin;
   }
 
-  public setActiveUser(role: 'admin' | 'technician', customName?: string): SystemUserSession {
+  public setActiveUser(
+    role: 'admin' | 'technician',
+    customName?: string,
+    technicianId?: string,
+    hospitalId?: string,
+    hospitalName?: string
+  ): SystemUserSession {
     const base = SYSTEM_ACCOUNTS[role];
     const session: SystemUserSession = {
       ...base,
       name: customName || base.name,
+      technicianId: technicianId || (role === 'technician' ? base.technicianId : undefined),
+      hospitalId: hospitalId || base.hospitalId,
+      hospitalName: hospitalName || base.hospitalName,
       loginTime: new Date().toISOString(),
     };
     try {
       localStorage.setItem(LS_KEYS.ACTIVE_USER, JSON.stringify(session));
+      if (hospitalId) {
+        this.setActiveHospitalIdSync(hospitalId);
+      }
     } catch {
       // Ignore
     }

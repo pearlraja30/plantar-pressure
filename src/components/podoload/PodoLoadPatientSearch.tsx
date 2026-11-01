@@ -189,7 +189,7 @@ export const PodoLoadPatientSearch: React.FC<PodoLoadPatientSearchProps> = ({
                   <div className="podoload-patient-item-details">
                     <span className="podoload-patient-item-name">{pat.name || 'Clinical Patient'}</span>
                     <span className="podoload-patient-item-sub">
-                      ID {pat.mrn || '00000'} · {calcAge} · {pGender}
+                      ID {pat.mrn || '00000'} · {calcAge} · {pGender} {pat.hospitalName ? `· ${pat.hospitalName}` : ''}
                     </span>
                   </div>
                 </div>
