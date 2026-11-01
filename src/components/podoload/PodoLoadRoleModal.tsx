@@ -1758,24 +1758,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           </div>
 
           {/* Modal Actions */}
-          {!deviceLockout && recoveryMode === 'none' && (
+          {!deviceLockout && recoveryMode === 'none' && !isSettingInitialPassword && (
             <div className="podoload-modal-footer" style={{ justifyContent: isMandatoryActivation ? 'flex-end' : 'space-between' }}>
               {!isMandatoryActivation && (
                 <button type="button" className="podoload-btn-secondary" onClick={onClose}>
                   Cancel
                 </button>
               )}
-              {isSettingInitialPassword ? (
-                <button
-                  type="button"
-                  className="podoload-btn-primary"
-                  onClick={handleSetInitialPassword}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Set Master Password &amp; Login</span>
-                </button>
-              ) : selectedRole === 'technician' && mobileAuthTab === 'activate' ? (
+              {selectedRole === 'technician' && mobileAuthTab === 'activate' ? (
                 <button
                   type="button"
                   className="podoload-btn-primary"
