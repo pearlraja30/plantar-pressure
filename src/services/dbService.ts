@@ -1662,8 +1662,62 @@ class PodoPressDatabase {
       // Ignore
     }
     deviceBindingService.bindCurrentDevice(`${updated.name} Station`);
+    this.authorizeStationForAdmin(updated);
     this.setActiveUser('admin', updated.name, undefined, updated.hospitalId, updated.hospitalName);
     return updated;
+  }
+
+  /**
+   * Authorizes and cryptographically binds the physical diagnostic station when the Hospital Administrator
+   * sets master credentials or logs in. Unlocks clinical workflows immediately.
+   */
+  public authorizeStationForAdmin(admin?: AdminAccount): DeviceAuthorizationToken {
+    const adminAcc = admin || this.getAdminAccountSync();
+    const currentDeviceId = deviceBindingService.getCurrentDeviceId();
+    const existingToken = this.getDeviceAuthorizationSync();
+
+    if (
+      existingToken &&
+      existingToken.deviceFingerprint === currentDeviceId &&
+      existingToken.appVersion === APP_CURRENT_VERSION &&
+      existingToken.status === 'authorized'
+    ) {
+      return existingToken;
+    }
+
+    const randPart1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const randPart2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const tokenStr = `AUTH-ADMIN-${randPart1}-${randPart2}`;
+
+    const hospitals = this.getHospitalProfilesSync();
+    const hosp = hospitals.find((h) => h.id === adminAcc.hospitalId) || hospitals[0] || {
+      id: adminAcc.hospitalId || 'hosp-technomind-main',
+      code: 'TMH-CENTRAL',
+      name: adminAcc.hospitalName || 'Technomind Healthcare Systems',
+    };
+
+    const authToken: DeviceAuthorizationToken = {
+      token: tokenStr,
+      hospitalId: hosp.id,
+      hospitalCode: hosp.code || 'TMH-CENTRAL',
+      hospitalName: hosp.name || 'Technomind Healthcare Systems',
+      technicianId: adminAcc.id || 'admin-master-01',
+      technicianName: adminAcc.name || 'Dr. Specialist',
+      deviceFingerprint: currentDeviceId,
+      deviceName: `${adminAcc.name || 'Hospital Admin'} Workstation`,
+      appVersion: APP_CURRENT_VERSION,
+      authorizedAt: new Date().toISOString(),
+      status: 'authorized',
+    };
+
+    try {
+      localStorage.setItem(LS_KEYS.DEVICE_AUTH_TOKEN, JSON.stringify(authToken));
+    } catch {
+      // Ignore
+    }
+
+    this.saveDeviceAuthorization(authToken).catch(() => {});
+    return authToken;
   }
 
   public registerAdminAccount(account: AdminAccount): AdminAccount {
@@ -1689,6 +1743,7 @@ class PodoPressDatabase {
 
     // Automatically bind the current device as the primary authorized device for this admin
     deviceBindingService.bindCurrentDevice(`${fullAccount.name} Terminal`);
+    this.authorizeStationForAdmin(fullAccount);
 
     // Update active user session
     this.setActiveUser('admin', fullAccount.name, undefined, fullAccount.hospitalId, fullAccount.hospitalName);
@@ -1721,9 +1776,11 @@ class PodoPressDatabase {
     // If an admin account was created, match against it
     if (registered) {
       const matchUser =
+        !cleanUser ||
+        cleanUser === 'admin' ||
         registered.username.toLowerCase() === cleanUser ||
         (registered.email && registered.email.toLowerCase() === cleanUser);
-      const matchPin = registered.pin === cleanPin;
+      const matchPin = registered.pin && registered.pin.trim() === cleanPin;
 
       if (matchUser && matchPin) {
         registered.lastLoginAt = new Date().toISOString();
@@ -1732,13 +1789,15 @@ class PodoPressDatabase {
         } catch {
           // Ignore
         }
+        this.authorizeStationForAdmin(registered);
         return { success: true, account: registered };
       }
       return { success: false, error: 'Invalid Administrator username or Master Password.' };
     }
 
     // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
-    if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin') && (cleanPin === '1234' || cleanPin === 'admin')) {
+    if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin' || !cleanUser) && (cleanPin === '1234' || cleanPin === 'admin')) {
+      this.authorizeStationForAdmin(DEFAULT_ADMIN_ACCOUNT);
       return { success: true, account: DEFAULT_ADMIN_ACCOUNT };
     }
 

@@ -256,9 +256,12 @@ export function PodoLoadApp() {
   ) => {
     const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
+    if (role === 'admin') {
+      dbService.authorizeStationForAdmin();
+    }
     const updatedStatus = dbService.checkDeviceAuthorizationStatus();
     setDeviceAuthStatus(updatedStatus);
-    if (updatedStatus.isAuthorized) {
+    if (updatedStatus.isAuthorized || role === 'admin') {
       setIsRoleModalOpen(false);
     }
     if (hospitalId) {
@@ -1195,7 +1198,7 @@ export function PodoLoadApp() {
       />
 
       {/* Full-Screen Blocking Backdrop if Device / Version is not Authorized */}
-      {!deviceAuthStatus.isAuthorized && (
+      {!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && (
         <div
           style={{
             position: 'fixed',
@@ -1250,17 +1253,17 @@ export function PodoLoadApp() {
 
       {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen || !deviceAuthStatus.isAuthorized}
+        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin')}
         onClose={() => {
           const status = dbService.checkDeviceAuthorizationStatus();
           setDeviceAuthStatus(status);
-          if (status.isAuthorized) {
+          if (status.isAuthorized || currentUser.role === 'admin') {
             setIsRoleModalOpen(false);
           }
         }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
-        isMandatoryActivation={!deviceAuthStatus.isAuthorized}
+        isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin'}
         activationReason={deviceAuthStatus.reason}
       />
     </div>

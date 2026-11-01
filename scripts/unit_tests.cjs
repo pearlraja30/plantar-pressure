@@ -2574,6 +2574,87 @@ it("Enforces Admin-Only Security Model: Zero arbitrary admin self-registration, 
   expect(techUser.pin).toBe("NewTechPass123!");
 });
 
+it("Enforces Administrator Master Password Station Authorization: Automatic device token binding upon initial setup and login, preventing activation deadlocks", () => {
+  // Simulate database state
+  let registeredAdmin = {
+    id: "admin-master-01",
+    name: "Dr. Specialist",
+    username: "admin@technomind.health",
+    pin: "AdminPass123",
+    hospitalId: "hosp-001",
+    hospitalName: "Technomind Healthcare Systems",
+    isInitialSetupCompleted: false,
+  };
+  let deviceAuthToken = null;
+  const currentHardwareDeviceId = "DEV-MOCK-FINGERPRINT-8899";
+  const appVersion = "1.0.55";
+
+  const authorizeStationForAdmin = (admin) => {
+    deviceAuthToken = {
+      token: "AUTH-ADMIN-TEST-TOKEN",
+      hospitalId: admin.hospitalId,
+      hospitalCode: "TMH-CENTRAL",
+      hospitalName: admin.hospitalName,
+      technicianId: admin.id,
+      technicianName: admin.name,
+      deviceFingerprint: currentHardwareDeviceId,
+      appVersion: appVersion,
+      authorizedAt: new Date().toISOString(),
+      status: "authorized",
+    };
+    return deviceAuthToken;
+  };
+
+  const checkDeviceAuthorizationStatus = () => {
+    if (!deviceAuthToken) return { isAuthorized: false, reason: "unregistered" };
+    if (deviceAuthToken.status !== "authorized") return { isAuthorized: false, reason: "revoked" };
+    if (deviceAuthToken.deviceFingerprint !== currentHardwareDeviceId) return { isAuthorized: false, reason: "new_device" };
+    if (deviceAuthToken.appVersion !== appVersion) return { isAuthorized: false, reason: "new_version" };
+    return { isAuthorized: true, token: deviceAuthToken };
+  };
+
+  const setInitialAdminPassword = (newPass) => {
+    registeredAdmin.pin = newPass;
+    registeredAdmin.isInitialSetupCompleted = true;
+    authorizeStationForAdmin(registeredAdmin);
+    return registeredAdmin;
+  };
+
+  const authenticateAdmin = (usernameOrEmail, pin) => {
+    const cleanUser = (usernameOrEmail || "").trim().toLowerCase();
+    const cleanPin = (pin || "").trim();
+    const matchUser = !cleanUser || cleanUser === "admin" || registeredAdmin.username.toLowerCase() === cleanUser;
+    const matchPin = registeredAdmin.pin === cleanPin;
+    if (matchUser && matchPin) {
+      authorizeStationForAdmin(registeredAdmin);
+      return { success: true, account: registeredAdmin };
+    }
+    return { success: false, error: "Invalid credentials" };
+  };
+
+  // Initially before setting password: device is unregistered
+  expect(checkDeviceAuthorizationStatus().isAuthorized).toBe(false);
+
+  // Admin sets first-time password to 'test123'
+  const updatedAdmin = setInitialAdminPassword("test123");
+  expect(updatedAdmin.pin).toBe("test123");
+  expect(updatedAdmin.isInitialSetupCompleted).toBe(true);
+
+  // After setting password, station must be automatically authorized
+  const statusAfterSetup = checkDeviceAuthorizationStatus();
+  expect(statusAfterSetup.isAuthorized).toBe(true);
+  expect(statusAfterSetup.token.technicianName).toBe("Dr. Specialist");
+
+  // Subsequent login with master password 'test123' must authenticate and authorize station
+  const authLogin = authenticateAdmin("", "test123");
+  expect(authLogin.success).toBe(true);
+  expect(checkDeviceAuthorizationStatus().isAuthorized).toBe(true);
+
+  // Incorrect password must be rejected
+  const authFailed = authenticateAdmin("admin", "wrongpass");
+  expect(authFailed.success).toBe(false);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

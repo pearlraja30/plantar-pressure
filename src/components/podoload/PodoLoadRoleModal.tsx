@@ -157,6 +157,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     setRegisteredAdmin(updated);
     setIsSettingInitialPassword(false);
     setPinError(null);
+    dbService.authorizeStationForAdmin(updated);
 
     // Automatically log in as Administrator
     onSelectRole('admin', updated.name, undefined, updated.hospitalId, updated.hospitalName);
@@ -175,7 +176,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       }
 
       // 2. Validate Credentials strictly
-      const auth = dbService.authenticateAdmin(registeredAdmin.username, adminPassword);
+      const auth = dbService.authenticateAdmin(registeredAdmin?.username || 'admin', adminPassword);
       if (!auth.success) {
         setPinError(auth.error || 'Incorrect Master Password. Please try again or use "Forgot Master Password" to recover your account.');
         return;
@@ -186,11 +187,13 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
       if (devCheck.authorized) {
         // Current device is authorized!
+        dbService.authorizeStationForAdmin(auth.account);
         onSelectRole('admin', auth.account?.name, undefined, auth.account?.hospitalId, auth.account?.hospitalName);
         onClose();
       } else if (devCheck.canAutoBind) {
         // Free seat available within quota! Automatically bind this station
         dbService.bindCurrentDevice();
+        dbService.authorizeStationForAdmin(auth.account);
         onSelectRole('admin', auth.account?.name, undefined, auth.account?.hospitalId, auth.account?.hospitalName);
         onClose();
       } else {
@@ -972,6 +975,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         onChange={(e) => setRegAdminPassword(e.target.value)}
                         placeholder="Create Master Password (min. 4)"
                         style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        autoComplete="new-password"
                         required
                         autoFocus
                       />
@@ -1007,6 +1011,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         onChange={(e) => setRegAdminPasswordConfirm(e.target.value)}
                         placeholder="Re-enter Master Password"
                         style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        autoComplete="new-password"
                         required
                       />
                       <button
@@ -1168,9 +1173,16 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                               type={showAdminPassword ? 'text' : 'password'}
                               placeholder="••••••••"
                               value={adminPassword}
+                              autoComplete="current-password"
                               onChange={(e) => {
                                 setAdminPassword(e.target.value);
                                 setPinError(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSwitchAccount();
+                                }
                               }}
                               onClick={(e) => e.stopPropagation()}
                               style={{
@@ -1592,9 +1604,16 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   type={showTechPassword ? 'text' : 'password'}
                                   placeholder="••••••••"
                                   value={techPassword}
+                                  autoComplete="current-password"
                                   onChange={(e) => {
                                     setTechPassword(e.target.value);
                                     setPinError(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSwitchAccount();
+                                    }
                                   }}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
