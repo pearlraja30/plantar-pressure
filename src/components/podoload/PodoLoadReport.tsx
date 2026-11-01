@@ -697,20 +697,20 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 <td>Arch index</td>
                 <td>
                   {leftAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
-                    ? leftAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    ? leftAnalysis?.regionalAnalysis?.cavanaghArchIndex?.toFixed(2)
                     : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
-                    ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    ? currentCase?.regionalAnalysis?.cavanaghArchIndex?.toFixed(2)
                     : currentCase?.orthoticMeasurements?.archIndex !== undefined
-                    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
+                    ? currentCase?.orthoticMeasurements?.archIndex?.toFixed(2)
                     : '—'}
                 </td>
                 <td>
                   {rightAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
-                    ? rightAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    ? rightAnalysis?.regionalAnalysis?.cavanaghArchIndex?.toFixed(2)
                     : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
-                    ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    ? currentCase?.regionalAnalysis?.cavanaghArchIndex?.toFixed(2)
                     : currentCase?.orthoticMeasurements?.archIndex !== undefined
-                    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
+                    ? currentCase?.orthoticMeasurements?.archIndex?.toFixed(2)
                     : '—'}
                 </td>
               </tr>
@@ -718,16 +718,16 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
                 <td>Forefoot / Heel load</td>
                 <td>
                   {leftAnalysis?.regionalAnalysis?.forefootContactPct
-                    ? `${leftAnalysis.regionalAnalysis.forefootContactPct} / ${leftAnalysis.regionalAnalysis.hindfootContactPct} %`
+                    ? `${leftAnalysis?.regionalAnalysis?.forefootContactPct} / ${leftAnalysis?.regionalAnalysis?.hindfootContactPct} %`
                     : currentCase?.regionalAnalysis?.forefootContactPct
-                    ? `${currentCase.regionalAnalysis.forefootContactPct} / ${currentCase.regionalAnalysis.hindfootContactPct} %`
+                    ? `${currentCase?.regionalAnalysis?.forefootContactPct} / ${currentCase?.regionalAnalysis?.hindfootContactPct} %`
                     : '—'}
                 </td>
                 <td>
                   {rightAnalysis?.regionalAnalysis?.forefootContactPct
-                    ? `${rightAnalysis.regionalAnalysis.forefootContactPct} / ${rightAnalysis.regionalAnalysis.hindfootContactPct} %`
+                    ? `${rightAnalysis?.regionalAnalysis?.forefootContactPct} / ${rightAnalysis?.regionalAnalysis?.hindfootContactPct} %`
                     : currentCase?.regionalAnalysis?.forefootContactPct
-                    ? `${currentCase.regionalAnalysis.forefootContactPct} / ${currentCase.regionalAnalysis.hindfootContactPct} %`
+                    ? `${currentCase?.regionalAnalysis?.forefootContactPct} / ${currentCase?.regionalAnalysis?.hindfootContactPct} %`
                     : '—'}
                 </td>
               </tr>

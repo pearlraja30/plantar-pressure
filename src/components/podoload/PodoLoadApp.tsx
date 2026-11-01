@@ -283,8 +283,18 @@ export function PodoLoadApp() {
       if (currentCase.rightProcessedHeatMapDataUrl && !rightHeatmapUrl) {
         setRightHeatmapUrl(currentCase.rightProcessedHeatMapDataUrl);
       }
+      if (currentCase.regionalAnalysis && !leftAnalysis) {
+        const analysisData = {
+          regionalAnalysis: currentCase.regionalAnalysis,
+          orthoticMeasurements: currentCase.orthoticMeasurements,
+          categoryDistribution: currentCase.categoryDistribution,
+          landmarks: currentCase.landmarks,
+        };
+        setLeftAnalysis(analysisData);
+        setRightAnalysis(analysisData);
+      }
     }
-  }, [selectedCaseId, currentCase?.rawScanDataUrl, currentCase?.rightRawScanDataUrl]);
+  }, [selectedCaseId, currentCase?.rawScanDataUrl, currentCase?.rightRawScanDataUrl, currentCase?.regionalAnalysis]);
 
   // Full purge of all data to start completely fresh
   const handlePurgeAllStaleData = () => {

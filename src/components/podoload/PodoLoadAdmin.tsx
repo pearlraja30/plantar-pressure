@@ -31,6 +31,7 @@ import {
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
 import { dbService } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
+import { diagnosticsLogger, DiagnosticErrorLog } from '../../services/diagnosticsLogger';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
 interface PodoLoadAdminProps {
@@ -75,6 +76,10 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [voucherInput, setVoucherInput] = useState('');
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
+
+  // Diagnostics & Error Logs State (IEC 62304 / ISO 13485)
+  const [diagnosticLogs, setDiagnosticLogs] = useState<DiagnosticErrorLog[]>(() => diagnosticsLogger.getErrorLogs());
+  const [selectedDetailLog, setSelectedDetailLog] = useState<DiagnosticErrorLog | null>(null);
 
   // Form states for the currently selected hospital
   const [name, setName] = useState(activeHospital.name);
@@ -1733,6 +1738,218 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                   <span className="podo-badge podo-badge-green">ISO 13485 / IEC 62304 Compliant</span>
                 </div>
               </div>
+
+              {/* System Diagnostics & Clinical Error Logs Audit Table */}
+              <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <h5 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#0c2328' }}>
+                      SYSTEM DIAGNOSTICS & CLINICAL ERROR LOGS (IEC 62304 / ISO 13485)
+                    </h5>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.68rem', color: '#64748b' }}>
+                      Detailed runtime anomaly tracking with root-cause reasons, station parameters, and exportable logs.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button
+                      type="button"
+                      className="podoload-btn-secondary podoload-btn-sm"
+                      onClick={() => {
+                        const json = diagnosticsLogger.exportLogsJson();
+                        const blob = new Blob([json], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `PodoPress-Audit-Logs-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export All Logs (.json)</span>
+                    </button>
+
+                    {diagnosticLogs.length > 0 && (
+                      <button
+                        type="button"
+                        className="podoload-btn-secondary podoload-btn-sm"
+                        onClick={() => {
+                          if (confirm('Clear all captured diagnostic error logs?')) {
+                            diagnosticsLogger.clearLogs();
+                            setDiagnosticLogs([]);
+                            setSaveSuccess('✓ Diagnostic logs cleared.');
+                            setTimeout(() => setSaveSuccess(null), 2500);
+                          }
+                        }}
+                        style={{ fontSize: '0.7rem', color: '#dc2626', borderColor: '#fecaca' }}
+                      >
+                        Clear Logs
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>LOG ID & TIME</th>
+                      <th style={{ textAlign: 'left' }}>CATEGORY</th>
+                      <th style={{ textAlign: 'left' }}>ERROR MESSAGE</th>
+                      <th style={{ textAlign: 'left' }}>DIAGNOSTIC REASON & REMEDY</th>
+                      <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diagnosticLogs.length > 0 ? (
+                      diagnosticLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td style={{ fontWeight: 700, color: '#0c2328' }}>
+                            <div>{log.id}</div>
+                            <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                              {log.timestamp.slice(0, 16).replace('T', ' ')}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className="podo-badge"
+                              style={{
+                                fontSize: '0.62rem',
+                                backgroundColor:
+                                  log.category === 'METRICS_HYDRATION'
+                                    ? '#e0f2fe'
+                                    : log.category === 'STORAGE_QUOTA'
+                                    ? '#fef3c7'
+                                    : '#fee2e2',
+                                color:
+                                  log.category === 'METRICS_HYDRATION'
+                                    ? '#0369a1'
+                                    : log.category === 'STORAGE_QUOTA'
+                                    ? '#b45309'
+                                    : '#b91c1c',
+                              }}
+                            >
+                              {log.categoryLabel}
+                            </span>
+                          </td>
+                          <td>
+                            <code style={{ fontSize: '0.68rem', color: '#b91c1c' }}>
+                              {log.errorMessage}
+                            </code>
+                          </td>
+                          <td style={{ maxWidth: '280px' }}>
+                            <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.35 }}>
+                              {log.reasonExplanation}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="podoload-btn-secondary podoload-btn-sm"
+                              onClick={() => setSelectedDetailLog(log)}
+                              style={{ fontSize: '0.68rem' }}
+                            >
+                              View Trace
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: '#16a34a', fontWeight: 600 }}>
+                          ✓ Zero system anomalies recorded. All clinical pipelines operating within normative limits.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Selected Detail Trace Modal */}
+              {selectedDetailLog && (
+                <div className="podoload-modal-backdrop" onClick={() => setSelectedDetailLog(null)}>
+                  <div
+                    className="podoload-modal-box"
+                    style={{ maxWidth: '640px', width: '92%', maxHeight: '85vh', overflowY: 'auto' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="podoload-modal-header">
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>
+                        Diagnostic Error Trace ({selectedDetailLog.id})
+                      </h4>
+                      <button type="button" className="podoload-modal-close-btn" onClick={() => setSelectedDetailLog(null)}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.76rem' }}>
+                      <div>
+                        <strong>Error Classification:</strong> {selectedDetailLog.categoryLabel}
+                      </div>
+                      <div>
+                        <strong>Diagnostic Reason:</strong> {selectedDetailLog.reasonExplanation}
+                      </div>
+                      <div>
+                        <strong>Remedy / Action:</strong> {selectedDetailLog.suggestedRemedy}
+                      </div>
+                      <div>
+                        <strong>Station:</strong> {selectedDetailLog.deviceInfo.name} ({selectedDetailLog.deviceInfo.id})
+                      </div>
+                      <div>
+                        <strong>JavaScript Stack Trace:</strong>
+                        <pre
+                          style={{
+                            backgroundColor: '#0f172a',
+                            color: '#f87171',
+                            padding: '0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.68rem',
+                            overflowX: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            marginTop: '4px',
+                          }}
+                        >
+                          {selectedDetailLog.errorStack || 'No stack trace captured.'}
+                        </pre>
+                      </div>
+                      {selectedDetailLog.componentStack && (
+                        <div>
+                          <strong>React Component Tree:</strong>
+                          <pre
+                            style={{
+                              backgroundColor: '#0f172a',
+                              color: '#cbd5e1',
+                              padding: '0.75rem',
+                              borderRadius: '6px',
+                              fontSize: '0.68rem',
+                              overflowX: 'auto',
+                              whiteSpace: 'pre-wrap',
+                              marginTop: '4px',
+                            }}
+                          >
+                            {selectedDetailLog.componentStack}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                    <div className="podoload-modal-footer">
+                      <button
+                        type="button"
+                        className="podoload-btn-secondary podoload-btn-sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(selectedDetailLog, null, 2));
+                          alert('Diagnostic trace copied to clipboard.');
+                        }}
+                      >
+                        Copy Trace
+                      </button>
+                      <button type="button" className="podoload-btn-primary podoload-btn-sm" onClick={() => setSelectedDetailLog(null)}>
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

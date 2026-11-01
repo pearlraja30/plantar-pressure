@@ -202,7 +202,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   }
 
   const highPressureRegion = hasAnalysis
-    ? `${activeAnalysis.regionalAnalysis.peakRegion} (${activeAnalysis.regionalAnalysis.peakContactCategory})`
+    ? `${activeAnalysis?.regionalAnalysis?.peakRegion || currentCase?.regionalAnalysis?.peakRegion || 'Forefoot Metatarsal'} (${activeAnalysis?.regionalAnalysis?.peakContactCategory || currentCase?.regionalAnalysis?.peakContactCategory || 'C3'})`
     : 'Awaiting scan analysis';
 
   const handleExportImage = () => {
