@@ -116,6 +116,7 @@ The system includes an automated clinical verification battery covering all test
 * **Master Password Architecture**: Robust credentials with zero default password leaks and show/hide unmasking toggles.
 * **Two-Way Password Recovery**: Admin recovery via cryptographic Security Key (`REC-TMH-9901`) or phone; Technician recovery via email/phone or Admin Master Password override.
 * **Single-Device Hardware Binding**: Automatic device fingerprint generation (`DEVICE-FPRINT-...`) with built-in multi-device licensing upgrade and payment workflow.
+* **Database Password Validation & REST API**: End-to-end specification for cryptographic Argon2id password hashing, brute-force lockout, JWT session management, and dual-mode online REST / offline IndexedDB authentication adapter.
 
 ### 3. Inbuilt Live Database Records Explorer
 * Direct in-app inspection of all 7 database stores (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `audit_logs`, `settings`).
