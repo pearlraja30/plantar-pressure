@@ -3,7 +3,7 @@ import { Patient, AnalysisCase } from '../../types';
 import { generateBilateralClubbedReportPdf } from '../../services/reportPdfService';
 import { FootCaptureData } from './PodoLoadCapture';
 import { dbService } from '../../services/dbService';
-import { generateSyntheticFootprintHeatmap } from '../../services/imageProcessingService';
+import { generateSyntheticFootprintHeatmap, generateSyntheticHarrisMatScan } from '../../services/imageProcessingService';
 import { Download, Printer, Share2, FolderArchive, Sliders, Building2 } from 'lucide-react';
 
 interface PodoLoadReportProps {
@@ -198,38 +198,38 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   // Imaging View Mode: Heatmap | Scanned Imprint | Dual
   const [reportViewMode, setReportViewMode] = useState<'heatmap' | 'raw' | 'dual'>('heatmap');
 
-  // Resolve left and right images with comprehensive fallbacks (and synthetic Jet reconstruction if missing)
+  // Resolve left and right images with clinical separation: Raw Scans (Harris Mat) vs Heatmaps (JET Colormap)
+  const leftArch = currentCase?.orthoticMeasurements?.archType || currentCase?.regionalAnalysis?.archClassification || 'Normal Arch';
+  const leftPeak = currentCase?.regionalAnalysis?.peakRegion || 'Hindfoot / Heel';
+
+  const isScanValid = (url?: string | null) => Boolean(url && typeof url === 'string' && url.length > 500);
+
   const leftHeatmap =
-    leftHeatmapUrl ||
-    currentCase?.processedHeatMapDataUrl ||
-    (currentCase
-      ? generateSyntheticFootprintHeatmap(
-          'Left',
-          currentCase.orthoticMeasurements?.archType || currentCase.regionalAnalysis?.archClassification,
-          currentCase.regionalAnalysis?.peakRegion
-        )
-      : null);
-  const leftRawScan = leftFoot?.rawDataUrl || currentCase?.rawScanDataUrl || leftHeatmap;
+    (isScanValid(leftHeatmapUrl) ? leftHeatmapUrl : null) ||
+    (isScanValid(currentCase?.processedHeatMapDataUrl) ? currentCase?.processedHeatMapDataUrl : null) ||
+    (typeof window !== 'undefined' ? generateSyntheticFootprintHeatmap('Left', leftArch, leftPeak) : null);
+
+  const leftRawScan =
+    (isScanValid(leftFoot?.rawDataUrl) ? leftFoot?.rawDataUrl : null) ||
+    (isScanValid(currentCase?.rawScanDataUrl) ? currentCase?.rawScanDataUrl : null) ||
+    (typeof window !== 'undefined' ? generateSyntheticHarrisMatScan('Left', leftArch) : null);
+
   const leftImg = reportViewMode === 'raw'
     ? (leftRawScan || leftHeatmap)
     : (leftHeatmap || leftRawScan);
 
   const rightHeatmap =
-    rightHeatmapUrl ||
-    currentCase?.rightProcessedHeatMapDataUrl ||
-    (currentCase?.footSide === 'Right' ? currentCase.processedHeatMapDataUrl : null) ||
-    (currentCase && currentCase.footSide !== 'Left'
-      ? generateSyntheticFootprintHeatmap(
-          'Right',
-          currentCase.orthoticMeasurements?.archType || currentCase.regionalAnalysis?.archClassification,
-          currentCase.regionalAnalysis?.peakRegion
-        )
-      : null);
+    (isScanValid(rightHeatmapUrl) ? rightHeatmapUrl : null) ||
+    (isScanValid(currentCase?.rightProcessedHeatMapDataUrl) ? currentCase?.rightProcessedHeatMapDataUrl : null) ||
+    (currentCase?.footSide === 'Right' && isScanValid(currentCase?.processedHeatMapDataUrl) ? currentCase.processedHeatMapDataUrl : null) ||
+    (typeof window !== 'undefined' && currentCase?.footSide !== 'Left' ? generateSyntheticFootprintHeatmap('Right', leftArch, leftPeak) : null);
+
   const rightRawScan =
-    rightFoot?.rawDataUrl ||
-    currentCase?.rightRawScanDataUrl ||
-    (currentCase?.footSide === 'Right' ? currentCase.rawScanDataUrl : null) ||
-    rightHeatmap;
+    (isScanValid(rightFoot?.rawDataUrl) ? rightFoot?.rawDataUrl : null) ||
+    (isScanValid(currentCase?.rightRawScanDataUrl) ? currentCase?.rightRawScanDataUrl : null) ||
+    (currentCase?.footSide === 'Right' && isScanValid(currentCase?.rawScanDataUrl) ? currentCase.rawScanDataUrl : null) ||
+    (typeof window !== 'undefined' && currentCase?.footSide !== 'Left' ? generateSyntheticHarrisMatScan('Right', leftArch) : null);
+
   const rightImg = reportViewMode === 'raw'
     ? (rightRawScan || rightHeatmap)
     : (rightHeatmap || rightRawScan);
