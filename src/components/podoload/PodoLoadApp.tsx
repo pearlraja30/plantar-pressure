@@ -152,11 +152,15 @@ export function PodoLoadApp() {
     }
   }, [selectedCaseId]);
 
-  // Selected patient & case
-  const selectedPatient =
-    patients.find((p) => p.id === selectedPatientId) || (patients.length > 0 ? patients[0] : undefined);
-  const currentCase =
-    cases.find((c) => c.id === selectedCaseId) || (cases.length > 0 ? cases[0] : undefined);
+  // Selected patient & case (Strict matching without forced fallback to index 0)
+  const currentCase = selectedCaseId
+    ? cases.find((c) => c.id === selectedCaseId)
+    : undefined;
+  const selectedPatient = selectedPatientId
+    ? patients.find((p) => p.id === selectedPatientId)
+    : currentCase?.patientId
+    ? patients.find((p) => p.id === currentCase.patientId)
+    : undefined;
 
   // Active hospital profile
   const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());

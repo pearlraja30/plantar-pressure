@@ -210,6 +210,8 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
       setWeightKg(selectedPatient.weightKg ? String(selectedPatient.weightKg) : '');
       setReferringDoctor(selectedPatient.referringDoctor || '');
       setClinicalHistory(selectedPatient.clinicalNotes || '');
+    } else {
+      setActiveRecordId(null);
     }
   }, [selectedPatient]);
 
