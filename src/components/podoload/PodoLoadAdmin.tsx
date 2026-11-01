@@ -29,6 +29,10 @@ import {
   X,
   Eye,
   EyeOff,
+  Smartphone,
+  Copy,
+  RotateCw,
+  QrCode,
 } from 'lucide-react';
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
 import { dbService } from '../../services/dbService';
@@ -120,6 +124,10 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [techEditPasswordVal, setTechEditPasswordVal] = useState('');
   const [showTechEditPasswordVal, setShowTechEditPasswordVal] = useState(false);
   const [techPasswordModalError, setTechPasswordModalError] = useState<string | null>(null);
+
+  // Activation Voucher & Mobile Pairing State
+  const [voucherTech, setVoucherTech] = useState<TechnicianUser | null>(null);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   // Hospital-wise Patient Details filtering state
   const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('ALL');
@@ -298,6 +306,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
 
     const assignedHosp = hospitals.find((h) => h.id === newTechHospitalId) || activeHospital;
     const generatedPass = 'Tech' + Math.floor(1000 + Math.random() * 9000);
+    const activationCode = dbService.generateActivationCode(assignedHosp.code || 'TMH');
 
     const newTech: TechnicianUser = {
       id: `tech-${Date.now()}`,
@@ -313,6 +322,8 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       email: newTechEmail.trim(),
       notes: newTechNotes.trim(),
       recoveryKey: 'REC-TECH-' + Math.floor(1000 + Math.random() * 9000),
+      activationCode,
+      isRegisteredOnDevice: false,
     };
 
     await dbService.saveTechnician(newTech);
@@ -355,6 +366,29 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setTechniciansList(dbService.getTechniciansSync());
     setSaveSuccess(`✓ Technician ${tech.name} status updated to: ${updated.status}`);
     setTimeout(() => setSaveSuccess(null), 2500);
+  };
+
+  const handleCopyActivationCode = (code: string, id: string) => {
+    try {
+      navigator.clipboard?.writeText(code);
+      setCopiedCodeId(id);
+      setTimeout(() => setCopiedCodeId(null), 2200);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleRegenerateActivationCode = async (tech: TechnicianUser) => {
+    const hosp = hospitals.find((h) => h.id === tech.hospitalId) || activeHospital;
+    const newCode = dbService.generateActivationCode(hosp.code || 'TMH');
+    const updated: TechnicianUser = {
+      ...tech,
+      activationCode: newCode,
+    };
+    await dbService.saveTechnician(updated);
+    setTechniciansList(dbService.getTechniciansSync());
+    setSaveSuccess(`✓ New activation code generated for "${tech.name}": ${newCode}`);
+    setTimeout(() => setSaveSuccess(null), 3500);
   };
 
   const handleDeleteTechnician = async (tech: TechnicianUser) => {
@@ -990,6 +1024,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                     <th style={{ textAlign: 'left' }}>TECHNICIAN NAME</th>
                     <th style={{ textAlign: 'left' }}>LOGIN USERNAME</th>
                     <th style={{ textAlign: 'left' }}>ASSIGNED HOSPITAL</th>
+                    <th style={{ textAlign: 'left' }}>APP ACTIVATION CODE</th>
                     <th style={{ textAlign: 'left' }}>PASSWORD & CREDENTIALS</th>
                     <th style={{ textAlign: 'center' }}>STATUS</th>
                     <th style={{ textAlign: 'right' }}>ACTIONS</th>
@@ -1013,6 +1048,38 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                         <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.64rem' }}>
                           {tech.hospitalName || 'Technomind Healthcare Systems'}
                         </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <code style={{ fontSize: '0.74rem', fontWeight: 800, backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
+                            {tech.activationCode || 'TMH-TECH-1001'}
+                          </code>
+                          <button
+                            type="button"
+                            className="podoload-btn-secondary"
+                            style={{ fontSize: '0.62rem', padding: '0.15rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            onClick={() => handleCopyActivationCode(tech.activationCode || 'TMH-TECH-1001', tech.id)}
+                            title="Copy activation code for technician mobile app"
+                          >
+                            <Copy className="w-3 h-3 text-teal-600" />
+                            <span>{copiedCodeId === tech.id ? '✓ Copied' : 'Copy'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+                            onClick={() => handleRegenerateActivationCode(tech)}
+                            title="Regenerate activation code"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div style={{ fontSize: '0.64rem', color: tech.isRegisteredOnDevice ? '#16a34a' : '#94a3b8', marginTop: '2px' }}>
+                          {tech.isRegisteredOnDevice ? (
+                            <span>📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'}</span>
+                          ) : (
+                            <span>📱 Ready for Device Activation</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1057,6 +1124,16 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            className="podoload-btn-secondary podoload-btn-sm"
+                            style={{ fontSize: '0.66rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => setVoucherTech(tech)}
+                            title="View / Print Mobile Device Activation Voucher"
+                          >
+                            <Smartphone className="w-3 h-3 text-teal-600" />
+                            <span>Voucher</span>
+                          </button>
                           <button
                             type="button"
                             className="podoload-btn-primary podoload-btn-sm"
@@ -2199,6 +2276,159 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
               >
                 <Check className="w-4 h-4" />
                 <span>Save New Password</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technician Mobile App Activation Voucher Modal */}
+      {voucherTech && (
+        <div className="podoload-modal-overlay">
+          <div className="podoload-modal-card" style={{ maxWidth: '480px', width: '92%' }}>
+            <div className="podoload-modal-header" style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#ccfbf1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#0f766e',
+                  }}
+                >
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="podoload-modal-title" style={{ margin: 0, fontSize: '0.92rem' }}>
+                    Clinical Device Activation Voucher
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                    Share these credentials with the technician for mobile app or station enrollment
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="podoload-modal-close-btn"
+                onClick={() => setVoucherTech(null)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Voucher Card Details */}
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1.5px dashed #0d9488',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
+                      Facility & Hospital
+                    </div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
+                      {voucherTech.hospitalName || 'Technomind Healthcare Systems'}
+                    </div>
+                  </div>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                    Authorized Operator
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.64rem', color: '#64748b' }}>Clinic / Hospital Code:</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f766e', fontFamily: 'monospace' }}>
+                      {hospitals.find((h) => h.id === voucherTech.hospitalId)?.code || 'TMH-CENTRAL'}
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.64rem', color: '#64748b' }}>Technician Full Name:</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                      {voucherTech.name}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Activation Voucher Code */}
+                <div
+                  style={{
+                    backgroundColor: '#f0fdfa',
+                    border: '1.5px solid #99f6e4',
+                    borderRadius: '8px',
+                    padding: '0.75rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Technician Activation Voucher Code
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.35rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      fontFamily: 'monospace',
+                      color: '#115e59',
+                    }}
+                  >
+                    {voucherTech.activationCode || 'TMH-TECH-1001'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>
+                    One-time enrollment voucher to bind device for 100% offline scanning
+                  </div>
+                </div>
+
+                {/* Step-by-Step Instructions */}
+                <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 700, color: '#0c2328', marginBottom: '2px' }}>
+                    Instructions for Technician Phone / Tablet:
+                  </div>
+                  <ol style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                    <li>Open <strong>PodoPress</strong> on Android / iOS.</li>
+                    <li>Tap <strong>"Activate Device with Code"</strong> on login.</li>
+                    <li>Enter Clinic Code: <strong>{hospitals.find((h) => h.id === voucherTech.hospitalId)?.code || 'TMH-CENTRAL'}</strong>.</li>
+                    <li>Enter Activation Code: <strong>{voucherTech.activationCode || 'TMH-TECH-1001'}</strong>.</li>
+                    <li>Confirm your quick-access password. The device is now ready for offline examinations!</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <div className="podoload-modal-footer">
+              <button
+                type="button"
+                className="podoload-btn-secondary"
+                onClick={() => setVoucherTech(null)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={() => {
+                  const hospCode = hospitals.find((h) => h.id === voucherTech.hospitalId)?.code || 'TMH-CENTRAL';
+                  const text = `🏥 PodoPress Mobile Device Activation Voucher\nFacility: ${voucherTech.hospitalName || 'Clinic'}\nHospital Code: ${hospCode}\nTechnician: ${voucherTech.name} (${voucherTech.username})\nActivation Code: ${voucherTech.activationCode}\n\n1. Open PodoPress App on mobile/tablet\n2. Select "Activate Device with Code"\n3. Enter Hospital Code (${hospCode}) and Activation Code (${voucherTech.activationCode})\n4. Set your PIN/Password to start offline clinical scanning.`;
+                  navigator.clipboard?.writeText(text);
+                  alert('✓ Activation Voucher instructions copied to clipboard!');
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copy Voucher Details</span>
               </button>
             </div>
           </div>

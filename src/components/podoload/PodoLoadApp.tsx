@@ -295,7 +295,39 @@ export function PodoLoadApp() {
 
   // Cloud Sync state
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>(cloudSyncService.getStatus());
-  const refreshCloudStatus = () => setCloudStatus(cloudSyncService.getStatus());
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => dbService.getPendingCasesCountSync());
+  const [isSyncingCases, setIsSyncingCases] = useState<boolean>(false);
+
+  const refreshCloudStatus = () => {
+    setCloudStatus(cloudSyncService.getStatus());
+    setPendingSyncCount(dbService.getPendingCasesCountSync());
+  };
+
+  const handleTriggerCloudSync = async () => {
+    setIsSyncingCases(true);
+    try {
+      await dbService.syncAllPendingCases();
+      const updatedCases = await dbService.getAllCases();
+      setCases(updatedCases);
+      setPendingSyncCount(dbService.getPendingCasesCountSync());
+      refreshCloudStatus();
+    } catch {
+      // Sync failed
+    } finally {
+      setIsSyncingCases(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = async () => {
+      refreshCloudStatus();
+      if (navigator.onLine) {
+        await handleTriggerCloudSync();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   // Foot capture data (Screens 2 - 5) - FRESH DATA ONLY (No auto-injection of sample footprints)
   const [leftFoot, setLeftFoot] = useState<FootCaptureData | null>(null);
@@ -964,6 +996,9 @@ export function PodoLoadApp() {
           searchQuery={globalSearch}
           onSearchChange={setGlobalSearch}
           cloudSynced={cloudStatus.isOnline}
+          pendingSyncCount={pendingSyncCount}
+          isSyncing={isSyncingCases}
+          onTriggerSync={handleTriggerCloudSync}
           onOpenCloud={() => setCurrentSection('reports_cloud')}
           doctorName={activeHospital.defaultDoctor || 'Dr. Specialist'}
           clinicName={activeHospital.name}

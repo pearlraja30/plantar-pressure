@@ -17,9 +17,12 @@ import {
   Key,
   ArrowLeft,
   HelpCircle,
+  Smartphone,
+  Sparkles,
+  Building2,
 } from 'lucide-react';
 import { SystemUserSession, dbService } from '../../services/dbService';
-import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense } from '../../types';
+import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken } from '../../types';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
 interface PodoLoadRoleModalProps {
@@ -81,6 +84,26 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [techNewPasswordConfirm, setTechNewPasswordConfirm] = useState('');
   const [showTechNewPassword, setShowTechNewPassword] = useState(false);
   const [techRecoverySuccess, setTechRecoverySuccess] = useState<string | null>(null);
+
+  // Code-based Device Authorization & Pairing State
+  const [deviceAuth, setDeviceAuth] = useState<DeviceAuthorizationToken | null>(() =>
+    dbService.getDeviceAuthorizationSync()
+  );
+  const [mobileAuthTab, setMobileAuthTab] = useState<'login' | 'activate'>(() => {
+    return dbService.getDeviceAuthorizationSync() ? 'login' : 'activate';
+  });
+
+  // Code Activation Form State
+  const [actHospitalCode, setActHospitalCode] = useState(
+    dbService.getDeviceAuthorizationSync()?.hospitalCode || 'TMH-CENTRAL'
+  );
+  const [actActivationCode, setActActivationCode] = useState('');
+  const [actPassword, setActPassword] = useState('');
+  const [actPasswordConfirm, setActPasswordConfirm] = useState('');
+  const [showActPassword, setShowActPassword] = useState(false);
+  const [showActConfirmPassword, setShowActConfirmPassword] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+  const [actSuccessMsg, setActSuccessMsg] = useState<string | null>(null);
 
   // Admin Account Creation / Registration Form State
   const [isRegisteringAdmin, setIsRegisteringAdmin] = useState<boolean>(!registeredAdmin);
@@ -207,7 +230,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       }
     } else {
       // Technician authentication
-      const techToAuth = technicians.find((t) => t.id === selectedTechId);
+      let techToAuth = technicians.find((t) => t.id === selectedTechId);
+      if (deviceAuth && (!techToAuth || isMobileDevice)) {
+        const boundTech = technicians.find((t) => t.id === deviceAuth.technicianId);
+        if (boundTech) techToAuth = boundTech;
+      }
       if (techToAuth) {
         if (techToAuth.pin && techPassword.trim() !== techToAuth.pin) {
           setPinError(`Incorrect password for technician ${techToAuth.name}. Please try again or use "Forgot Password".`);
@@ -220,6 +247,59 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         onSelectRole('technician');
         onClose();
       }
+    }
+  };
+
+  // Handle Code-based Device Activation & Pairing
+  const handleActivateDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    setActSuccessMsg(null);
+
+    if (!actHospitalCode.trim()) {
+      setPinError('Please enter your Clinic or Hospital Code (e.g. TMH-CENTRAL).');
+      return;
+    }
+    if (!actActivationCode.trim()) {
+      setPinError('Please enter your Technician Activation Voucher Code (e.g. TMH-TECH-1001).');
+      return;
+    }
+    if (actPassword && actPassword.trim().length < 4) {
+      setPinError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (actPassword && actPassword !== actPasswordConfirm) {
+      setPinError('Password confirmation does not match. Please re-enter.');
+      return;
+    }
+
+    setIsActivating(true);
+    try {
+      const res = await dbService.registerDeviceWithActivationCode({
+        hospitalCode: actHospitalCode.trim(),
+        activationCode: actActivationCode.trim(),
+        password: actPassword.trim() || undefined,
+      });
+
+      if (!res.success || !res.technician || !res.hospital) {
+        setPinError(res.error || 'Activation failed. Please check your clinic and voucher codes.');
+        setIsActivating(false);
+        return;
+      }
+
+      const authTech = res.technician;
+      const authHosp = res.hospital;
+      setDeviceAuth(res.token || null);
+      setActSuccessMsg(`✓ Device successfully registered & authorized! Bound to ${authTech.name} (${authHosp.name}).`);
+      setIsActivating(false);
+
+      setTimeout(() => {
+        onSelectRole('technician', authTech.name, authTech.id, authHosp.id, authHosp.name);
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setPinError('Device activation encountered an error: ' + (err as Error).message);
+      setIsActivating(false);
     }
   };
 
@@ -1240,104 +1320,353 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     <div
                       style={{
                         marginTop: '0.5rem',
-                        paddingLeft: '2.5rem',
+                        paddingLeft: isMobileDevice ? '0' : '2.5rem',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.5rem',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0c2328' }}>
-                          Select Technician Account:
-                        </label>
-                        <select
-                          className="podoload-input"
-                          style={{ fontSize: '0.74rem', padding: '0.25rem 0.5rem', width: 'auto', minWidth: '220px' }}
-                          value={selectedTechId}
-                          onChange={(e) => {
-                            setSelectedTechId(e.target.value);
+                      {/* Tab Switcher: Station Quick Login vs Activate Station with Code */}
+                      <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMobileAuthTab('login');
                             setPinError(null);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.4rem',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            backgroundColor: mobileAuthTab === 'login' ? '#ffffff' : 'transparent',
+                            color: mobileAuthTab === 'login' ? '#0f766e' : '#64748b',
+                            boxShadow: mobileAuthTab === 'login' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                          }}
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Station Login</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMobileAuthTab('activate');
+                            setPinError(null);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.4rem',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            backgroundColor: mobileAuthTab === 'activate' ? '#ffffff' : 'transparent',
+                            color: mobileAuthTab === 'activate' ? '#0f766e' : '#64748b',
+                            boxShadow: mobileAuthTab === 'activate' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                          }}
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>📱 Activate Device with Code</span>
+                        </button>
+                      </div>
+
+                      {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING */}
+                      {mobileAuthTab === 'activate' ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.65rem',
+                            padding: '0.75rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {technicians.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name} ({t.hospitalName || 'Clinic'}) · {t.username}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Lock className="w-3.5 h-3.5 text-slate-500" />
-                          <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Password:</span>
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
-                            <input
-                              type={showTechPassword ? 'text' : 'password'}
-                              placeholder="••••••••"
-                              value={techPassword}
-                              onChange={(e) => {
-                                setTechPassword(e.target.value);
-                                setPinError(null);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                width: '130px',
-                                padding: '0.2rem 1.6rem 0.2rem 0.4rem',
-                                fontSize: '0.74rem',
-                                border: '1px solid #94a3b8',
-                                borderRadius: '4px',
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowTechPassword(!showTechPassword);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                right: '4px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#64748b',
-                                padding: '1px',
-                              }}
-                            >
-                              {showTechPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                            </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f766e', fontSize: '0.74rem', fontWeight: 700 }}>
+                            <Sparkles className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                            <span>Device Registration & Offline-First Authorization</span>
                           </div>
-                        </div>
+                          <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.4 }}>
+                            Enter your Clinic Code and Activation Voucher Code from your Hospital Administrator. This cryptographically binds this station for <strong>100% offline clinical operation</strong>.
+                          </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>
+                              <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                                Hospital / Clinic Code *
+                              </label>
+                              <input
+                                type="text"
+                                className="podoload-input"
+                                style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontFamily: 'monospace' }}
+                                placeholder="e.g. TMH-CENTRAL"
+                                value={actHospitalCode}
+                                onChange={(e) => setActHospitalCode(e.target.value.toUpperCase())}
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                                Activation Voucher Code *
+                              </label>
+                              <input
+                                type="text"
+                                className="podoload-input"
+                                style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 800, color: '#0f766e' }}
+                                placeholder="e.g. TMH-TECH-1001"
+                                value={actActivationCode}
+                                onChange={(e) => setActActivationCode(e.target.value.toUpperCase())}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>
+                              <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                                Set Quick Password (Optional)
+                              </label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type={showActPassword ? 'text' : 'password'}
+                                  className="podoload-input"
+                                  style={{ fontSize: '0.76rem', paddingRight: '1.8rem' }}
+                                  placeholder="Create or confirm PIN"
+                                  value={actPassword}
+                                  onChange={(e) => setActPassword(e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowActPassword(!showActPassword)}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '4px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '1px',
+                                  }}
+                                >
+                                  {showActPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                                Confirm Quick Password
+                              </label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type={showActConfirmPassword ? 'text' : 'password'}
+                                  className="podoload-input"
+                                  style={{ fontSize: '0.76rem', paddingRight: '1.8rem' }}
+                                  placeholder="Re-enter password"
+                                  value={actPasswordConfirm}
+                                  onChange={(e) => setActPasswordConfirm(e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowActConfirmPassword(!showActConfirmPassword)}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '4px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '1px',
+                                  }}
+                                >
+                                  {showActConfirmPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRecoveryMode('technician');
-                              setTechRecoveryId(selectedTechId);
-                              setPinError(null);
-                            }}
+                            className="podoload-btn-primary"
+                            disabled={isActivating}
+                            onClick={handleActivateDevice}
                             style={{
-                              background: 'none',
-                              border: 'none',
-                              fontSize: '0.68rem',
-                              color: '#0284c7',
-                              textDecoration: 'underline',
-                              cursor: 'pointer',
+                              marginTop: '0.25rem',
+                              fontSize: '0.78rem',
+                              padding: '0.45rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
                             }}
                           >
-                            Forgot Password?
+                            <Check className="w-4 h-4" />
+                            <span>{isActivating ? 'Registering Device...' : '🚀 Authorize & Register Device'}</span>
                           </button>
-                          <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
-                            (Admin can also view/reset in Admin Panel)
-                          </span>
                         </div>
-                      </div>
+                      ) : (
+                        /* TAB 2: STATION QUICK LOGIN */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {deviceAuth ? (
+                            <div
+                              style={{
+                                padding: '0.6rem 0.8rem',
+                                backgroundColor: '#f0fdfa',
+                                border: '1px solid #99f6e4',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.25rem',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f766e' }}>
+                                  🏥 {deviceAuth.hospitalName} ({deviceAuth.hospitalCode})
+                                </span>
+                                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                                  ● Authorized Station
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#1e293b', fontWeight: 700 }}>
+                                👨‍⚕️ Registered Operator: {deviceAuth.technicianName}
+                              </div>
+                              <div style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                                Station ID: {deviceAuth.deviceFingerprint} · 100% Offline Clinical Scanning Ready
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0c2328' }}>
+                                Select Technician Account:
+                              </label>
+                              <select
+                                className="podoload-input"
+                                style={{ fontSize: '0.74rem', padding: '0.25rem 0.5rem', width: 'auto', minWidth: '220px' }}
+                                value={selectedTechId}
+                                onChange={(e) => {
+                                  setSelectedTechId(e.target.value);
+                                  setPinError(null);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {technicians.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} ({t.hospitalName || 'Clinic'}) · {t.username}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Lock className="w-3.5 h-3.5 text-slate-500" />
+                              <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Password:</span>
+                              <div style={{ position: 'relative', display: 'inline-block' }}>
+                                <input
+                                  type={showTechPassword ? 'text' : 'password'}
+                                  placeholder="••••••••"
+                                  value={techPassword}
+                                  onChange={(e) => {
+                                    setTechPassword(e.target.value);
+                                    setPinError(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    width: '130px',
+                                    padding: '0.2rem 1.6rem 0.2rem 0.4rem',
+                                    fontSize: '0.74rem',
+                                    border: '1px solid #94a3b8',
+                                    borderRadius: '4px',
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowTechPassword(!showTechPassword);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '4px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '1px',
+                                  }}
+                                >
+                                  {showTechPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRecoveryMode('technician');
+                                  setTechRecoveryId(deviceAuth?.technicianId || selectedTechId);
+                                  setPinError(null);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  fontSize: '0.68rem',
+                                  color: '#0284c7',
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Forgot Password?
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMobileAuthTab('activate');
+                                  setPinError(null);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  fontSize: '0.68rem',
+                                  color: '#0f766e',
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Switch / Re-pair Station
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1392,6 +1721,22 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               </div>
             )}
 
+            {actSuccessMsg && (
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #99f6e4',
+                  borderRadius: '6px',
+                  fontSize: '0.74rem',
+                  color: '#0f766e',
+                  fontWeight: 700,
+                }}
+              >
+                {actSuccessMsg}
+              </div>
+            )}
+
             {transferSuccess && (
               <div
                 style={{
@@ -1425,6 +1770,17 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   <UserPlus className="w-4 h-4" />
                   <span>Create Admin Account & Bind Station</span>
                 </button>
+              ) : selectedRole === 'technician' && mobileAuthTab === 'activate' ? (
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={handleSwitchAccount}
+                  disabled={isActivating}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isActivating ? 'Registering Device...' : '🚀 Authorize & Register Device'}</span>
+                </button>
               ) : (
                 <button
                   type="button"
@@ -1436,6 +1792,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   <span>
                     {selectedRole === 'admin'
                       ? 'Log In as Hospital Administrator'
+                      : deviceAuth
+                      ? `Log In as ${deviceAuth.technicianName} (Offline Ready)`
                       : `Log In as ${currentActiveTech?.name || 'Technician'}`}
                   </span>
                 </button>

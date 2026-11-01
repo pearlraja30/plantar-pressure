@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { CloudSyncStatus, cloudSyncService } from '../../services/cloudSyncService';
+import { dbService } from '../../services/dbService';
 import { AnalysisCase, Patient } from '../../types';
 
 interface PodoLoadCloudRecordsProps {
@@ -70,6 +71,7 @@ export const PodoLoadCloudRecords: React.FC<PodoLoadCloudRecordsProps> = ({
 
   const handleSyncNow = async () => {
     setIsSyncing(true);
+    await dbService.syncAllPendingCases();
     await cloudSyncService.processQueue();
     onRefreshCloud();
     setTimeout(() => setIsSyncing(false), 900);

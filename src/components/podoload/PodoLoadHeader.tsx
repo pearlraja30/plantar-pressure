@@ -14,6 +14,9 @@ interface PodoLoadHeaderProps {
   onSearchChange: (q: string) => void;
   cloudSynced: boolean;
   onOpenCloud: () => void;
+  pendingSyncCount?: number;
+  isSyncing?: boolean;
+  onTriggerSync?: () => void;
   doctorName?: string;
   clinicName?: string;
   currentUser?: SystemUserSession;
@@ -31,6 +34,9 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   onSearchChange,
   cloudSynced,
   onOpenCloud,
+  pendingSyncCount = 0,
+  isSyncing = false,
+  onTriggerSync,
   doctorName = 'Dr. Specialist',
   clinicName = 'Technomind Healthcare Systems',
   currentUser = SYSTEM_ACCOUNTS.admin,
@@ -114,12 +120,43 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
           <button
             type="button"
             className="podoload-synced-pill"
-            onClick={onOpenCloud}
-            title="Cloud synchronization status"
-            style={{ border: 'none', cursor: 'pointer' }}
+            onClick={onTriggerSync || onOpenCloud}
+            title={
+              !cloudSynced
+                ? 'Device Offline — All reports stored locally in IndexedDB'
+                : pendingSyncCount > 0
+                ? `${pendingSyncCount} offline report(s) ready to sync. Click to sync now.`
+                : 'Cloud: All reports synchronized'
+            }
+            style={{
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: !cloudSynced ? '#fef3c7' : pendingSyncCount > 0 ? '#eff6ff' : '#ecfdf5',
+            }}
           >
-            <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{cloudSynced ? 'Cloud: synced' : 'Cloud: queued'}</span>
+            <Cloud
+              className={`w-3.5 h-3.5 ${
+                !cloudSynced
+                  ? 'text-amber-600'
+                  : isSyncing || pendingSyncCount > 0
+                  ? 'text-blue-600 animate-pulse'
+                  : 'text-emerald-600'
+              }`}
+            />
+            <span
+              style={{
+                color: !cloudSynced ? '#b45309' : pendingSyncCount > 0 ? '#1d4ed8' : '#047857',
+                fontWeight: 600,
+              }}
+            >
+              {!cloudSynced
+                ? 'Offline (Local)'
+                : isSyncing
+                ? 'Syncing reports...'
+                : pendingSyncCount > 0
+                ? `Cloud: ${pendingSyncCount} pending`
+                : 'Cloud: synced'}
+            </span>
           </button>
 
           {/* Language Selector */}

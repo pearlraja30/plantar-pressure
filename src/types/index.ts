@@ -268,6 +268,24 @@ export interface TechnicianUser {
   email?: string;
   notes?: string;
   recoveryKey?: string;
+  activationCode?: string; // Code-based enrollment voucher, e.g. "TMH-TECH-1001"
+  registeredDeviceId?: string; // Bound hardware device fingerprint
+  isRegisteredOnDevice?: boolean;
+  authorizedAt?: string;
+}
+
+export interface DeviceAuthorizationToken {
+  token: string; // Cryptographic enrollment token, e.g. "AUTH-DEV-8F29-4A1B"
+  hospitalId: string;
+  hospitalCode: string;
+  hospitalName: string;
+  technicianId: string;
+  technicianName: string;
+  deviceFingerprint: string;
+  deviceName?: string;
+  authorizedAt: string;
+  expiresAt?: string;
+  status: 'authorized' | 'revoked';
 }
 
 export interface HospitalProfile {

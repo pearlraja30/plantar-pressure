@@ -1,9 +1,10 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice, DeviceAuthorizationToken } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
+import { cloudSyncService } from './cloudSyncService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
@@ -148,6 +149,7 @@ const LS_KEYS = {
   TECHNICIANS: 'podopress_technicians_v1',
   ADMIN_ACCOUNT: 'podopress_admin_account_v1',
   ADMIN_ACCOUNTS_LIST: 'podopress_admin_accounts_list_v1',
+  DEVICE_AUTH_TOKEN: 'podopress_device_auth_token_v1',
 };
 
 export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
@@ -171,7 +173,7 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
     name: 'Tech. Specialist',
     username: 'tech@technomind.health',
     pin: '1234',
-    hospitalId: 'hosp-technomind-main',
+    hospitalId: 'hosp-001',
     hospitalName: 'Technomind Healthcare Systems',
     role: 'technician',
     status: 'active',
@@ -180,14 +182,16 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
     email: 'tech@technomind.health',
     notes: 'Primary Clinical Lab Technician',
     recoveryKey: 'REC-TECH-1001',
+    activationCode: 'TMH-TECH-1001',
+    isRegisteredOnDevice: true,
   },
   {
     id: 'tech-user-02',
     name: 'Kavita Rao',
     username: 'kavita.rao',
     pin: '1234',
-    hospitalId: 'hosp-metro-podiatry',
-    hospitalName: 'Metropolitan Podiatry Center',
+    hospitalId: 'hosp-003',
+    hospitalName: 'Metro Diabetes & Preventive Foot Care',
     role: 'technician',
     status: 'active',
     createdAt: '2026-02-01T09:30:00.000Z',
@@ -195,6 +199,8 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
     email: 'kavita@metropodiatry.com',
     notes: 'Outpatient Biomechanics Technician',
     recoveryKey: 'REC-TECH-1002',
+    activationCode: 'METRO-TECH-2002',
+    isRegisteredOnDevice: false,
   },
 ];
 
@@ -1054,7 +1060,24 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.TECHNICIANS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          let updated = false;
+          for (const t of parsed) {
+            if (!t.activationCode) {
+              const prefix = t.hospitalId?.includes('metro') ? 'METRO' : 'TMH';
+              t.activationCode = `${prefix}-TECH-${Math.floor(1000 + Math.random() * 9000)}`;
+              updated = true;
+            }
+          }
+          if (updated) {
+            try {
+              localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(parsed));
+            } catch {
+              // Ignore
+            }
+          }
+          return parsed;
+        }
       }
       localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(DEFAULT_TECHNICIANS));
       return DEFAULT_TECHNICIANS;
@@ -1089,6 +1112,11 @@ class PodoPressDatabase {
   }
 
   public async saveTechnician(tech: TechnicianUser): Promise<void> {
+    if (!tech.activationCode) {
+      const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
+      tech.activationCode = this.generateActivationCode(hosp?.code || 'TMH');
+    }
+
     const list = this.getTechniciansSync();
     const idx = list.findIndex((t) => t.id === tech.id);
     if (idx >= 0) {
@@ -1145,6 +1173,269 @@ class PodoPressDatabase {
     );
 
     return tech || null;
+  }
+
+  /**
+   * Generates a unique, human-friendly technician activation voucher code.
+   * e.g. "TMH-TECH-4821"
+   */
+  public generateActivationCode(hospitalPrefix: string = 'TMH'): string {
+    const cleanPrefix = hospitalPrefix.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    return `${cleanPrefix}-TECH-${randNum}`;
+  }
+
+  /**
+   * Get device authorization token synchronously from local storage.
+   */
+  public getDeviceAuthorizationSync(): DeviceAuthorizationToken | null {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.DEVICE_AUTH_TOKEN);
+      if (saved) {
+        return JSON.parse(saved) as DeviceAuthorizationToken;
+      }
+    } catch {
+      // Storage unavailable
+    }
+    return null;
+  }
+
+  /**
+   * Get device authorization token from local storage / IndexedDB.
+   */
+  public async getDeviceAuthorization(): Promise<DeviceAuthorizationToken | null> {
+    const cached = this.getDeviceAuthorizationSync();
+    if (cached) return cached;
+
+    const db = await this.initDatabase();
+    if (!db || !db.objectStoreNames.contains('settings')) return null;
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction('settings', 'readonly');
+        const store = tx.objectStore('settings');
+        const req = store.get('device_auth_token');
+        req.onsuccess = () => resolve((req.result as DeviceAuthorizationToken) || null);
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  /**
+   * Persists device authorization token locally for 100% offline access.
+   */
+  public async saveDeviceAuthorization(token: DeviceAuthorizationToken): Promise<void> {
+    try {
+      localStorage.setItem(LS_KEYS.DEVICE_AUTH_TOKEN, JSON.stringify(token));
+    } catch {
+      // Storage quota or restriction
+    }
+
+    const db = await this.initDatabase();
+    if (db && db.objectStoreNames.contains('settings')) {
+      try {
+        const tx = db.transaction('settings', 'readwrite');
+        tx.objectStore('settings').put(token, 'device_auth_token');
+      } catch (err) {
+        console.warn('PodoPress: Failed to save device authorization to IndexedDB:', err);
+      }
+    }
+  }
+
+  /**
+   * Clears device authorization token (allows unpairing or re-registering).
+   */
+  public async clearDeviceAuthorization(): Promise<void> {
+    try {
+      localStorage.removeItem(LS_KEYS.DEVICE_AUTH_TOKEN);
+    } catch {
+      // Ignore
+    }
+
+    const db = await this.initDatabase();
+    if (db && db.objectStoreNames.contains('settings')) {
+      try {
+        const tx = db.transaction('settings', 'readwrite');
+        tx.objectStore('settings').delete('device_auth_token');
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  /**
+   * Validates Hospital Code and Technician Activation Code, then registers
+   * and cryptographically binds the current hardware terminal for offline clinical scanning.
+   */
+  public async registerDeviceWithActivationCode(params: {
+    hospitalCode: string;
+    activationCode: string;
+    password?: string;
+    deviceName?: string;
+  }): Promise<{
+    success: boolean;
+    token?: DeviceAuthorizationToken;
+    technician?: TechnicianUser;
+    hospital?: HospitalProfile;
+    error?: string;
+  }> {
+    const normHospCode = params.hospitalCode.trim().toUpperCase();
+    const normActCode = params.activationCode.trim().toUpperCase();
+
+    if (!normHospCode) {
+      return { success: false, error: 'Please enter your Hospital or Clinic Code.' };
+    }
+    if (!normActCode) {
+      return { success: false, error: 'Please enter your Technician Activation Code.' };
+    }
+
+    // 1. Resolve Hospital
+    const hospitals = this.getHospitalProfilesSync();
+    const hospital = hospitals.find(
+      (h: HospitalProfile) =>
+        h.code.toUpperCase() === normHospCode ||
+        h.id.toUpperCase() === normHospCode ||
+        h.name.toLowerCase().includes(normHospCode.toLowerCase())
+    );
+
+    if (!hospital) {
+      return {
+        success: false,
+        error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please check with your Administrator.`,
+      };
+    }
+
+    // 2. Resolve Technician by Activation Code
+    const technicians = this.getTechniciansSync();
+    let tech = technicians.find(
+      (t) => (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode)
+    );
+
+    // Fallback search by username or recovery key if technician entered that
+    if (!tech) {
+      tech = technicians.find(
+        (t) =>
+          t.username.trim().toUpperCase() === normActCode ||
+          (t.recoveryKey && t.recoveryKey.trim().toUpperCase() === normActCode)
+      );
+    }
+
+    if (!tech) {
+      return {
+        success: false,
+        error: `Invalid or unrecognized Activation Code "${params.activationCode}". Please request a fresh voucher from your Hospital Administrator.`,
+      };
+    }
+
+    if (tech.status !== 'active') {
+      return {
+        success: false,
+        error: `Technician account "${tech.name}" is currently marked inactive by the Administrator.`,
+      };
+    }
+
+    // 3. Update password if technician customized it on activation
+    if (params.password && params.password.trim().length >= 4) {
+      tech.pin = params.password.trim();
+    }
+
+    // 4. Bind hardware device fingerprint
+    const hardwareDeviceId = deviceBindingService.getCurrentDeviceId();
+    const deviceName =
+      params.deviceName?.trim() ||
+      deviceBindingService.getCurrentDeviceInfo()?.name ||
+      'Authorized Diagnostic Station';
+
+    tech.registeredDeviceId = hardwareDeviceId;
+    tech.isRegisteredOnDevice = true;
+    tech.authorizedAt = new Date().toISOString();
+    tech.hospitalId = hospital.id;
+    tech.hospitalName = hospital.name;
+
+    await this.saveTechnician(tech);
+
+    // 5. Generate persistent Device Authorization Token
+    const randPart1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const randPart2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const tokenStr = `AUTH-DEV-${randPart1}-${randPart2}`;
+
+    const authToken: DeviceAuthorizationToken = {
+      token: tokenStr,
+      hospitalId: hospital.id,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      technicianId: tech.id,
+      technicianName: tech.name,
+      deviceFingerprint: hardwareDeviceId,
+      deviceName,
+      authorizedAt: new Date().toISOString(),
+      status: 'authorized',
+    };
+
+    await this.saveDeviceAuthorization(authToken);
+
+    // 6. Set Active User & Hospital Session
+    this.setActiveHospitalIdSync(hospital.id);
+    this.setActiveUser('technician', tech.name, tech.id, hospital.id, hospital.name);
+
+    return {
+      success: true,
+      token: authToken,
+      technician: tech,
+      hospital,
+    };
+  }
+
+  /**
+   * Synchronous check of pending cases count for instant header badges.
+   */
+  public getPendingCasesCountSync(): number {
+    try {
+      const cases = this.getCasesSync();
+      return cases.filter((c) => c.syncStatus !== 'synced').length;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Synchronize all offline-generated reports and cases to the cloud database.
+   * Updates case sync status in IndexedDB and storage cache.
+   */
+  public async syncAllPendingCases(
+    onProgress?: (synced: number, total: number) => void
+  ): Promise<{ syncedCount: number; totalPending: number; errors: string[] }> {
+    const allCases = await this.getAllCases();
+    const pendingCases = allCases.filter((c: AnalysisCase) => c.syncStatus !== 'synced');
+    const totalPending = pendingCases.length;
+    const errors: string[] = [];
+
+    if (totalPending === 0) {
+      return { syncedCount: 0, totalPending: 0, errors: [] };
+    }
+
+    let syncedCount = 0;
+    for (const c of pendingCases) {
+      try {
+        const syncRes = await cloudSyncService.syncCase(c);
+        if (syncRes.success) {
+          c.syncStatus = 'synced';
+          c.cloudSyncId = syncRes.cloudId || `CLOUD-SYNC-${(c.caseNumber || c.id).replace(/[^a-zA-Z0-9]/g, '')}`;
+          c.lastSyncAttempt = new Date().toISOString();
+          await this.saveCase(c);
+          syncedCount++;
+          onProgress?.(syncedCount, totalPending);
+        } else {
+          errors.push(`Case ${c.caseNumber || c.id}: ${syncRes.error || 'Sync failed'}`);
+        }
+      } catch (err) {
+        errors.push(`Case ${c.caseNumber || c.id}: ${(err as Error).message}`);
+      }
+    }
+
+    return { syncedCount, totalPending, errors };
   }
 
   // =========================================================================
