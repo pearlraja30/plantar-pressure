@@ -1461,7 +1461,7 @@
    ---------------------------------------------------- */
 .podoload-settings-layout {
   display: grid;
-  grid-template-columns: 220px 1.4fr 1.2fr;
+  grid-template-columns: 220px 1fr;
   gap: 1rem;
   flex: 1;
 }

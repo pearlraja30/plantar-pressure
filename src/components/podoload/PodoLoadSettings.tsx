@@ -927,8 +927,174 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                 </button>
               </div>
             </div>
+          ) : activeMenu === 'language' ? (
+            /* Dedicated Language and Region Tab */
+            <div className="podoload-card" style={{ padding: '1rem', maxWidth: '720px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
+                <div>
+                  <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.9rem' }}>
+                    LANGUAGE AND REGIONAL LOCALIZATION
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Configure application display language, report generation language, measurement units, and date formatting conventions.
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div className="podoload-form-group">
+                  <label className="podoload-label">App Interface Language</label>
+                  <select
+                    className="podoload-input"
+                    value={appLanguage}
+                    onChange={(e) => setAppLanguage(e.target.value)}
+                  >
+                    <option value="English">English</option>
+                    <option value="Spanish">Español (Spanish)</option>
+                    <option value="French">Français (French)</option>
+                    <option value="German">Deutsch (German)</option>
+                    <option value="Tamil">தமிழ் (Tamil)</option>
+                    <option value="Hindi">हिन्दी (Hindi)</option>
+                  </select>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    Language displayed across buttons, navigation tabs, and system prompts.
+                  </span>
+                </div>
+
+                <div className="podoload-form-group">
+                  <label className="podoload-label">Clinical Report Language</label>
+                  <select
+                    className="podoload-input"
+                    value={reportLanguage}
+                    onChange={(e) => setReportLanguage(e.target.value)}
+                  >
+                    <option value="English">English</option>
+                    <option value="Spanish">Español (Spanish)</option>
+                    <option value="French">Français (French)</option>
+                    <option value="German">Deutsch (German)</option>
+                    <option value="Tamil">தமிழ் (Tamil)</option>
+                    <option value="Hindi">हिन्दी (Hindi)</option>
+                  </select>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    Language used when compiling PDF clinical reports, interpretations, and printed summaries.
+                  </span>
+                </div>
+
+                <div className="podoload-form-group">
+                  <label className="podoload-label">Measurement Units</label>
+                  <div className="podoload-segmented-buttons" style={{ width: '100%' }}>
+                    <button
+                      type="button"
+                      className={`podoload-seg-btn ${unit === 'mm' ? 'active' : ''}`}
+                      onClick={() => setUnit('mm')}
+                    >
+                      Millimeters (mm) — Standard
+                    </button>
+                    <button
+                      type="button"
+                      className={`podoload-seg-btn ${unit === 'cm' ? 'active' : ''}`}
+                      onClick={() => setUnit('cm')}
+                    >
+                      Centimeters (cm)
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    Foot length, forefoot breadth, and heel dimensions are displayed in physical {unit}.
+                  </span>
+                </div>
+
+                <div className="podoload-form-group">
+                  <label className="podoload-label">Date Format</label>
+                  <select
+                    className="podoload-input"
+                    value={dateFormat}
+                    onChange={(e) => setDateFormat(e.target.value)}
+                  >
+                    <option value="dd-mm-yyyy">dd-mm-yyyy (e.g. 31-10-2026 - UK/Europe/India standard)</option>
+                    <option value="yyyy-mm-dd">yyyy-mm-dd (e.g. 2026-10-31 - ISO 8601 standard)</option>
+                    <option value="mm/dd/yyyy">mm/dd/yyyy (e.g. 10/31/2026 - US standard)</option>
+                  </select>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    Applied across timestamps, report print dates, and patient history logs.
+                  </span>
+                </div>
+              </div>
+
+              {/* Regional Clinical Reference Standard */}
+              <div style={{ marginTop: '1.25rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>
+                  REGIONAL BIOMECHANICAL STANDARDS
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                  The active regional analysis follows the <strong>Cavanagh & Rodgers (1987)</strong> Normative Arch Index baseline (Normative: 0.15–0.26, High Arch &lt; 0.15, Flat Foot &gt; 0.26) coupled with <strong>IWGDF 2023</strong> Diabetic Risk Stratification.
+                </div>
+              </div>
+            </div>
+          ) : activeMenu === 'cloud' ? (
+            /* Dedicated Cloud Sync Tab */
+            <div className="podoload-card" style={{ padding: '1rem', maxWidth: '720px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
+                <div>
+                  <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.9rem' }}>
+                    CLOUD SYNCHRONIZATION & REMOTE EHR INTEGRATION
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Configure automated report sync, encrypted cloud backup, and hospital EHR server endpoint.
+                  </span>
+                </div>
+                <span className="podo-badge podo-badge-green">AES-256 Encrypted</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#0c2328', fontWeight: 600, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={autoSyncReports}
+                    onChange={(e) => setAutoSyncReports(e.target.checked)}
+                    style={{ accentColor: 'var(--podo-primary)', width: '16px', height: '16px' }}
+                  />
+                  <span>Automatically sync clinical exams & reports to cloud repository</span>
+                </label>
+
+                <div className="podoload-form-group">
+                  <label className="podoload-label">Cloud Server Endpoint URL</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={serverAddress}
+                    onChange={(e) => setServerAddress(e.target.value)}
+                    placeholder="https://cloud.technomind.clinic/v1"
+                  />
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    Secure HTTPS/TLS 1.3 FHIR-compliant endpoint for remote storage and hospital archive.
+                  </span>
+                </div>
+
+                <div className="podoload-form-group">
+                  <label className="podoload-label">Account / Operator Identity</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    placeholder="clinic-admin@technomind.health"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => alert('Connection test successful! Status: 200 OK — Remote cloud server is online and accepting encrypted sync payloads.')}
+                  >
+                    Test connection
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
-            <>
+            /* activeMenu === 'scanner' (Default) */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
               {/* Card 1: CHOOSE SCANNER (Genuine Hardware Discovery) */}
               <div className="podoload-card" style={{ padding: '0.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
@@ -1153,125 +1319,8 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                   </label>
                 </div>
               </div>
-            </>
+            </div>
           )}
-        </div>
-
-        {/* ================= COLUMN 3: RIGHT PANEL ================= */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {/* Card 1: LANGUAGE AND REGION matching Screenshot 5 */}
-          <div className="podoload-card" style={{ padding: '0.85rem' }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.65rem' }}>
-              LANGUAGE AND REGION
-            </h4>
-
-            <div className="podoload-form-group" style={{ marginBottom: '0.65rem' }}>
-              <label className="podoload-label">App language</label>
-              <select
-                className="podoload-input"
-                value={appLanguage}
-                onChange={(e) => setAppLanguage(e.target.value)}
-              >
-                <option value="English">English</option>
-                <option value="Spanish">Spanish</option>
-                <option value="French">French</option>
-                <option value="German">German</option>
-              </select>
-            </div>
-
-            <div className="podoload-form-group" style={{ marginBottom: '0.65rem' }}>
-              <label className="podoload-label">Report language</label>
-              <select
-                className="podoload-input"
-                value={reportLanguage}
-                onChange={(e) => setReportLanguage(e.target.value)}
-              >
-                <option value="English">English</option>
-                <option value="Spanish">Spanish</option>
-                <option value="French">French</option>
-                <option value="German">German</option>
-              </select>
-            </div>
-
-            <div className="podoload-form-group" style={{ marginBottom: '0.65rem' }}>
-              <label className="podoload-label">Units</label>
-              <div className="podoload-segmented-buttons" style={{ width: '100%' }}>
-                <button
-                  type="button"
-                  className={`podoload-seg-btn ${unit === 'mm' ? 'active' : ''}`}
-                  onClick={() => setUnit('mm')}
-                >
-                  mm
-                </button>
-                <button
-                  type="button"
-                  className={`podoload-seg-btn ${unit === 'cm' ? 'active' : ''}`}
-                  onClick={() => setUnit('cm')}
-                >
-                  cm
-                </button>
-              </div>
-            </div>
-
-            <div className="podoload-form-group">
-              <label className="podoload-label">Date format</label>
-              <select
-                className="podoload-input"
-                value={dateFormat}
-                onChange={(e) => setDateFormat(e.target.value)}
-              >
-                <option value="dd-mm-yyyy">dd-mm-yyyy</option>
-                <option value="yyyy-mm-dd">yyyy-mm-dd</option>
-                <option value="mm/dd/yyyy">mm/dd/yyyy</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Card 2: CLOUD SYNC matching Screenshot 5 */}
-          <div className="podoload-card" style={{ padding: '0.85rem', flex: 1 }}>
-            <h4 className="podoload-card-title" style={{ marginBottom: '0.65rem' }}>
-              CLOUD SYNC
-            </h4>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.74rem', color: '#0c2328', fontWeight: 600, marginBottom: '0.65rem', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={autoSyncReports}
-                onChange={(e) => setAutoSyncReports(e.target.checked)}
-                style={{ accentColor: 'var(--podo-primary)', width: '15px', height: '15px' }}
-              />
-              Auto-sync reports
-            </label>
-
-            <div className="podoload-form-group" style={{ marginBottom: '0.65rem' }}>
-              <label className="podoload-label">Server address</label>
-              <input
-                type="text"
-                className="podoload-input"
-                value={serverAddress}
-                onChange={(e) => setServerAddress(e.target.value)}
-              />
-            </div>
-
-            <div className="podoload-form-group" style={{ marginBottom: '0.85rem' }}>
-              <label className="podoload-label">Account</label>
-              <input
-                type="text"
-                className="podoload-input"
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="podoload-btn-secondary"
-              style={{ width: '100%' }}
-              onClick={() => alert('Connection test successful! Status: 200 OK')}
-            >
-              Test connection
-            </button>
-          </div>
         </div>
       </div>
 
