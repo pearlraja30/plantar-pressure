@@ -93,10 +93,44 @@ GitHub Actions will automatically build all 4 platforms in parallel and publish 
 
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-13)
 
-The system includes an automated clinical verification battery covering all 13 test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
+The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
+* **53 / 53 Unit Tests Passing** (`npm run test:unit`)
+* **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`)
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
-* Click **"Export Audit JSON"** to download the verifiable compliance evidence.
+* Click **"Export Audit JSON"** to download verifiable compliance evidence.
+
+---
+
+## 🏥 Enterprise Features & Clinical Architecture
+
+### 1. Patient Reports Hub
+* Centralized historical examination browser attached to Patient Registration.
+* Filter historical reports dynamically **By All**, **By Year**, **By Month**, and **By Date**.
+* One-click session restoration: **Open Report** (Page 5) or **View Results** (Page 4).
+* "Scan / Upload New Report for this Patient" workflow preserving active demographic context.
+
+### 2. Two-Tier Role-Based Access Control (RBAC) & Hardware Licensing
+* **Hospital Administrator**: System-level controls, multi-hospital profiles, technician provisioning, device licensing, and database maintenance.
+* **Clinical Technician**: High-throughput patient intake, scanning, image unwarping, and report generation.
+* **Master Password Architecture**: Robust credentials with zero default password leaks and show/hide unmasking toggles.
+* **Two-Way Password Recovery**: Admin recovery via cryptographic Security Key (`REC-TMH-9901`) or phone; Technician recovery via email/phone or Admin Master Password override.
+* **Single-Device Hardware Binding**: Automatic device fingerprint generation (`DEVICE-FPRINT-...`) with built-in multi-device licensing upgrade and payment workflow.
+
+### 3. Inbuilt Live Database Records Explorer
+* Direct in-app inspection of all 7 database stores (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `audit_logs`, `settings`).
+* Accessible via sidebar (**`Database records`**) and Settings (**`Patient ID & Database`** $\rightarrow$ **`Live Records Explorer`**).
+* Real-time search, live row count metrics, pretty-printed JSON inspection modal with one-click copy, and atomic Export/Import JSON backup.
+
+---
+
+## 📚 Enterprise Documentation & Architectural Roadmaps
+
+For detailed clinical, architectural, and developer references, consult the following comprehensive manuals:
+* 📄 [**`POSTGRESQL_3TIER_MIGRATION_PLAN.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/POSTGRESQL_3TIER_MIGRATION_PLAN.md) — 3-Tier Distributed Architecture (Multi-platform Clients, Microservices, PostgreSQL 16+ & Cloud S3 Object Storage) with complete DDL schemas, migration scripts, and sync protocols.
+* 📄 [**`ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md) — Clean Hexagonal Architecture, HAL, 10-Zone AI segmentation model, storage engines, and regulatory compliance.
+* 📄 [**`DEVELOPER_REFERENCE_GUIDE.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/DEVELOPER_REFERENCE_GUIDE.md) — Comprehensive developer cookbook, computer vision pipeline, biomechanical indices, schema migration, and testing recipes.
+* 📄 [**`PROJECT_ACTIVITY_AND_IMPLEMENTATION_RECORD.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/PROJECT_ACTIVITY_AND_IMPLEMENTATION_RECORD.md) — Chronological implementation activity log, features, bug fixes, and verification test batteries.
 
 ---
 
