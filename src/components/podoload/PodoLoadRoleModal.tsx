@@ -1541,25 +1541,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                               </div>
                             </div>
                           </div>
-
-                          <button
-                            type="button"
-                            className="podoload-btn-primary"
-                            disabled={isActivating}
-                            onClick={handleActivateDevice}
-                            style={{
-                              marginTop: '0.25rem',
-                              fontSize: '0.78rem',
-                              padding: '0.45rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.35rem',
-                            }}
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>{isActivating ? 'Registering Device...' : '🚀 Authorize & Register Device'}</span>
-                          </button>
                         </div>
                       ) : (
                         /* TAB 2: STATION QUICK LOGIN */
@@ -1808,12 +1789,18 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 <button
                   type="button"
                   className="podoload-btn-primary"
-                  onClick={handleSwitchAccount}
-                  disabled={isActivating}
+                  onClick={handleActivateDevice}
+                  disabled={isActivating || Boolean(actSuccessMsg)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Check className="w-4 h-4" />
-                  <span>{isActivating ? 'Registering Device...' : '🚀 Authorize & Register Device'}</span>
+                  <span>
+                    {isActivating
+                      ? 'Registering Device...'
+                      : actSuccessMsg
+                      ? '✓ Registered! Logging in...'
+                      : '🚀 Authorize & Register Device'}
+                  </span>
                 </button>
               ) : (
                 <button
