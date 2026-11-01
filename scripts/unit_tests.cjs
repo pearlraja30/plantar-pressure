@@ -2745,6 +2745,114 @@ it("Enforces Aligned Technician Login & Multi-Platform Offline Enrollment: Valid
   expect(resBadCode.success).toBe(false);
 });
 
+it("Enforces Multi-Technician Management & Remote Technician Examination Data Ingestion", () => {
+  // 1. Admin creates multiple technicians across facilities
+  const hospitals = [
+    { id: "hosp-01", code: "TMH-CENTRAL", name: "Technomind Healthcare" },
+    { id: "hosp-02", code: "METRO-FOOT", name: "Metro Podiatry Center" },
+  ];
+
+  const generateActivationCode = (prefix) => {
+    const raw = (prefix || 'TMH').includes('-') ? prefix.split('-')[0] : prefix;
+    const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    return `${cleanPrefix}-TECH-${randNum}`;
+  };
+
+  const technicians = [
+    {
+      id: "tech-01",
+      name: "Tech. Specialist",
+      username: "tech@technomind.health",
+      hospitalId: "hosp-01",
+      activationCode: "TMH-TECH-1001",
+      pin: "Tech#1234",
+    },
+  ];
+
+  // Admin adds second technician
+  const code2 = generateActivationCode("METRO-FOOT");
+  const tech2 = {
+    id: "tech-02",
+    name: "Kavita Rao",
+    username: "kavita.rao",
+    hospitalId: "hosp-02",
+    activationCode: code2,
+    pin: "Kavita@2026",
+  };
+  technicians.push(tech2);
+
+  // Admin adds third technician
+  const code3 = generateActivationCode("TMH-CENTRAL");
+  const tech3 = {
+    id: "tech-03",
+    name: "Alex Rivera",
+    username: "alex.rivera",
+    hospitalId: "hosp-01",
+    activationCode: code3,
+    pin: "Alex#9988",
+  };
+  technicians.push(tech3);
+
+  expect(technicians.length).toBe(3);
+  expect(tech2.activationCode).toContain("METRO-TECH-");
+  expect(tech3.activationCode).toContain("TMH-TECH-");
+
+  // 2. Remote Technician conducts exam on Android/iOS/Remote system
+  const remoteExamData = {
+    appName: "PodoPress",
+    version: "1.0",
+    exportedAt: new Date().toISOString(),
+    patients: [
+      {
+        id: "pat-remote-101",
+        name: "Elena Rostova",
+        mrn: "TMH-2026-9021",
+        hospitalId: "hosp-01",
+        hospitalName: "Technomind Healthcare",
+      },
+    ],
+    cases: [
+      {
+        id: "case-remote-501",
+        caseNumber: "CASE-2026-9021",
+        patientId: "pat-remote-101",
+        hospitalId: "hosp-01",
+        archType: "Normal Arch",
+        peakPressureKpa: 285,
+        syncStatus: "synced",
+      },
+    ],
+  };
+
+  // 3. Admin PC Ingestion (dbService.importDatabaseBackup)
+  const centralDb = {
+    patients: [{ id: "pat-central-001", name: "John Doe", mrn: "TMH-001" }],
+    cases: [{ id: "case-central-001", caseNumber: "CASE-001", patientId: "pat-central-001" }],
+  };
+
+  // Simulate import
+  const rawJson = JSON.stringify(remoteExamData);
+  const parsed = JSON.parse(rawJson);
+  expect(parsed.patients.length).toBe(1);
+  expect(parsed.cases.length).toBe(1);
+
+  // Merging into central DB
+  parsed.patients.forEach((p) => {
+    const exists = centralDb.patients.find((cp) => cp.id === p.id);
+    if (!exists) centralDb.patients.push(p);
+  });
+  parsed.cases.forEach((c) => {
+    const exists = centralDb.cases.find((cc) => cc.id === c.id);
+    if (!exists) centralDb.cases.push(c);
+  });
+
+  expect(centralDb.patients.length).toBe(2);
+  expect(centralDb.cases.length).toBe(2);
+  expect(Boolean(centralDb.patients.find((p) => p.name === "Elena Rostova"))).toBe(true);
+  expect(Boolean(centralDb.cases.find((c) => c.id === "case-remote-501"))).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

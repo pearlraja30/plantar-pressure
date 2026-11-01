@@ -1168,6 +1168,14 @@ export function PodoLoadApp() {
               onSelectPatient={(p) => setSelectedPatientId(p.id)}
               onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
               onSwitchUser={handleSelectRole}
+              onRefreshData={() => {
+                dbService.getAllPatients().then((pats) => {
+                  if (pats) setPatients(pats);
+                });
+                dbService.getAllCases().then((cs) => {
+                  if (cs) setCases(cs);
+                });
+              }}
             />
           )}
 

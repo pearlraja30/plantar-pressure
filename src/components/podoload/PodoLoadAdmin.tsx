@@ -38,6 +38,7 @@ import {
   Mail,
   MessageSquare,
   Printer,
+  Cloud,
 } from 'lucide-react';
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
 import { dbService } from '../../services/dbService';
@@ -60,6 +61,7 @@ interface PodoLoadAdminProps {
     hospId?: string,
     hospName?: string
   ) => void;
+  onRefreshData?: () => void;
 }
 
 export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
@@ -71,7 +73,22 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   onSelectPatient,
   onSelectReport,
   onSwitchUser,
+  onRefreshData,
 }) => {
+  const [localPatients, setLocalPatients] = useState<Patient[]>(patients);
+  const [localCases, setLocalCases] = useState<AnalysisCase[]>(cases);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [syncStatusMessage, setSyncStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    setLocalPatients(patients);
+  }, [patients]);
+
+  useEffect(() => {
+    setLocalCases(cases);
+  }, [cases]);
+
   const [hospitals, setHospitals] = useState<HospitalProfile[]>(() => dbService.getHospitalProfilesSync());
   const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());
   const [activeTab, setActiveTab] = useState<
@@ -489,8 +506,11 @@ STEP 2: RETURNING STATION SESSIONS
   // HOSPITAL-WISE PATIENT DETAILS FILTERING & REASSIGNMENT
   // =========================================================================
 
+  const effectivePatients = localPatients && localPatients.length > 0 ? localPatients : (patients || []);
+  const effectiveCases = localCases && localCases.length > 0 ? localCases : (cases || []);
+
   const hospitalFilteredPatients = useMemo(() => {
-    return (patients || []).filter((p) => {
+    return effectivePatients.filter((p) => {
       const matchHospital =
         selectedHospitalFilter === 'ALL' ||
         (p.hospitalId ? p.hospitalId === selectedHospitalFilter : selectedHospitalFilter === activeHospital.id);
@@ -504,7 +524,7 @@ STEP 2: RETURNING STATION SESSIONS
         (p.hospitalName || '').toLowerCase().includes(q)
       );
     });
-  }, [patients, selectedHospitalFilter, patientFilterSearch, activeHospital.id]);
+  }, [effectivePatients, selectedHospitalFilter, patientFilterSearch, activeHospital.id]);
 
   const handleConfirmReassignHospital = async () => {
     if (!reassigningPatient) return;
@@ -513,6 +533,98 @@ STEP 2: RETURNING STATION SESSIONS
     setSaveSuccess(`✓ Patient ${reassigningPatient.name} reassigned to ${targetHosp.name}`);
     setReassigningPatient(null);
     setTimeout(() => setSaveSuccess(null), 3000);
+  };
+
+  const handleSyncCloudReports = async () => {
+    setIsSyncingCloud(true);
+    setSyncStatusMessage(null);
+    try {
+      const res = await dbService.syncAllPendingCases();
+      const updatedPatients = await dbService.getAllPatients();
+      const updatedCases = await dbService.getAllCases();
+      if (updatedPatients && updatedPatients.length > 0) {
+        setLocalPatients(updatedPatients);
+      }
+      if (updatedCases && updatedCases.length > 0) {
+        setLocalCases(updatedCases);
+      }
+      onRefreshData?.();
+      setSyncStatusMessage({
+        type: 'success',
+        text: `✓ Cloud Sync Complete: Synced ${res.syncedCount} cases. Central database up to date (${(updatedCases || []).length} total exams).`,
+      });
+    } catch (err) {
+      setSyncStatusMessage({
+        type: 'error',
+        text: `Sync Error: ${(err as Error).message || 'Unable to connect to central server.'}`,
+      });
+    } finally {
+      setIsSyncingCloud(false);
+      setTimeout(() => setSyncStatusMessage(null), 6000);
+    }
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    setSyncStatusMessage(null);
+    try {
+      const text = await file.text();
+      const success = await dbService.importDatabaseBackup(text);
+      if (success) {
+        const updatedPatients = await dbService.getAllPatients();
+        const updatedCases = await dbService.getAllCases();
+        if (updatedPatients) setLocalPatients(updatedPatients);
+        if (updatedCases) setLocalCases(updatedCases);
+        onRefreshData?.();
+        setSyncStatusMessage({
+          type: 'success',
+          text: `✓ Remote data successfully imported! (${(updatedPatients || []).length} Patients, ${(updatedCases || []).length} Exams).`,
+        });
+      } else {
+        setSyncStatusMessage({
+          type: 'error',
+          text: 'Invalid file format. Please upload a valid PodoPress clinical backup JSON file.',
+        });
+      }
+    } catch (err) {
+      setSyncStatusMessage({
+        type: 'error',
+        text: `Import failed: ${(err as Error).message}`,
+      });
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
+      setTimeout(() => setSyncStatusMessage(null), 6000);
+    }
+  };
+
+  const handleExportCentralRepository = async () => {
+    try {
+      const jsonBackup = await dbService.exportDatabaseBackup();
+      const blob = new Blob([jsonBackup], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `podopress_central_database_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSyncStatusMessage({
+        type: 'success',
+        text: '✓ Central hospital database backup downloaded successfully.',
+      });
+      setTimeout(() => setSyncStatusMessage(null), 4000);
+    } catch (err) {
+      setSyncStatusMessage({
+        type: 'error',
+        text: `Export failed: ${(err as Error).message}`,
+      });
+      setTimeout(() => setSyncStatusMessage(null), 5000);
+    }
   };
 
   // =========================================================================
@@ -1050,6 +1162,23 @@ STEP 2: RETURNING STATION SESSIONS
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          className="podoload-btn-primary"
+                          onClick={() => setShowAddTech(true)}
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.35rem 0.65rem',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                          }}
+                          title="Create another technician login for Android, iOS, or Windows"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Add Technician</span>
+                        </button>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1474,6 +1603,39 @@ STEP 2: RETURNING STATION SESSIONS
                 </div>
               )}
 
+              {/* Technicians Table Header Bar with Add Button */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: '0.6rem',
+                  marginBottom: '0.35rem',
+                  flexWrap: 'wrap',
+                  gap: '0.4rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f766e' }}>
+                    REGISTERED TECHNICIANS ({techniciansList.length})
+                  </span>
+                  <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>
+                    Support for multiple technicians across hospitals &amp; clinics
+                  </span>
+                </div>
+                {!showAddTech && (
+                  <button
+                    type="button"
+                    className="podoload-btn-primary podoload-btn-sm"
+                    onClick={() => setShowAddTech(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem' }}
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add New Technician</span>
+                  </button>
+                )}
+              </div>
+
               {/* Technicians Table */}
               <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
                 <thead>
@@ -1624,10 +1786,10 @@ STEP 2: RETURNING STATION SESSIONS
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
                   <h4 className="podoload-card-title" style={{ margin: 0 }}>
-                    HOSPITAL-WISE PATIENT & MEDICAL REPORT REPOSITORY
+                    HOSPITAL-WISE PATIENT &amp; MEDICAL REPORT REPOSITORY
                   </h4>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.68rem', color: '#64748b' }}>
-                    Structured multi-facility patient database ready for centralized hospital cloud management.
+                    Structured multi-facility patient database with centralized cloud synchronization and remote technician data ingestion.
                   </p>
                 </div>
 
@@ -1640,9 +1802,9 @@ STEP 2: RETURNING STATION SESSIONS
                     value={selectedHospitalFilter}
                     onChange={(e) => setSelectedHospitalFilter(e.target.value)}
                   >
-                    <option value="ALL">All Hospitals & Facilities ({patients.length} Patients)</option>
+                    <option value="ALL">All Hospitals &amp; Facilities ({effectivePatients.length} Patients)</option>
                     {hospitals.map((h) => {
-                      const count = patients.filter((p) => (p.hospitalId ? p.hospitalId === h.id : h.id === activeHospital.id)).length;
+                      const count = effectivePatients.filter((p) => (p.hospitalId ? p.hospitalId === h.id : h.id === activeHospital.id)).length;
                       return (
                         <option key={h.id} value={h.id}>
                           {h.name} ({count} Patients)
@@ -1650,6 +1812,129 @@ STEP 2: RETURNING STATION SESSIONS
                       );
                     })}
                   </select>
+                </div>
+              </div>
+
+              {/* REMOTE TECHNICIAN DATA INGESTION & CLOUD SYNCHRONIZATION BAR */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 100%)',
+                  border: '1.5px solid #99f6e4',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                  boxShadow: '0 2px 6px rgba(13, 148, 136, 0.05)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: '#0d9488',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff',
+                      }}
+                    >
+                      <Cloud className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span>Remote Technician Data Ingestion &amp; Central Cloud Synchronization</span>
+                        <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
+                          Cross-Device Sync
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.66rem', color: '#64748b' }}>
+                        Pull examinations from remote Android, iOS &amp; Windows technician apps, or ingest offline clinic packages (.json / USB).
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                      🟢 Cloud API: Ready
+                    </span>
+                    <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>
+                      📁 {effectivePatients.length} Patients
+                    </span>
+                    <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>
+                      📊 {effectiveCases.length} Total Exams
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions Row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    {/* Button 1: Cloud Sync */}
+                    <button
+                      type="button"
+                      className="podoload-btn-primary podoload-btn-sm"
+                      onClick={handleSyncCloudReports}
+                      disabled={isSyncingCloud}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem' }}
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingCloud ? 'Syncing Cloud...' : '🔄 Sync Remote Cloud Cases'}</span>
+                    </button>
+
+                    {/* Button 2: Import Remote Data (.json / USB / WhatsApp) */}
+                    <label
+                      className="podoload-btn-secondary podoload-btn-sm"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.72rem',
+                        cursor: isImporting ? 'not-allowed' : 'pointer',
+                        margin: 0,
+                      }}
+                    >
+                      <Upload className="w-3.5 h-3.5 text-teal-600" />
+                      <span>{isImporting ? 'Importing Data...' : '📥 Import Remote Data (.json / USB)'}</span>
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        style={{ display: 'none' }}
+                        onChange={handleFileImport}
+                        disabled={isImporting}
+                      />
+                    </label>
+
+                    {/* Button 3: Export Central Backup */}
+                    <button
+                      type="button"
+                      className="podoload-btn-secondary podoload-btn-sm"
+                      onClick={handleExportCentralRepository}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem' }}
+                    >
+                      <Download className="w-3.5 h-3.5 text-teal-600" />
+                      <span>📤 Export Central Backup</span>
+                    </button>
+                  </div>
+
+                  {syncStatusMessage && (
+                    <div
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        color: syncStatusMessage.type === 'error' ? '#b91c1c' : '#0f766e',
+                        backgroundColor: syncStatusMessage.type === 'error' ? '#fef2f2' : '#f0fdfa',
+                        padding: '0.25rem 0.55rem',
+                        borderRadius: '4px',
+                        border: `1px solid ${syncStatusMessage.type === 'error' ? '#fca5a5' : '#99f6e4'}`,
+                      }}
+                    >
+                      {syncStatusMessage.text}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1669,7 +1954,7 @@ STEP 2: RETURNING STATION SESSIONS
                       Patients: <strong>{hospitalFilteredPatients.length}</strong>
                     </div>
                     <div>
-                      Reports: <strong>{cases.filter((c) => (c.hospitalId ? c.hospitalId === currentViewedHospital.id : true)).length}</strong>
+                      Reports: <strong>{effectiveCases.filter((c) => (c.hospitalId ? c.hospitalId === currentViewedHospital.id : true)).length}</strong>
                     </div>
                     <div>
                       Technicians: <strong>{techniciansList.filter((t) => t.hospitalId === currentViewedHospital.id).length}</strong>
@@ -1692,7 +1977,7 @@ STEP 2: RETURNING STATION SESSIONS
                   />
                 </div>
                 <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                  Showing {hospitalFilteredPatients.length} of {patients.length} patients
+                  Showing {hospitalFilteredPatients.length} of {effectivePatients.length} patients
                 </span>
               </div>
 
@@ -1711,7 +1996,7 @@ STEP 2: RETURNING STATION SESSIONS
                 <tbody>
                   {hospitalFilteredPatients.length > 0 ? (
                     hospitalFilteredPatients.map((p) => {
-                      const patientExams = cases.filter((c) => c.patientId === p.id);
+                      const patientExams = effectiveCases.filter((c) => c.patientId === p.id);
                       const latestExam = patientExams[0];
                       const currentPatientHosp =
                         hospitals.find((h) => h.id === p.hospitalId) || activeHospital;

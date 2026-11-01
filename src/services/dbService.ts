@@ -1181,7 +1181,8 @@ class PodoPressDatabase {
    * e.g. "TMH-TECH-4821"
    */
   public generateActivationCode(hospitalPrefix: string = 'TMH'): string {
-    const cleanPrefix = hospitalPrefix.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
+    const raw = hospitalPrefix.includes('-') ? hospitalPrefix.split('-')[0] : hospitalPrefix;
+    const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
     const randNum = Math.floor(1000 + Math.random() * 9000);
     return `${cleanPrefix}-TECH-${randNum}`;
   }
