@@ -84,6 +84,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
 }) => {
   const isMobileDevice =
     Capacitor.isNativePlatform() ||
+    (typeof window !== 'undefined' && window.innerWidth <= 768) ||
     (typeof navigator !== 'undefined' &&
       (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
@@ -737,12 +738,20 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && viewfinderActive && step === 1) {
+    if (isOpen && (viewfinderActive || isMobileDevice) && step === 1) {
       startCameraStream();
     } else {
       stopCameraStream();
     }
-  }, [isOpen, startCameraStream, stopCameraStream, step, viewfinderActive]);
+  }, [isOpen, startCameraStream, stopCameraStream, step, viewfinderActive, isMobileDevice]);
+
+  // Ensure mounted video element immediately attaches active camera stream
+  useEffect(() => {
+    if (videoRef.current && streamRef.current && videoRef.current.srcObject !== streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  });
 
   if (!isOpen) return null;
 
@@ -1314,6 +1323,14 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
           playsInline
           autoPlay
           muted
+          onLoadedMetadata={async (e) => {
+            try {
+              await (e.target as HTMLVideoElement).play();
+              setIsCameraActive(true);
+            } catch (err) {
+              console.warn('Mobile video onLoadedMetadata play non-fatal:', err);
+            }
+          }}
           className="absolute inset-0 w-full h-full object-cover z-0"
         />
 
