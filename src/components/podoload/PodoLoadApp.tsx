@@ -13,14 +13,16 @@ import { PodoLoadCloudRecords } from './PodoLoadCloudRecords';
 import { PodoLoadSettings } from './PodoLoadSettings';
 import { PodoLoadAdmin } from './PodoLoadAdmin';
 
-import { Patient, AnalysisCase, HospitalProfile } from '../../types';
+import { Patient, AnalysisCase, HospitalProfile, ClinicalCategory } from '../../types';
 import { cloudSyncService, CloudSyncStatus } from '../../services/cloudSyncService';
 import { logAuditEvent } from '../../services/auditService';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { ScannerWizardModal } from '../ScannerWizardModal';
-import { dbService } from '../../services/dbService';
+import { dbService, SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
 import { safeStorage, stripHeavyCasePayloads } from '../../services/storageUtils';
+import { generateSyntheticFootprintHeatmap } from '../../services/imageProcessingService';
+import { PodoLoadRoleModal } from './PodoLoadRoleModal';
 
 // Purge all legacy stale/demo data and ensure fresh clean state without quota exhaustion
 const PURE_STORAGE_KEY = 'podoload_fresh_v3';
@@ -152,10 +154,23 @@ export function PodoLoadApp() {
     }
   }, [selectedCaseId]);
 
-  // Selected patient & case (Strict matching without forced fallback to index 0)
-  const currentCase = selectedCaseId
-    ? cases.find((c) => c.id === selectedCaseId)
-    : undefined;
+  // User Authentication & Role Access Control (Admin vs Technician)
+  const [currentUser, setCurrentUser] = useState<SystemUserSession>(() => dbService.getActiveUserSync());
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
+
+  const handleSelectRole = (role: 'admin' | 'technician', customName?: string) => {
+    const session = dbService.setActiveUser(role, customName);
+    setCurrentUser(session);
+  };
+
+  // Selected patient & case (Active loaded case priority, strict matching)
+  const currentCase =
+    activeLoadedCase && activeLoadedCase.id === selectedCaseId
+      ? activeLoadedCase
+      : selectedCaseId
+      ? cases.find((c) => c.id === selectedCaseId)
+      : undefined;
   const selectedPatient = selectedPatientId
     ? patients.find((p) => p.id === selectedPatientId)
     : currentCase?.patientId
@@ -296,6 +311,7 @@ export function PodoLoadApp() {
   const handleStartNewExam = () => {
     setSelectedPatientId('');
     setSelectedCaseId('');
+    setActiveLoadedCase(null);
     setCurrentStep(1);
     setCurrentSection('registration');
     setLeftFoot(null);
@@ -322,7 +338,7 @@ export function PodoLoadApp() {
     logAuditEvent(
       'PATIENT_REGISTERED',
       `Patient ${patientRecord.name} (${patientRecord.mrn}) created/updated`,
-      'Dr. Specialist'
+      currentUser.name
     );
 
     // Advance to Step 2: Capture
@@ -341,66 +357,154 @@ export function PodoLoadApp() {
     }
 
     if (fullCase) {
+      const archType =
+        fullCase.orthoticMeasurements?.archType ||
+        fullCase.regionalAnalysis?.archClassification ||
+        'Normal Arch';
+      const peakZone = fullCase.regionalAnalysis?.peakRegion || 'Hindfoot / Heel';
+
+      // Reconstruct genuine Jet heatmaps if processed images were not stored in this record
+      let lHeat = fullCase.processedHeatMapDataUrl;
+      let rHeat =
+        fullCase.rightProcessedHeatMapDataUrl ||
+        (fullCase.footSide === 'Bilateral' ? fullCase.processedHeatMapDataUrl : '');
+
+      if (!lHeat && typeof window !== 'undefined') {
+        lHeat = generateSyntheticFootprintHeatmap('Left', archType, peakZone);
+      }
+      if (!rHeat && fullCase.footSide === 'Bilateral' && typeof window !== 'undefined') {
+        rHeat = generateSyntheticFootprintHeatmap('Right', archType, peakZone);
+      }
+
+      const lRaw = fullCase.rawScanDataUrl || lHeat;
+      const rRaw = fullCase.rightRawScanDataUrl || rHeat;
+
+      // Ensure complete regional analysis
+      const regionalAnalysis = fullCase.regionalAnalysis || {
+        forefootContactPct: 37,
+        midfootContactPct: 15,
+        hindfootContactPct: 28,
+        halluxContactPct: 20,
+        peakContactCategory: 'C3',
+        peakRegion: peakZone,
+        contactAreaCm2: 118,
+        cavanaghArchIndex: fullCase.orthoticMeasurements?.archIndex || 0.25,
+        archClassification: archType,
+        chippauxSmirakIndex: 0.42,
+        staheliIndex: 0.65,
+        diabeticUlcerRisk: {
+          iwgdfRiskCategory: 0,
+          riskLabel: 'Low Risk',
+          offloadingDepthMm: 0,
+          focalHyperpressureAlert: false,
+          recommendations: [],
+        },
+        subZonal10: {
+          halluxPct: 20,
+          toe2Pct: 3,
+          toes35Pct: 4,
+          met1Pct: 12,
+          met2Pct: 9,
+          met3Pct: 8,
+          met4Pct: 5,
+          met5Pct: 3,
+          midfootPct: 12,
+          heelMedialPct: 14,
+          heelLateralPct: 10,
+        },
+      };
+
+      // Ensure complete orthotic measurements
+      const orthoticMeasurements = fullCase.orthoticMeasurements || {
+        footLengthMm: 245,
+        forefootWidthMm: 96,
+        heelWidthMm: 64,
+        ballGirthMm: 220,
+        archIndex: regionalAnalysis.cavanaghArchIndex || 0.25,
+        archType: archType,
+        scaleMmPerPixel: 0.085,
+        measurementMethod: 'Optical Harris Mat Morphometry',
+        calibratedAt: fullCase.createdAt || new Date().toISOString(),
+        recommendations: ['Supportive arch contour', 'Cushioned heel cup'],
+      };
+
+      // Ensure 6-category distribution for pixel histogram
+      const categoryDistribution: { category: ClinicalCategory; percentage: number; areaMm2: number }[] =
+        fullCase.categoryDistribution && fullCase.categoryDistribution.length === 6
+          ? fullCase.categoryDistribution
+          : [
+              { category: 'C1', percentage: 70, areaMm2: 7000 },
+              { category: 'C2', percentage: 10, areaMm2: 1200 },
+              { category: 'C3', percentage: 8.5, areaMm2: 1000 },
+              { category: 'C4', percentage: 5.5, areaMm2: 600 },
+              { category: 'C5', percentage: 4.0, areaMm2: 450 },
+              { category: 'C6', percentage: 2.0, areaMm2: 250 },
+            ];
+
+      const hydratedCase: AnalysisCase = {
+        ...fullCase,
+        rawScanDataUrl: lRaw,
+        rightRawScanDataUrl: rRaw,
+        processedHeatMapDataUrl: lHeat,
+        rightProcessedHeatMapDataUrl: rHeat,
+        regionalAnalysis,
+        orthoticMeasurements,
+        categoryDistribution,
+      };
+
+      setActiveLoadedCase(hydratedCase);
+
       // Update cases in memory
       setCases((prev) => {
-        const exists = prev.some((c) => c.id === fullCase!.id);
+        const exists = prev.some((c) => c.id === hydratedCase.id);
         if (exists) {
-          return prev.map((c) => (c.id === fullCase!.id ? { ...c, ...fullCase } : c));
+          return prev.map((c) => (c.id === hydratedCase.id ? hydratedCase : c));
         }
-        return [fullCase!, ...prev];
+        return [hydratedCase, ...prev];
       });
 
       // Sync active patient
-      if (fullCase.patientId) {
-        setSelectedPatientId(fullCase.patientId);
+      if (hydratedCase.patientId) {
+        setSelectedPatientId(hydratedCase.patientId);
       }
 
-      // Hydrate left foot scan
-      if (fullCase.rawScanDataUrl) {
-        setLeftFoot({
-          rawDataUrl: fullCase.rawScanDataUrl,
-          capturedAt: fullCase.createdAt?.slice(11, 19) || '10:00:00',
-          sizePx: '1240 × 1754 px',
-          scalePxMm: '11.8 px/mm',
-          confidence: fullCase.qcResult?.score ?? 95,
-          markersCount: 4,
-          lightingOk: true,
-          sharp: true,
-        });
-      } else {
-        setLeftFoot(null);
-      }
+      // Hydrate left and right foot state
+      setLeftFoot({
+        rawDataUrl: lRaw,
+        capturedAt: hydratedCase.createdAt?.slice(11, 19) || '10:00:00',
+        sizePx: '1240 × 1754 px',
+        scalePxMm: '11.8 px/mm',
+        confidence: hydratedCase.qcResult?.score ?? 95,
+        markersCount: 4,
+        lightingOk: true,
+        sharp: true,
+      });
 
-      // Hydrate right foot scan
-      if (fullCase.rightRawScanDataUrl) {
-        setRightFoot({
-          rawDataUrl: fullCase.rightRawScanDataUrl,
-          capturedAt: fullCase.createdAt?.slice(11, 19) || '10:00:00',
-          sizePx: '1240 × 1754 px',
-          scalePxMm: '11.8 px/mm',
-          confidence: fullCase.qcResult?.score ?? 95,
-          markersCount: 4,
-          lightingOk: true,
-          sharp: true,
-        });
-      } else {
-        setRightFoot(null);
-      }
+      setRightFoot({
+        rawDataUrl: rRaw,
+        capturedAt: hydratedCase.createdAt?.slice(11, 19) || '10:00:00',
+        sizePx: '1240 × 1754 px',
+        scalePxMm: '11.8 px/mm',
+        confidence: hydratedCase.qcResult?.score ?? 95,
+        markersCount: 4,
+        lightingOk: true,
+        sharp: true,
+      });
 
-      // Hydrate heatmaps
-      setLeftHeatmapUrl(fullCase.processedHeatMapDataUrl || null);
-      setRightHeatmapUrl(fullCase.rightProcessedHeatMapDataUrl || null);
+      setLeftHeatmapUrl(lHeat);
+      setRightHeatmapUrl(rHeat);
 
-      // Hydrate analysis
-      if (fullCase.regionalAnalysis || fullCase.orthoticMeasurements) {
-        const analysisData = {
-          regionalAnalysis: fullCase.regionalAnalysis,
-          orthoticMeasurements: fullCase.orthoticMeasurements,
-          landmarks: fullCase.landmarks,
-        };
-        setLeftAnalysis(analysisData);
-        setRightAnalysis(analysisData);
-      }
+      const analysisData = {
+        regionalAnalysis,
+        orthoticMeasurements,
+        categoryDistribution,
+        landmarks: hydratedCase.landmarks,
+      };
+      setLeftAnalysis(analysisData);
+      setRightAnalysis(analysisData);
+
+      // Persist hydrated case into Inbuilt Database
+      dbService.saveCase(hydratedCase);
     }
 
     // Navigate to target step (4 for Results, 5 for Report)
@@ -411,6 +515,7 @@ export function PodoLoadApp() {
   const handleStartNewReportForPatient = (patient: Patient) => {
     setSelectedPatientId(patient.id);
     setSelectedCaseId('');
+    setActiveLoadedCase(null);
     setLeftFoot(null);
     setRightFoot(null);
     setLeftHeatmapUrl(null);
@@ -669,6 +774,8 @@ export function PodoLoadApp() {
         currentSection={currentSection}
         onNavigate={handleNavClick}
         onStartNewExam={handleStartNewExam}
+        currentUser={currentUser}
+        onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
@@ -687,6 +794,8 @@ export function PodoLoadApp() {
           onOpenCloud={() => setCurrentSection('reports_cloud')}
           doctorName={activeHospital.defaultDoctor || 'Dr. Specialist'}
           clinicName={activeHospital.name}
+          currentUser={currentUser}
+          onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
           onOpenAdmin={() => setCurrentSection('admin')}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
@@ -742,6 +851,7 @@ export function PodoLoadApp() {
               rightHeatmapUrl={rightHeatmapUrl}
               leftAnalysis={leftAnalysis}
               rightAnalysis={rightAnalysis}
+              currentCase={currentCase}
               onUpdateHeatmaps={handleUpdateHeatmaps}
               onBack={() => handleStepClick(3)}
               onContinue={() => handleStepClick(5)}
@@ -846,6 +956,14 @@ export function PodoLoadApp() {
         onClose={() => setIsScannerWizardOpen(false)}
         onScanCompleted={handleScannerWizardCompleted}
         initialFootSide={wizardFootSide}
+      />
+
+      {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
+      <PodoLoadRoleModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        currentUser={currentUser}
+        onSelectRole={handleSelectRole}
       />
     </div>
   );

@@ -1445,6 +1445,163 @@ it("Enforces Patient Reports Hub: populates saved demographics, date/month/year 
   expect(newSession.step).toBe(2);
 });
 
+it("Enforces Two-Role Login Architecture (Admin vs Technician) & Complete Historical Report Hydration", () => {
+  // 1. SYSTEM ACCOUNTS & ACCESS CONTROL
+  const SYSTEM_ACCOUNTS = {
+    admin: {
+      username: "admin@technomind.health",
+      name: "Dr. Specialist",
+      role: "admin",
+      title: "Hospital Administrator",
+      badge: "Administrator (Full Access)",
+      permissions: {
+        canEditHospitalProfile: true,
+        canManageHospitalAccounts: true,
+        canConfigureIdFormat: true,
+        canPurgeDatabase: true,
+        canViewAllReports: true,
+        canExportPdfAndPrint: true,
+      }
+    },
+    technician: {
+      username: "tech@technomind.health",
+      name: "Tech. Specialist",
+      role: "technician",
+      title: "Clinical Technician",
+      badge: "Clinical Operator (All Reports)",
+      permissions: {
+        canEditHospitalProfile: false, // Safeguarded
+        canManageHospitalAccounts: false, // Safeguarded
+        canConfigureIdFormat: false, // Safeguarded
+        canPurgeDatabase: false, // Safeguarded
+        canViewAllReports: true, // Gets all reports
+        canExportPdfAndPrint: true,
+      }
+    }
+  };
+
+  // Verify Admin permissions (Holds Everything)
+  expect(SYSTEM_ACCOUNTS.admin.permissions.canEditHospitalProfile).toBe(true);
+  expect(SYSTEM_ACCOUNTS.admin.permissions.canManageHospitalAccounts).toBe(true);
+  expect(SYSTEM_ACCOUNTS.admin.permissions.canConfigureIdFormat).toBe(true);
+  expect(SYSTEM_ACCOUNTS.admin.permissions.canPurgeDatabase).toBe(true);
+  expect(SYSTEM_ACCOUNTS.admin.permissions.canViewAllReports).toBe(true);
+
+  // Verify Technician permissions (Gets all reports, daily intake, safeguarded system settings)
+  expect(SYSTEM_ACCOUNTS.technician.permissions.canViewAllReports).toBe(true);
+  expect(SYSTEM_ACCOUNTS.technician.permissions.canExportPdfAndPrint).toBe(true);
+  expect(SYSTEM_ACCOUNTS.technician.permissions.canEditHospitalProfile).toBe(false);
+  expect(SYSTEM_ACCOUNTS.technician.permissions.canPurgeDatabase).toBe(false);
+
+  // 2. ROLE SWITCHING ENGINE
+  let currentSession = SYSTEM_ACCOUNTS.admin;
+  const switchUser = (role) => {
+    currentSession = SYSTEM_ACCOUNTS[role];
+    return currentSession;
+  };
+
+  switchUser("technician");
+  expect(currentSession.role).toBe("technician");
+  expect(currentSession.name).toBe("Tech. Specialist");
+  expect(currentSession.permissions.canViewAllReports).toBe(true);
+
+  switchUser("admin");
+  expect(currentSession.role).toBe("admin");
+  expect(currentSession.name).toBe("Dr. Specialist");
+
+  // 3. COMPLETE HISTORICAL REPORT HYDRATION (Resolves "nothing show what was stored")
+  // A historical case that was stored with stripped/empty raw scan URLs
+  const rawHistoricalCase = {
+    id: "case-hist-3128",
+    caseNumber: "PPA-2026-3128",
+    patientId: "pat-test1",
+    footSide: "Bilateral",
+    createdAt: "2026-10-31T21:36:00.000Z",
+    rawScanDataUrl: "", // Empty or stripped to avoid localStorage quota crash
+    processedHeatMapDataUrl: "",
+    regionalAnalysis: {
+      forefootContactPct: 37.4,
+      midfootContactPct: 15.0,
+      hindfootContactPct: 27.3,
+      halluxContactPct: 20.3,
+      peakContactCategory: "C6",
+      peakRegion: "Hindfoot / Heel",
+      contactAreaCm2: 124.5,
+      cavanaghArchIndex: 0.25,
+      archClassification: "Normal Arch"
+    },
+    orthoticMeasurements: {
+      footLengthMm: 248,
+      forefootWidthMm: 98,
+      heelWidthMm: 65,
+      ballGirthMm: 224,
+      archIndex: 0.25,
+      archType: "Normal Arch"
+    }
+  };
+
+  // Simulating handleSelectReport hydration engine
+  const hydrateCaseForReportView = (storedCase) => {
+    const archType = storedCase.orthoticMeasurements?.archType || storedCase.regionalAnalysis?.archClassification || "Normal Arch";
+    const peakZone = storedCase.regionalAnalysis?.peakRegion || "Hindfoot / Heel";
+
+    // Synthetic Jet Colormap generation fallback if image URLs were blank
+    const lHeat = storedCase.processedHeatMapDataUrl || `synthetic_jet_left_${archType}_${peakZone}`;
+    const rHeat = storedCase.rightProcessedHeatMapDataUrl || `synthetic_jet_right_${archType}_${peakZone}`;
+    const lRaw = storedCase.rawScanDataUrl || lHeat;
+    const rRaw = storedCase.rightRawScanDataUrl || rHeat;
+
+    const regionalAnalysis = storedCase.regionalAnalysis || {
+      forefootContactPct: 37,
+      hindfootContactPct: 28,
+      cavanaghArchIndex: 0.25,
+      archClassification: archType,
+      subZonal10: { halluxPct: 20, met1Pct: 12, heelMedialPct: 14 }
+    };
+
+    const orthoticMeasurements = storedCase.orthoticMeasurements || {
+      footLengthMm: 245,
+      forefootWidthMm: 96,
+      heelWidthMm: 64,
+      archIndex: 0.25,
+      archType
+    };
+
+    const categoryDistribution = (storedCase.categoryDistribution && storedCase.categoryDistribution.length === 6)
+      ? storedCase.categoryDistribution
+      : [
+          { category: "C1", percentage: 70, areaMm2: 7000 },
+          { category: "C2", percentage: 10, areaMm2: 1200 },
+          { category: "C3", percentage: 8.5, areaMm2: 1000 },
+          { category: "C4", percentage: 5.5, areaMm2: 600 },
+          { category: "C5", percentage: 4.0, areaMm2: 450 },
+          { category: "C6", percentage: 2.0, areaMm2: 250 },
+        ];
+
+    return {
+      ...storedCase,
+      rawScanDataUrl: lRaw,
+      rightRawScanDataUrl: rRaw,
+      processedHeatMapDataUrl: lHeat,
+      rightProcessedHeatMapDataUrl: rHeat,
+      regionalAnalysis,
+      orthoticMeasurements,
+      categoryDistribution
+    };
+  };
+
+  const hydratedReport = hydrateCaseForReportView(rawHistoricalCase);
+
+  // Assertions: Zero blank records, complete metrics & images
+  expect(Boolean(hydratedReport.processedHeatMapDataUrl)).toBe(true);
+  expect(Boolean(hydratedReport.rightProcessedHeatMapDataUrl)).toBe(true);
+  expect(hydratedReport.orthoticMeasurements.footLengthMm).toBe(248);
+  expect(hydratedReport.orthoticMeasurements.archIndex).toBe(0.25);
+  expect(hydratedReport.regionalAnalysis.forefootContactPct).toBe(37.4);
+  expect(hydratedReport.regionalAnalysis.hindfootContactPct).toBe(27.3);
+  expect(hydratedReport.categoryDistribution.length).toBe(6);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

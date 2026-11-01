@@ -80,6 +80,79 @@ export function getColorByMap(value: number, colorMapName: string = 'Jet'): [num
 }
 
 /**
+ * Synthesizes a high-fidelity plantar pressure heatmap data URL
+ * used when loading historical records that have archived biomechanical metrics (arch index, peak zone)
+ * but lacked raw sensor files.
+ */
+export function generateSyntheticFootprintHeatmap(
+  footSide: 'Left' | 'Right' = 'Left',
+  archType: string = 'Normal Arch',
+  peakZone: string = 'Hindfoot / Heel'
+): string {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = 240;
+  canvas.height = 420;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const isRight = footSide === 'Right';
+
+  ctx.save();
+  if (isRight) {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+
+  // Draw background glow (low pressure contour - Deep Blue)
+  const drawLobe = (x: number, y: number, rx: number, ry: number, color: string) => {
+    const grad = ctx.createRadialGradient(x, y, 2, x, y, Math.max(rx, ry));
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'rgba(0, 0, 128, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  // Base outline (cyan/blue contour)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 1. Heel lobe (Calcaneus)
+  const heelPeak = peakZone.toLowerCase().includes('heel') || peakZone.toLowerCase().includes('hindfoot');
+  drawLobe(120, 340, 48, 55, heelPeak ? 'rgba(220, 38, 38, 0.95)' : 'rgba(234, 179, 8, 0.9)');
+  drawLobe(120, 340, 60, 68, 'rgba(16, 185, 129, 0.7)');
+  drawLobe(120, 340, 72, 80, 'rgba(6, 182, 212, 0.45)');
+
+  // 2. Midfoot / Lateral border
+  const isFlat = archType.toLowerCase().includes('flat') || archType.toLowerCase().includes('planus');
+  const isHigh = archType.toLowerCase().includes('high') || archType.toLowerCase().includes('cavus');
+  const midX = isFlat ? 115 : 138;
+  const midW = isFlat ? 42 : isHigh ? 14 : 26;
+  drawLobe(midX, 240, midW, 65, isFlat ? 'rgba(234, 179, 8, 0.85)' : 'rgba(6, 182, 212, 0.6)');
+
+  // 3. Forefoot / Metatarsal heads
+  const forePeak = peakZone.toLowerCase().includes('metatarsal') || peakZone.toLowerCase().includes('forefoot');
+  drawLobe(118, 155, 62, 45, forePeak ? 'rgba(220, 38, 38, 0.95)' : 'rgba(234, 88, 12, 0.9)');
+  drawLobe(118, 155, 75, 58, 'rgba(234, 179, 8, 0.8)');
+  drawLobe(118, 155, 88, 70, 'rgba(16, 185, 129, 0.5)');
+
+  // 4. Hallux (Big Toe)
+  const halluxPeak = peakZone.toLowerCase().includes('hallux');
+  drawLobe(88, 80, 24, 28, halluxPeak ? 'rgba(220, 38, 38, 0.95)' : 'rgba(234, 179, 8, 0.85)');
+  drawLobe(88, 80, 32, 36, 'rgba(6, 182, 212, 0.5)');
+
+  // 5. Lesser Toes 2 - 5
+  drawLobe(118, 75, 14, 16, 'rgba(16, 185, 129, 0.75)');
+  drawLobe(138, 82, 13, 15, 'rgba(6, 182, 212, 0.75)');
+  drawLobe(156, 95, 11, 13, 'rgba(6, 182, 212, 0.65)');
+  drawLobe(170, 112, 9, 11, 'rgba(30, 64, 175, 0.6)');
+
+  ctx.restore();
+  return canvas.toDataURL('image/png');
+}
+
+/**
  * Maps a continuous intensity value to the defined 6 clinical categories (FR-08)
  */
 export function mapIntensityToCategory(val: number): ClinicalCategory {

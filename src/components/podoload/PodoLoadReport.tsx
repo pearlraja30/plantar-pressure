@@ -3,6 +3,7 @@ import { Patient, AnalysisCase } from '../../types';
 import { generateBilateralClubbedReportPdf } from '../../services/reportPdfService';
 import { FootCaptureData } from './PodoLoadCapture';
 import { dbService } from '../../services/dbService';
+import { generateSyntheticFootprintHeatmap } from '../../services/imageProcessingService';
 import { Download, Printer, Share2, FolderArchive, Sliders, Building2 } from 'lucide-react';
 
 interface PodoLoadReportProps {
@@ -178,19 +179,37 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
 
-  // Synchronize auto-generated comments if data updates and user has not overwritten with custom text
+  // Synchronize auto-generated comments and signatories if currentCase updates
   useEffect(() => {
-    if (!comments || comments === 'Plantar screening completed. Bilateral symmetric loading with normal arch alignment.') {
+    if (currentCase) {
+      if (currentCase.clinicName) setClinicName(currentCase.clinicName);
+      if (currentCase.operatorName) setTechnicianName(currentCase.operatorName);
+      if (currentCase.signOff?.physicianName) setDoctorName(currentCase.signOff.physicianName);
+      if (currentCase.signOff?.comments) {
+        setComments(deduplicateSentences(currentCase.signOff.comments));
+      } else {
+        setComments(generateAutoDoctorComments(leftAnalysis, rightAnalysis, leftFoot, rightFoot, currentCase));
+      }
+    } else {
       setComments(initialAutoComments);
     }
-  }, [initialAutoComments]);
+  }, [currentCase?.id, initialAutoComments]);
 
   // Imaging View Mode: Heatmap | Scanned Imprint | Dual
   const [reportViewMode, setReportViewMode] = useState<'heatmap' | 'raw' | 'dual'>('heatmap');
 
-  // Resolve left and right images with comprehensive fallbacks
-  const leftHeatmap = leftHeatmapUrl || currentCase?.processedHeatMapDataUrl || null;
-  const leftRawScan = leftFoot?.rawDataUrl || currentCase?.rawScanDataUrl || null;
+  // Resolve left and right images with comprehensive fallbacks (and synthetic Jet reconstruction if missing)
+  const leftHeatmap =
+    leftHeatmapUrl ||
+    currentCase?.processedHeatMapDataUrl ||
+    (currentCase
+      ? generateSyntheticFootprintHeatmap(
+          'Left',
+          currentCase.orthoticMeasurements?.archType || currentCase.regionalAnalysis?.archClassification,
+          currentCase.regionalAnalysis?.peakRegion
+        )
+      : null);
+  const leftRawScan = leftFoot?.rawDataUrl || currentCase?.rawScanDataUrl || leftHeatmap;
   const leftImg = reportViewMode === 'raw'
     ? (leftRawScan || leftHeatmap)
     : (leftHeatmap || leftRawScan);
@@ -199,12 +218,18 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
     rightHeatmapUrl ||
     currentCase?.rightProcessedHeatMapDataUrl ||
     (currentCase?.footSide === 'Right' ? currentCase.processedHeatMapDataUrl : null) ||
-    null;
+    (currentCase && currentCase.footSide !== 'Left'
+      ? generateSyntheticFootprintHeatmap(
+          'Right',
+          currentCase.orthoticMeasurements?.archType || currentCase.regionalAnalysis?.archClassification,
+          currentCase.regionalAnalysis?.peakRegion
+        )
+      : null);
   const rightRawScan =
     rightFoot?.rawDataUrl ||
     currentCase?.rightRawScanDataUrl ||
     (currentCase?.footSide === 'Right' ? currentCase.rawScanDataUrl : null) ||
-    null;
+    rightHeatmap;
   const rightImg = reportViewMode === 'raw'
     ? (rightRawScan || rightHeatmap)
     : (rightHeatmap || rightRawScan);
@@ -671,17 +696,21 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
               <tr>
                 <td>Arch index</td>
                 <td>
-                  {leftAnalysis?.regionalAnalysis?.cavanaghArchIndex
+                  {leftAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
                     ? leftAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
-                    : currentCase?.regionalAnalysis?.cavanaghArchIndex
+                    : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
                     ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    : currentCase?.orthoticMeasurements?.archIndex !== undefined
+                    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
                     : '—'}
                 </td>
                 <td>
-                  {rightAnalysis?.regionalAnalysis?.cavanaghArchIndex
+                  {rightAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
                     ? rightAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
-                    : currentCase?.regionalAnalysis?.cavanaghArchIndex
+                    : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
                     ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+                    : currentCase?.orthoticMeasurements?.archIndex !== undefined
+                    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
                     : '—'}
                 </td>
               </tr>

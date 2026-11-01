@@ -10,8 +10,12 @@ import {
   Sliders,
   Building2,
   X,
+  Lock,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
 
 export type PodoLoadNavSection =
   | 'registration'
@@ -28,6 +32,8 @@ interface PodoLoadSidebarProps {
   currentSection: PodoLoadNavSection;
   onNavigate: (section: PodoLoadNavSection) => void;
   onStartNewExam: () => void;
+  currentUser?: SystemUserSession;
+  onOpenUserSwitcher?: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -36,6 +42,8 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
   currentSection,
   onNavigate,
   onStartNewExam,
+  currentUser = SYSTEM_ACCOUNTS.admin,
+  onOpenUserSwitcher,
   isOpenMobile = false,
   onCloseMobile,
 }) => {
@@ -162,30 +170,80 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
 
         {/* Section 3: ADMINISTRATION & SYSTEM */}
         <div className="podoload-nav-section">
-          <div className="podoload-section-label">ADMIN & SYSTEM</div>
+          <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>ADMIN & SYSTEM</span>
+            {currentUser?.role === 'technician' && (
+              <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <Lock className="w-2.5 h-2.5" /> Admin Only
+              </span>
+            )}
+          </div>
           <nav className="podoload-nav-list">
             <button
               type="button"
               className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
-              onClick={() => handleItemClick('admin')}
+              onClick={() => {
+                if (currentUser?.role === 'technician') {
+                  if (onOpenUserSwitcher) onOpenUserSwitcher();
+                } else {
+                  handleItemClick('admin');
+                }
+              }}
+              title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Hospital profile & clinic accounts'}
             >
               <Building2 className="podoload-nav-item-icon" />
-              <span>Hospital & Admin</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>Hospital & Admin</span>
+              {currentUser?.role === 'technician' && (
+                <Lock className="w-3 h-3 text-amber-400 opacity-80" />
+              )}
             </button>
 
             <button
               type="button"
               className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
-              onClick={() => handleItemClick('settings')}
+              onClick={() => {
+                if (currentUser?.role === 'technician') {
+                  if (onOpenUserSwitcher) onOpenUserSwitcher();
+                } else {
+                  handleItemClick('settings');
+                }
+              }}
+              title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Clinical device settings & system maintenance'}
             >
               <Sliders className="podoload-nav-item-icon" />
-              <span>Settings</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>Settings</span>
+              {currentUser?.role === 'technician' && (
+                <Lock className="w-3 h-3 text-amber-400 opacity-80" />
+              )}
             </button>
           </nav>
         </div>
       </div>
 
-      <div style={{ padding: '0.85rem 1.25rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
+      {/* User Login Profile & Switcher Card */}
+      <div
+        className="podoload-sidebar-user-card"
+        onClick={() => {
+          if (onOpenUserSwitcher) onOpenUserSwitcher();
+          if (onCloseMobile) onCloseMobile();
+        }}
+        title="Click to switch between Hospital Administrator and Clinical Technician"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          {currentUser?.role === 'admin' ? (
+            <ShieldCheck className="w-4 h-4 text-teal-400" />
+          ) : (
+            <UserCheck className="w-4 h-4 text-cyan-400" />
+          )}
+          <span className="podoload-sidebar-user-role">
+            {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
+          </span>
+        </div>
+        <div className="podoload-sidebar-user-name">{currentUser?.name}</div>
+        <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
+      </div>
+
+      <div style={{ padding: '0.45rem 1.25rem 0.75rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
         v1.0.29 · TechFile TF-001
       </div>
     </aside>

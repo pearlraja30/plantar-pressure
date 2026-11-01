@@ -1992,3 +1992,143 @@
   }
 }
 
+/* =========================================================================
+   USER ROLE BADGES & ROLE SWITCHER MODAL
+   ========================================================================= */
+
+.podoload-role-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  padding: 0.22rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.podoload-role-badge.role-admin {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.podoload-role-badge.role-admin:hover {
+  background-color: #fde68a;
+}
+
+.podoload-role-badge.role-tech {
+  background-color: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+.podoload-role-badge.role-tech:hover {
+  background-color: #bae6fd;
+}
+
+.podoload-sidebar-user-card {
+  margin: 0.5rem 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.podoload-sidebar-user-card:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.podoload-sidebar-user-role {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5eead4;
+  letter-spacing: 0.02em;
+}
+
+.podoload-sidebar-user-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+.podoload-sidebar-user-sub {
+  font-size: 0.62rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.podoload-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.podoload-modal-box {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #e2e8f0;
+  animation: podoModalFadeIn 0.2s ease-out;
+}
+
+@keyframes podoModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.podoload-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.75rem;
+}
+
+.podoload-modal-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.podoload-modal-close-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.podoload-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.85rem;
+}
+
+

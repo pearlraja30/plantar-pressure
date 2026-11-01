@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { FootCaptureData } from './PodoLoadCapture';
+import { AnalysisCase } from '../../types';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
 
 interface PodoLoadResultsProps {
@@ -10,6 +11,7 @@ interface PodoLoadResultsProps {
   rightHeatmapUrl: string | null;
   leftAnalysis?: any;
   rightAnalysis?: any;
+  currentCase?: AnalysisCase;
   onUpdateHeatmaps?: (leftUrl: string, rightUrl: string, leftProcessed: any, rightProcessed: any) => void;
   onBack: () => void;
   onContinue: () => void;
@@ -22,6 +24,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   rightHeatmapUrl,
   leftAnalysis,
   rightAnalysis,
+  currentCase,
   onUpdateHeatmaps,
   onBack,
   onContinue,
@@ -80,37 +83,97 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
     }
   }, [leftFoot, rightFoot, leftHeatmapUrl, rightHeatmapUrl, leftAnalysis, rightAnalysis, isProcessing, onUpdateHeatmaps]);
 
-  // Measurements from real clinical scan analysis (or clean dash if foot was not scanned)
-  const lLength = leftAnalysis?.orthoticMeasurements?.footLengthMm ? `${leftAnalysis.orthoticMeasurements.footLengthMm} mm` : '—';
-  const rLength = rightAnalysis?.orthoticMeasurements?.footLengthMm ? `${rightAnalysis.orthoticMeasurements.footLengthMm} mm` : '—';
-  const lWidth = leftAnalysis?.orthoticMeasurements?.forefootWidthMm ? `${leftAnalysis.orthoticMeasurements.forefootWidthMm} mm` : '—';
-  const rWidth = rightAnalysis?.orthoticMeasurements?.forefootWidthMm ? `${rightAnalysis.orthoticMeasurements.forefootWidthMm} mm` : '—';
-  const lHeel = leftAnalysis?.orthoticMeasurements?.heelWidthMm ? `${leftAnalysis.orthoticMeasurements.heelWidthMm} mm` : '—';
-  const rHeel = rightAnalysis?.orthoticMeasurements?.heelWidthMm ? `${rightAnalysis.orthoticMeasurements.heelWidthMm} mm` : '—';
-  const lArch = leftAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined ? leftAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—';
-  const rArch = rightAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined ? rightAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2) : '—';
-  const lArea = leftAnalysis?.regionalAnalysis?.contactAreaCm2 ? `${leftAnalysis.regionalAnalysis.contactAreaCm2} cm²` : '—';
-  const rArea = rightAnalysis?.regionalAnalysis?.contactAreaCm2 ? `${rightAnalysis.regionalAnalysis.contactAreaCm2} cm²` : '—';
+  // Fallback image URLs with currentCase support
+  const effectiveLeftRaw = leftFoot?.rawDataUrl || currentCase?.rawScanDataUrl || '';
+  const effectiveRightRaw = rightFoot?.rawDataUrl || currentCase?.rightRawScanDataUrl || '';
+  const effectiveLeftHeatmap = leftHeatmapUrl || currentCase?.processedHeatMapDataUrl || '';
+  const effectiveRightHeatmap =
+    rightHeatmapUrl ||
+    currentCase?.rightProcessedHeatMapDataUrl ||
+    (currentCase?.footSide === 'Bilateral' ? currentCase.processedHeatMapDataUrl : '') ||
+    '';
+
+  // Measurements from real clinical scan analysis (or currentCase fallback)
+  const lLength = leftAnalysis?.orthoticMeasurements?.footLengthMm
+    ? `${leftAnalysis.orthoticMeasurements.footLengthMm} mm`
+    : currentCase?.orthoticMeasurements?.footLengthMm
+    ? `${currentCase.orthoticMeasurements.footLengthMm} mm`
+    : '—';
+  const rLength = rightAnalysis?.orthoticMeasurements?.footLengthMm
+    ? `${rightAnalysis.orthoticMeasurements.footLengthMm} mm`
+    : currentCase?.orthoticMeasurements?.footLengthMm
+    ? `${currentCase.orthoticMeasurements.footLengthMm} mm`
+    : '—';
+  const lWidth = leftAnalysis?.orthoticMeasurements?.forefootWidthMm
+    ? `${leftAnalysis.orthoticMeasurements.forefootWidthMm} mm`
+    : currentCase?.orthoticMeasurements?.forefootWidthMm
+    ? `${currentCase.orthoticMeasurements.forefootWidthMm} mm`
+    : '—';
+  const rWidth = rightAnalysis?.orthoticMeasurements?.forefootWidthMm
+    ? `${rightAnalysis.orthoticMeasurements.forefootWidthMm} mm`
+    : currentCase?.orthoticMeasurements?.forefootWidthMm
+    ? `${currentCase.orthoticMeasurements.forefootWidthMm} mm`
+    : '—';
+  const lHeel = leftAnalysis?.orthoticMeasurements?.heelWidthMm
+    ? `${leftAnalysis.orthoticMeasurements.heelWidthMm} mm`
+    : currentCase?.orthoticMeasurements?.heelWidthMm
+    ? `${currentCase.orthoticMeasurements.heelWidthMm} mm`
+    : '—';
+  const rHeel = rightAnalysis?.orthoticMeasurements?.heelWidthMm
+    ? `${rightAnalysis.orthoticMeasurements.heelWidthMm} mm`
+    : currentCase?.orthoticMeasurements?.heelWidthMm
+    ? `${currentCase.orthoticMeasurements.heelWidthMm} mm`
+    : '—';
+  const lArch = leftAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
+    ? leftAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+    : currentCase?.orthoticMeasurements?.archIndex !== undefined
+    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
+    : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
+    ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+    : '—';
+  const rArch = rightAnalysis?.regionalAnalysis?.cavanaghArchIndex !== undefined
+    ? rightAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+    : currentCase?.orthoticMeasurements?.archIndex !== undefined
+    ? currentCase.orthoticMeasurements.archIndex.toFixed(2)
+    : currentCase?.regionalAnalysis?.cavanaghArchIndex !== undefined
+    ? currentCase.regionalAnalysis.cavanaghArchIndex.toFixed(2)
+    : '—';
+  const lArea = leftAnalysis?.regionalAnalysis?.contactAreaCm2
+    ? `${leftAnalysis.regionalAnalysis.contactAreaCm2} cm²`
+    : currentCase?.regionalAnalysis?.contactAreaCm2
+    ? `${currentCase.regionalAnalysis.contactAreaCm2} cm²`
+    : '—';
+  const rArea = rightAnalysis?.regionalAnalysis?.contactAreaCm2
+    ? `${rightAnalysis.regionalAnalysis.contactAreaCm2} cm²`
+    : currentCase?.regionalAnalysis?.contactAreaCm2
+    ? `${currentCase.regionalAnalysis.contactAreaCm2} cm²`
+    : '—';
 
   // Pressure zones percentage
-  const lZones = leftAnalysis?.regionalAnalysis?.subZonal10 || null;
-  const rZones = rightAnalysis?.regionalAnalysis?.subZonal10 || null;
+  const lZones = leftAnalysis?.regionalAnalysis?.subZonal10 || currentCase?.regionalAnalysis?.subZonal10 || null;
+  const rZones = rightAnalysis?.regionalAnalysis?.subZonal10 || currentCase?.regionalAnalysis?.subZonal10 || null;
 
   // Real histogram pixel intensity distribution from analysis
-  const activeCategories = leftAnalysis?.categoryDistribution?.length === 6
+  const activeCategories = (leftAnalysis?.categoryDistribution?.length === 6)
     ? leftAnalysis.categoryDistribution
-    : rightAnalysis?.categoryDistribution?.length === 6
+    : (rightAnalysis?.categoryDistribution?.length === 6)
     ? rightAnalysis.categoryDistribution
+    : (currentCase?.categoryDistribution?.length === 6)
+    ? currentCase.categoryDistribution
     : [];
 
   const histColors = ['#1d4ed8', '#06b6d4', '#10b981', '#eab308', '#ea580c', '#dc2626'];
 
   // Dynamic clinical automatic interpretation metrics (Strictly from real data)
   const activeAnalysis = leftAnalysis || rightAnalysis;
-  const hasAnalysis = Boolean(activeAnalysis?.regionalAnalysis);
+  const hasAnalysis = Boolean(activeAnalysis?.regionalAnalysis || currentCase?.regionalAnalysis);
 
-  const forePct = leftAnalysis?.regionalAnalysis?.forefootContactPct ?? rightAnalysis?.regionalAnalysis?.forefootContactPct ?? 0;
-  const hindPct = leftAnalysis?.regionalAnalysis?.hindfootContactPct ?? rightAnalysis?.regionalAnalysis?.hindfootContactPct ?? 0;
+  const forePct = leftAnalysis?.regionalAnalysis?.forefootContactPct ??
+    rightAnalysis?.regionalAnalysis?.forefootContactPct ??
+    currentCase?.regionalAnalysis?.forefootContactPct ?? 0;
+  const hindPct = leftAnalysis?.regionalAnalysis?.hindfootContactPct ??
+    rightAnalysis?.regionalAnalysis?.hindfootContactPct ??
+    currentCase?.regionalAnalysis?.hindfootContactPct ?? 0;
 
   let loadDistributionLabel = 'Awaiting scan analysis';
   if (hasAnalysis && (forePct > 0 || hindPct > 0)) {
@@ -124,11 +187,11 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   }
 
   const archClassification = hasAnalysis
-    ? `${activeAnalysis.regionalAnalysis.archClassification} (AI: ${activeAnalysis.regionalAnalysis.cavanaghArchIndex.toFixed(2)})`
+    ? `${activeAnalysis?.regionalAnalysis?.archClassification || currentCase?.orthoticMeasurements?.archType || currentCase?.regionalAnalysis?.archClassification || 'Normal Arch'} (AI: ${(activeAnalysis?.regionalAnalysis?.cavanaghArchIndex || currentCase?.orthoticMeasurements?.archIndex || currentCase?.regionalAnalysis?.cavanaghArchIndex || 0.25).toFixed(2)})`
     : 'Awaiting scan analysis';
 
-  const lAreaNum = leftAnalysis?.regionalAnalysis?.contactAreaCm2 || 0;
-  const rAreaNum = rightAnalysis?.regionalAnalysis?.contactAreaCm2 || 0;
+  const lAreaNum = leftAnalysis?.regionalAnalysis?.contactAreaCm2 || currentCase?.regionalAnalysis?.contactAreaCm2 || 0;
+  const rAreaNum = rightAnalysis?.regionalAnalysis?.contactAreaCm2 || currentCase?.regionalAnalysis?.contactAreaCm2 || 0;
 
   let asymmetryLabel = 'Awaiting scan analysis';
   if (lAreaNum > 0 && rAreaNum > 0) {
@@ -223,9 +286,9 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                   {viewMode === 'raw' && (
-                    leftFoot?.rawDataUrl ? (
+                    effectiveLeftRaw ? (
                       <img
-                        src={leftFoot.rawDataUrl}
+                        src={effectiveLeftRaw}
                         alt="Left Foot Raw Impression"
                         style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain' }}
                       />
@@ -235,13 +298,13 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   )}
 
                   {viewMode === 'heatmap' && (
-                    leftHeatmapUrl ? (
+                    effectiveLeftHeatmap ? (
                       <img
-                        src={leftHeatmapUrl}
+                        src={effectiveLeftHeatmap}
                         alt="Left Plantar Heatmap"
                         style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity }}
                       />
-                    ) : leftFoot?.rawDataUrl ? (
+                    ) : effectiveLeftRaw ? (
                       <div style={{ color: '#0ea5e9', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         Analyzing Left Foot Scan...
@@ -253,19 +316,19 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
 
                   {viewMode === 'overlay' && (
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                      {leftFoot?.rawDataUrl && (
+                      {effectiveLeftRaw && (
                         <img
-                          src={leftFoot.rawDataUrl}
+                          src={effectiveLeftRaw}
                           alt="Left Base Scan"
                           style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
                         />
                       )}
-                      {leftHeatmapUrl && (
+                      {effectiveLeftHeatmap && (
                         <img
-                          src={leftHeatmapUrl}
+                          src={effectiveLeftHeatmap}
                           alt="Left Heatmap Overlay"
                           style={{
-                            position: leftFoot?.rawDataUrl ? 'absolute' : 'relative',
+                            position: effectiveLeftRaw ? 'absolute' : 'relative',
                             top: 0,
                             left: 0,
                             width: '100%',
@@ -276,7 +339,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                           }}
                         />
                       )}
-                      {!leftFoot?.rawDataUrl && !leftHeatmapUrl && (
+                      {!effectiveLeftRaw && !effectiveLeftHeatmap && (
                         <div style={{ color: '#94a3b8', fontSize: '0.74rem' }}>No Left Scan Available</div>
                       )}
                     </div>
@@ -291,9 +354,9 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                 </span>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                   {viewMode === 'raw' && (
-                    rightFoot?.rawDataUrl ? (
+                    effectiveRightRaw ? (
                       <img
-                        src={rightFoot.rawDataUrl}
+                        src={effectiveRightRaw}
                         alt="Right Foot Raw Impression"
                         style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain' }}
                       />
@@ -305,13 +368,13 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   )}
 
                   {viewMode === 'heatmap' && (
-                    rightHeatmapUrl ? (
+                    effectiveRightHeatmap ? (
                       <img
-                        src={rightHeatmapUrl}
+                        src={effectiveRightHeatmap}
                         alt="Right Plantar Heatmap"
                         style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity }}
                       />
-                    ) : rightFoot?.rawDataUrl ? (
+                    ) : effectiveRightRaw ? (
                       <div style={{ color: '#0ea5e9', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         Analyzing Right Foot Scan...
@@ -326,19 +389,19 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
 
                   {viewMode === 'overlay' && (
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                      {rightFoot?.rawDataUrl && (
+                      {effectiveRightRaw && (
                         <img
-                          src={rightFoot.rawDataUrl}
+                          src={effectiveRightRaw}
                           alt="Right Base Scan"
                           style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
                         />
                       )}
-                      {rightHeatmapUrl && (
+                      {effectiveRightHeatmap && (
                         <img
-                          src={rightHeatmapUrl}
+                          src={effectiveRightHeatmap}
                           alt="Right Heatmap Overlay"
                           style={{
-                            position: rightFoot?.rawDataUrl ? 'absolute' : 'relative',
+                            position: effectiveRightRaw ? 'absolute' : 'relative',
                             top: 0,
                             left: 0,
                             width: '100%',
@@ -349,7 +412,7 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                           }}
                         />
                       )}
-                      {!rightFoot?.rawDataUrl && !rightHeatmapUrl && (
+                      {!effectiveRightRaw && !effectiveRightHeatmap && (
                         <div style={{ color: '#94a3b8', fontSize: '0.74rem', textAlign: 'center' }}>
                           Awaiting Right Foot Scan
                         </div>

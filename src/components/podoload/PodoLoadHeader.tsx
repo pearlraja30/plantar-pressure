@@ -1,8 +1,9 @@
 import React from 'react';
-import { Cloud, Globe, Menu, Building2 } from 'lucide-react';
+import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
+import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
 
 interface PodoLoadHeaderProps {
   currentSection: PodoLoadNavSection;
@@ -15,6 +16,8 @@ interface PodoLoadHeaderProps {
   onOpenCloud: () => void;
   doctorName?: string;
   clinicName?: string;
+  currentUser?: SystemUserSession;
+  onOpenUserSwitcher?: () => void;
   onOpenAdmin?: () => void;
   onOpenMobileMenu?: () => void;
 }
@@ -30,6 +33,8 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   onOpenCloud,
   doctorName = 'Dr. Specialist',
   clinicName = 'Technomind Healthcare Systems',
+  currentUser = SYSTEM_ACCOUNTS.admin,
+  onOpenUserSwitcher,
   onOpenAdmin,
   onOpenMobileMenu,
 }) => {
@@ -147,8 +152,25 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             </button>
           )}
 
-          {/* Doctor Profile Name */}
-          <div className="podoload-doctor-tag">{doctorName}</div>
+          {/* Role & User Login Switcher Badge */}
+          <button
+            type="button"
+            className={`podoload-role-badge ${currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
+            onClick={onOpenUserSwitcher}
+            title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
+          >
+            {currentUser.role === 'admin' ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin: {currentUser.name} ▾</span>
+              </>
+            ) : (
+              <>
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Tech: {currentUser.name} ▾</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 

@@ -143,6 +143,35 @@ const LS_KEYS = {
   SELECTED_CASE: 'ppa-selected-case-id',
   HOSPITALS: 'podopress_hospitals_v1',
   ACTIVE_HOSPITAL_ID: 'podopress_active_hospital_id_v1',
+  ACTIVE_USER: 'podopress_active_user_v1',
+};
+
+export interface SystemUserSession {
+  username: string;
+  name: string;
+  role: 'admin' | 'technician';
+  title: string;
+  badge: string;
+  loginTime: string;
+}
+
+export const SYSTEM_ACCOUNTS: Record<'admin' | 'technician', SystemUserSession> = {
+  admin: {
+    username: 'admin@technomind.health',
+    name: 'Dr. Specialist',
+    role: 'admin',
+    title: 'Hospital Administrator',
+    badge: 'Administrator (Full Access)',
+    loginTime: new Date().toISOString(),
+  },
+  technician: {
+    username: 'tech@technomind.health',
+    name: 'Tech. Specialist',
+    role: 'technician',
+    title: 'Clinical Technician',
+    badge: 'Clinical Operator (All Reports)',
+    loginTime: new Date().toISOString(),
+  },
 };
 
 class PodoPressDatabase {
@@ -234,7 +263,7 @@ class PodoPressDatabase {
         }
       }
 
-      // Migrate cases
+      // Migrate cases from localStorage ONLY if they don't already exist in IndexedDB
       const localCases = localStorage.getItem(LS_KEYS.CASES);
       if (localCases) {
         const parsed: AnalysisCase[] = JSON.parse(localCases);
@@ -242,7 +271,13 @@ class PodoPressDatabase {
           const tx = db.transaction('cases', 'readwrite');
           const store = tx.objectStore('cases');
           for (const c of parsed) {
-            store.put(c);
+            // NEVER overwrite an existing uncompressed scan with a lightweight localStorage mirror
+            const getReq = store.get(c.id);
+            getReq.onsuccess = () => {
+              if (!getReq.result) {
+                store.put(c);
+              }
+            };
           }
         }
       }
@@ -914,6 +949,43 @@ class PodoPressDatabase {
     }
 
     return target;
+  }
+
+  // =========================================================================
+  // USER LOGIN & ROLE ACCESS CONTROL (ADMIN vs TECHNICIAN)
+  // =========================================================================
+
+  public getActiveUserSync(): SystemUserSession {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.ACTIVE_USER);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.role === 'admin' || parsed.role === 'technician')) {
+          return {
+            ...SYSTEM_ACCOUNTS[parsed.role as 'admin' | 'technician'],
+            ...parsed,
+          };
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return SYSTEM_ACCOUNTS.admin;
+  }
+
+  public setActiveUser(role: 'admin' | 'technician', customName?: string): SystemUserSession {
+    const base = SYSTEM_ACCOUNTS[role];
+    const session: SystemUserSession = {
+      ...base,
+      name: customName || base.name,
+      loginTime: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(LS_KEYS.ACTIVE_USER, JSON.stringify(session));
+    } catch {
+      // Ignore
+    }
+    return session;
   }
 }
 
