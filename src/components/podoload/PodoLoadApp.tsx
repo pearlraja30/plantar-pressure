@@ -23,6 +23,7 @@ import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwa
 import { safeStorage, stripHeavyCasePayloads } from '../../services/storageUtils';
 import { generateSyntheticFootprintHeatmap, generateSyntheticHarrisMatScan } from '../../services/imageProcessingService';
 import { PodoLoadRoleModal } from './PodoLoadRoleModal';
+import { PodoLoadDatabaseViewer } from './PodoLoadDatabaseViewer';
 
 // Purge all legacy stale/demo data and ensure fresh clean state without quota exhaustion
 const PURE_STORAGE_KEY = 'podoload_fresh_v3';
@@ -1057,6 +1058,20 @@ export function PodoLoadApp() {
               cases={cases}
               patients={patients}
               onSelectCase={(cid) => handleSelectReport(cid, 5)}
+            />
+          )}
+
+          {/* RECORDS: Inbuilt Database Explorer */}
+          {currentSection === 'database' && (
+            <PodoLoadDatabaseViewer
+              onSelectPatient={(p) => {
+                setSelectedPatientId(p.id);
+                setCurrentStep(1);
+                setCurrentSection('registration');
+              }}
+              onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
+              onOpenSettings={() => setCurrentSection('settings')}
+              onOpenAdmin={() => setCurrentSection('admin')}
             />
           )}
 

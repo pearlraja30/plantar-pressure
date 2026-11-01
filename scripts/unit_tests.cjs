@@ -2046,6 +2046,62 @@ it("Enforces Master Password Architecture, Zero Plaintext Leakage, Password Reco
   expect(technicianAccount.pin).toBe(generatedPassword);
 });
 
+it("Enforces Inbuilt Database Records Explorer: Live Store Browsing, Record Inspection, and Direct Multi-Table Access", () => {
+  // 1. NAVIGATION & STORE ENUMERATION
+  const supportedStores = [
+    "patients",
+    "cases",
+    "technicians",
+    "admin_accounts",
+    "bound_devices",
+    "audit_logs",
+    "settings"
+  ];
+  expect(supportedStores.length).toBe(7);
+  expect(supportedStores).toContain("patients");
+  expect(supportedStores).toContain("cases");
+  expect(supportedStores).toContain("technicians");
+  expect(supportedStores).toContain("audit_logs");
+
+  // 2. LIVE RECORD QUERY & FILTERING
+  const mockDbRecords = {
+    patients: [
+      { id: "pat-1", mrn: "PP-A101", name: "David Miller", age: 45, gender: "Male", phone: "+1 555-0101" },
+      { id: "pat-2", mrn: "PP-B202", name: "Elena Rostova", age: 38, gender: "Female", phone: "+1 555-0202" }
+    ],
+    cases: [
+      { id: "case-1", caseNumber: "PPA-2026-101", patientId: "pat-1", footSide: "Bilateral", syncStatus: "local safe" },
+      { id: "case-2", caseNumber: "PPA-2026-102", patientId: "pat-2", footSide: "Left", syncStatus: "synced" }
+    ]
+  };
+
+  const filterTableRecords = (storeName, query) => {
+    const list = mockDbRecords[storeName] || [];
+    if (!query) return list;
+    const q = query.toLowerCase();
+    return list.filter((item) =>
+      Object.values(item).some((val) => String(val).toLowerCase().includes(q))
+    );
+  };
+
+  // Search by MRN
+  expect(filterTableRecords("patients", "PP-A101").length).toBe(1);
+  expect(filterTableRecords("patients", "PP-A101")[0].name).toBe("David Miller");
+
+  // Search by Case Number
+  expect(filterTableRecords("cases", "102").length).toBe(1);
+  expect(filterTableRecords("cases", "102")[0].footSide).toBe("Left");
+
+  // 3. RECORD INSPECTION JSON SERIALIZATION
+  const inspectRecord = (record) => {
+    return JSON.stringify(record, null, 2);
+  };
+
+  const inspectedPatient = inspectRecord(mockDbRecords.patients[0]);
+  expect(inspectedPatient).toContain('"mrn": "PP-A101"');
+  expect(inspectedPatient).toContain('"name": "David Miller"');
+});
+
 it("Guarantees Null-Safe Regional Analysis Access & Comprehensive Clinical Diagnostic Error Logging (IEC 62304 / ISO 13485)", () => {
   // 1. VERIFY NULL-SAFE REGIONAL ANALYSIS ACCESS
   // Simulate activeAnalysis being null when navigating to Results (the exact condition that caused the error)

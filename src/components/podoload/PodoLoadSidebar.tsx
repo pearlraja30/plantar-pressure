@@ -13,6 +13,7 @@ import {
   Lock,
   ShieldCheck,
   UserCheck,
+  Database,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
@@ -25,6 +26,7 @@ export type PodoLoadNavSection =
   | 'report'
   | 'patient_search'
   | 'reports_cloud'
+  | 'database'
   | 'settings'
   | 'admin';
 
@@ -164,6 +166,15 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
             >
               <FolderArchive className="podoload-nav-item-icon" />
               <span>Reports and cloud</span>
+            </button>
+
+            <button
+              type="button"
+              className={`podoload-nav-item ${currentSection === 'database' ? 'active' : ''}`}
+              onClick={() => handleItemClick('database')}
+            >
+              <Database className="podoload-nav-item-icon" />
+              <span>Database records</span>
             </button>
           </nav>
         </div>

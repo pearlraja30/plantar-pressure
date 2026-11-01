@@ -48,6 +48,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   const getHeaderTitle = () => {
     if (currentSection === 'patient_search') return 'Patient records · Search directory';
     if (currentSection === 'reports_cloud') return 'Clinical records · Reports and cloud archive';
+    if (currentSection === 'database') return 'Database records · Inbuilt database explorer';
     if (currentSection === 'settings') return 'System · Clinical device settings';
     if (currentSection === 'admin') return 'Administration · Hospital profile & report branding';
 
