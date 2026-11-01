@@ -2450,6 +2450,58 @@ it("Guarantees 100% offline report generation, local queuing, and automatic back
   expect(Boolean(localCases[0].lastSyncAttempt)).toBe(true);
 });
 
+it("Enforces mandatory activation gate on new version installs or device change before permitting further processings", () => {
+  const evaluateDeviceAuthorizationGate = (token, currentDeviceId, currentVersion) => {
+    if (!token) {
+      return { isAuthorized: false, reason: 'unregistered' };
+    }
+    if (token.deviceFingerprint !== currentDeviceId) {
+      return { isAuthorized: false, reason: 'new_device' };
+    }
+    if (!token.appVersion || token.appVersion !== currentVersion) {
+      return { isAuthorized: false, reason: 'new_version' };
+    }
+    return { isAuthorized: true };
+  };
+
+  const CURRENT_DEVICE = 'DEV-9F42-88B1';
+  const CURRENT_VERSION = '1.0.55';
+
+  // Scenario A: Fresh install (no token stored)
+  const gateFresh = evaluateDeviceAuthorizationGate(null, CURRENT_DEVICE, CURRENT_VERSION);
+  expect(gateFresh.isAuthorized).toBe(false);
+  expect(gateFresh.reason).toBe('unregistered');
+
+  // Scenario B: Transferred to new device (hardware fingerprint mismatch)
+  const tokenOtherDevice = {
+    token: 'AUTH-DEV-1111-2222',
+    deviceFingerprint: 'DEV-OLD-0000',
+    appVersion: '1.0.55',
+  };
+  const gateDeviceMismatch = evaluateDeviceAuthorizationGate(tokenOtherDevice, CURRENT_DEVICE, CURRENT_VERSION);
+  expect(gateDeviceMismatch.isAuthorized).toBe(false);
+  expect(gateDeviceMismatch.reason).toBe('new_device');
+
+  // Scenario C: App updated to new version (v1.0.54 -> v1.0.55)
+  const tokenOlderVersion = {
+    token: 'AUTH-DEV-1111-2222',
+    deviceFingerprint: CURRENT_DEVICE,
+    appVersion: '1.0.54',
+  };
+  const gateNewVersion = evaluateDeviceAuthorizationGate(tokenOlderVersion, CURRENT_DEVICE, CURRENT_VERSION);
+  expect(gateNewVersion.isAuthorized).toBe(false);
+  expect(gateNewVersion.reason).toBe('new_version');
+
+  // Scenario D: Successfully authorized for current device & current version
+  const tokenAuthorized = {
+    token: 'AUTH-DEV-1111-2222',
+    deviceFingerprint: CURRENT_DEVICE,
+    appVersion: CURRENT_VERSION,
+  };
+  const gateAuthorized = evaluateDeviceAuthorizationGate(tokenAuthorized, CURRENT_DEVICE, CURRENT_VERSION);
+  expect(gateAuthorized.isAuthorized).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

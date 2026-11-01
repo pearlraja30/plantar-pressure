@@ -21,7 +21,7 @@ import {
   Sparkles,
   Building2,
 } from 'lucide-react';
-import { SystemUserSession, dbService } from '../../services/dbService';
+import { SystemUserSession, dbService, APP_CURRENT_VERSION } from '../../services/dbService';
 import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken } from '../../types';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
@@ -36,6 +36,8 @@ interface PodoLoadRoleModalProps {
     hospitalId?: string,
     hospitalName?: string
   ) => void;
+  isMandatoryActivation?: boolean;
+  activationReason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician';
 }
 
 export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
@@ -43,6 +45,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   onClose,
   currentUser,
   onSelectRole,
+  isMandatoryActivation = false,
+  activationReason,
 }) => {
   const isMobileDevice =
     Capacitor.isNativePlatform() ||
@@ -90,6 +94,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     dbService.getDeviceAuthorizationSync()
   );
   const [mobileAuthTab, setMobileAuthTab] = useState<'login' | 'activate'>(() => {
+    if (isMandatoryActivation) return 'activate';
     return dbService.getDeviceAuthorizationSync() ? 'login' : 'activate';
   });
 
@@ -411,7 +416,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   return (
     <>
-      <div className="podoload-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="podoload-modal-backdrop" onClick={isMandatoryActivation ? undefined : onClose} role="dialog" aria-modal="true">
         <div
           className="podoload-modal-box"
           style={{ maxWidth: '640px', width: '92%', maxHeight: '92vh', overflowY: 'auto' }}
@@ -431,6 +436,12 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Create Administration Account (First-Time Setup)'
                     : deviceLockout
                     ? 'Device Binding Security Lockout'
+                    : isMandatoryActivation
+                    ? activationReason === 'new_version'
+                      ? `PodoPress v${APP_CURRENT_VERSION} Update — Activation Required`
+                      : activationReason === 'new_device'
+                      ? 'New Hardware Device Detected — Registration Required'
+                      : 'Station Activation & Enrollment Required'
                     : isMobileDevice
                     ? 'Clinical Technician Login'
                     : 'Account & Role Switcher'}
@@ -444,24 +455,62 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Initialize medical facility administration and bind this primary diagnostic station'
                     : deviceLockout
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
+                    : isMandatoryActivation
+                    ? 'Security Policy: Enter your Clinic Code and Activation Voucher to authorize this station before proceeding with clinical examinations.'
                     : isMobileDevice
                     ? 'Sign in with your technician account created by the Administrator'
                     : 'Select between Hospital Administrator (Full System Control) or Clinical Technician'}
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="podoload-modal-close-btn"
-              onClick={onClose}
-              aria-label="Close modal"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {!isMandatoryActivation && (
+              <button
+                type="button"
+                className="podoload-modal-close-btn"
+                onClick={onClose}
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Modal Body */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem 0' }}>
+            {/* MANDATORY ACTIVATION NOTICE */}
+            {isMandatoryActivation && (
+              <div
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: '#fffbeb',
+                  border: '1.5px solid #fcd34d',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem',
+                  fontSize: '0.74rem',
+                  color: '#92400e',
+                }}
+              >
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                  <strong>
+                    {activationReason === 'new_version'
+                      ? 'Application Update / New Version Authorization Required'
+                      : activationReason === 'new_device'
+                      ? 'New Hardware Device Detected — Authorization Required'
+                      : 'Initial Device Registration Required'}
+                  </strong>
+                  <div style={{ marginTop: '2px', fontSize: '0.7rem', color: '#78350f', lineHeight: 1.4 }}>
+                    {activationReason === 'new_version'
+                      ? `PodoPress was updated to build v${APP_CURRENT_VERSION}. Enter your Clinic Code and Activation Voucher to authorize this new release before clinical examinations.`
+                      : activationReason === 'new_device'
+                      ? 'This physical device is not yet registered. Enter your Clinic Code and Activation Voucher to bind this terminal for offline clinical scanning.'
+                      : 'Please enter your Clinic Code and Technician Activation Voucher to authorize this device before proceeding with examinations.'}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* VIEW 1: DEVICE LOCKOUT WARNING (Single Device Enforcement) */}
             {deviceLockout ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
@@ -1327,63 +1376,65 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       }}
                     >
                       {/* Tab Switcher: Station Quick Login vs Activate Station with Code */}
-                      <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMobileAuthTab('login');
-                            setPinError(null);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0.4rem',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: mobileAuthTab === 'login' ? '#ffffff' : 'transparent',
-                            color: mobileAuthTab === 'login' ? '#0f766e' : '#64748b',
-                            boxShadow: mobileAuthTab === 'login' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.35rem',
-                          }}
-                        >
-                          <KeyRound className="w-3.5 h-3.5" />
-                          <span>Station Login</span>
-                        </button>
+                      {!isMandatoryActivation && (
+                        <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileAuthTab('login');
+                              setPinError(null);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '0.4rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              borderRadius: '6px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              backgroundColor: mobileAuthTab === 'login' ? '#ffffff' : 'transparent',
+                              color: mobileAuthTab === 'login' ? '#0f766e' : '#64748b',
+                              boxShadow: mobileAuthTab === 'login' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                            }}
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Station Login</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMobileAuthTab('activate');
-                            setPinError(null);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '0.4rem',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: mobileAuthTab === 'activate' ? '#ffffff' : 'transparent',
-                            color: mobileAuthTab === 'activate' ? '#0f766e' : '#64748b',
-                            boxShadow: mobileAuthTab === 'activate' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.35rem',
-                          }}
-                        >
-                          <Smartphone className="w-3.5 h-3.5" />
-                          <span>📱 Activate Device with Code</span>
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileAuthTab('activate');
+                              setPinError(null);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '0.4rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              borderRadius: '6px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              backgroundColor: mobileAuthTab === 'activate' ? '#ffffff' : 'transparent',
+                              color: mobileAuthTab === 'activate' ? '#0f766e' : '#64748b',
+                              boxShadow: mobileAuthTab === 'activate' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                            }}
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>📱 Activate Device with Code</span>
+                          </button>
+                        </div>
+                      )}
 
                       {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING */}
                       {mobileAuthTab === 'activate' ? (
@@ -1756,10 +1807,12 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
           {/* Modal Actions */}
           {!deviceLockout && recoveryMode === 'none' && (
-            <div className="podoload-modal-footer" style={{ justifyContent: 'space-between' }}>
-              <button type="button" className="podoload-btn-secondary" onClick={onClose}>
-                Cancel
-              </button>
+            <div className="podoload-modal-footer" style={{ justifyContent: isMandatoryActivation ? 'flex-end' : 'space-between' }}>
+              {!isMandatoryActivation && (
+                <button type="button" className="podoload-btn-secondary" onClick={onClose}>
+                  Cancel
+                </button>
+              )}
               {isRegisteringAdmin ? (
                 <button
                   type="button"

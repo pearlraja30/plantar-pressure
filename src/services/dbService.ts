@@ -8,6 +8,7 @@ import { cloudSyncService } from './cloudSyncService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
+export const APP_CURRENT_VERSION = '1.0.55';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -1370,6 +1371,7 @@ class PodoPressDatabase {
       technicianName: tech.name,
       deviceFingerprint: hardwareDeviceId,
       deviceName,
+      appVersion: APP_CURRENT_VERSION,
       authorizedAt: new Date().toISOString(),
       status: 'authorized',
     };
@@ -1386,6 +1388,90 @@ class PodoPressDatabase {
       technician: tech,
       hospital,
     };
+  }
+
+  /**
+   * Evaluates if this station is authorized to run examinations.
+   * If a new device is detected OR an app update/new version was installed,
+   * it requires re-authorization via activation code before unlocking further processings.
+   */
+  public checkDeviceAuthorizationStatus(): {
+    isAuthorized: boolean;
+    reason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician';
+    token: DeviceAuthorizationToken | null;
+    deviceId: string;
+    currentVersion: string;
+    registeredVersion?: string;
+  } {
+    const currentDeviceId = deviceBindingService.getCurrentDeviceId();
+    const currentVersion = APP_CURRENT_VERSION;
+    const token = this.getDeviceAuthorizationSync();
+
+    if (!token) {
+      return {
+        isAuthorized: false,
+        reason: 'unregistered',
+        token: null,
+        deviceId: currentDeviceId,
+        currentVersion,
+      };
+    }
+
+    if (token.status !== 'authorized') {
+      return {
+        isAuthorized: false,
+        reason: 'revoked',
+        token,
+        deviceId: currentDeviceId,
+        currentVersion,
+      };
+    }
+
+    // Hardware station fingerprint check: if app was moved to a new device or browser storage
+    if (token.deviceFingerprint !== currentDeviceId) {
+      return {
+        isAuthorized: false,
+        reason: 'new_device',
+        token,
+        deviceId: currentDeviceId,
+        currentVersion,
+      };
+    }
+
+    // New version install check: if installed app version differs from token version
+    if (token.appVersion && token.appVersion !== currentVersion) {
+      return {
+        isAuthorized: false,
+        reason: 'new_version',
+        token,
+        deviceId: currentDeviceId,
+        currentVersion,
+        registeredVersion: token.appVersion,
+      };
+    }
+
+    // If token has no appVersion stamped, treat as requiring new version registration
+    if (!token.appVersion) {
+      return {
+        isAuthorized: false,
+        reason: 'new_version',
+        token,
+        deviceId: currentDeviceId,
+        currentVersion,
+      };
+    }
+
+    return {
+      isAuthorized: true,
+      token,
+      deviceId: currentDeviceId,
+      currentVersion,
+      registeredVersion: token.appVersion,
+    };
+  }
+
+  public isDeviceAuthorized(): boolean {
+    return this.checkDeviceAuthorizationStatus().isAuthorized;
   }
 
   /**

@@ -283,6 +283,7 @@ export interface DeviceAuthorizationToken {
   technicianName: string;
   deviceFingerprint: string;
   deviceName?: string;
+  appVersion?: string; // Authorized app build version, e.g. "1.0.55"
   authorizedAt: string;
   expiresAt?: string;
   status: 'authorized' | 'revoked';

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { ShieldAlert } from 'lucide-react';
 import './podoload.css';
 import { PodoLoadSidebar, PodoLoadNavSection } from './PodoLoadSidebar';
 import { PodoLoadHeader } from './PodoLoadHeader';
@@ -242,7 +243,8 @@ export function PodoLoadApp() {
 
   // User Authentication & Role Access Control (Admin vs Technician)
   const [currentUser, setCurrentUser] = useState<SystemUserSession>(() => dbService.getActiveUserSync());
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [deviceAuthStatus, setDeviceAuthStatus] = useState(() => dbService.checkDeviceAuthorizationStatus());
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(!deviceAuthStatus.isAuthorized);
   const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
 
   const handleSelectRole = (
@@ -254,6 +256,11 @@ export function PodoLoadApp() {
   ) => {
     const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
+    const updatedStatus = dbService.checkDeviceAuthorizationStatus();
+    setDeviceAuthStatus(updatedStatus);
+    if (updatedStatus.isAuthorized) {
+      setIsRoleModalOpen(false);
+    }
     if (hospitalId) {
       const allHosps = dbService.getHospitalProfilesSync();
       const targetHosp = allHosps.find((h) => h.id === hospitalId);
@@ -1187,12 +1194,74 @@ export function PodoLoadApp() {
         initialFootSide={wizardFootSide}
       />
 
+      {/* Full-Screen Blocking Backdrop if Device / Version is not Authorized */}
+      {!deviceAuthStatus.isAuthorized && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.78)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            padding: '1.5rem',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ maxWidth: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(13, 148, 136, 0.2)',
+                border: '1.5px solid #14b8a6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#2dd4bf',
+              }}
+            >
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Clinical Station Activation Required</h3>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+              {deviceAuthStatus.reason === 'new_version'
+                ? `PodoPress was updated to build v${deviceAuthStatus.currentVersion}. Re-authorization via your Clinic Code and Activation Voucher is required before proceeding.`
+                : deviceAuthStatus.reason === 'new_device'
+                ? `New physical device detected (${deviceAuthStatus.deviceId}). Hardware station pairing with your clinic voucher code is required.`
+                : 'This terminal has not been enrolled. Enter your Clinic Code and Technician Activation Voucher to authorize this station.'}
+            </p>
+            <button
+              type="button"
+              className="podoload-btn-primary"
+              onClick={() => setIsRoleModalOpen(true)}
+              style={{ marginTop: '0.5rem', padding: '0.5rem 1.25rem', fontSize: '0.82rem' }}
+            >
+              📱 Enter Activation Voucher Code
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
+        isOpen={isRoleModalOpen || !deviceAuthStatus.isAuthorized}
+        onClose={() => {
+          const status = dbService.checkDeviceAuthorizationStatus();
+          setDeviceAuthStatus(status);
+          if (status.isAuthorized) {
+            setIsRoleModalOpen(false);
+          }
+        }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
+        isMandatoryActivation={!deviceAuthStatus.isAuthorized}
+        activationReason={deviceAuthStatus.reason}
       />
     </div>
   );
