@@ -698,6 +698,167 @@
 }
 
 /* ----------------------------------------------------
+   PATIENT REPORTS HUB & TIME-BASED ARCHIVE
+   ---------------------------------------------------- */
+.podoload-patient-hub-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.podoload-patient-hub-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #e1ebed;
+}
+
+.podoload-patient-hub-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #f0fdf9;
+  border: 1px solid #ccfbf1;
+  border-radius: 8px;
+}
+
+.podoload-patient-hub-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.podoload-patient-hub-filters {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.podoload-btn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.podoload-btn-chip:hover {
+  border-color: var(--podo-primary);
+  color: var(--podo-primary);
+}
+
+.podoload-btn-chip.active {
+  background: var(--podo-primary);
+  color: #ffffff;
+  border-color: var(--podo-primary);
+  font-weight: 600;
+}
+
+.podoload-patient-reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow-y: auto;
+  max-height: 480px;
+  padding-right: 0.25rem;
+}
+
+.podoload-report-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.podoload-report-card:hover {
+  border-color: var(--podo-primary);
+  box-shadow: 0 2px 8px rgba(12, 107, 100, 0.08);
+}
+
+.podoload-report-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.podoload-report-num {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--podo-primary);
+  letter-spacing: 0.02em;
+}
+
+.podoload-report-date {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.podoload-report-card-middle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.podoload-report-findings {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.35;
+}
+
+.podoload-report-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.podoload-db-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #0c6b64;
+  font-weight: 600;
+}
+
+.podoload-report-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.podoload-empty-reports-box {
+  text-align: center;
+  padding: 1.75rem 1rem;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
+/* ----------------------------------------------------
    DUAL FOOT CAPTURE VIEW (SCREEN 2)
    ---------------------------------------------------- */
 .podoload-hardware-toolbar {
@@ -1674,6 +1835,23 @@
     min-height: 44px;
     justify-content: center;
     font-size: 0.85rem;
+  }
+
+  .podoload-patient-hub-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .podoload-report-card-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .podoload-report-card-actions button {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
   }
 
   /* ---------------------------------------------

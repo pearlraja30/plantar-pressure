@@ -290,11 +290,16 @@ export function PodoLoadApp() {
   };
 
   const handleStartNewExam = () => {
+    setSelectedPatientId('');
+    setSelectedCaseId('');
     setCurrentStep(1);
     setCurrentSection('registration');
+    setLeftFoot(null);
     setRightFoot(null);
     setLeftHeatmapUrl(null);
     setRightHeatmapUrl(null);
+    setLeftAnalysis(null);
+    setRightAnalysis(null);
   };
 
   // Step 1: Save Patient & Proceed
@@ -317,6 +322,97 @@ export function PodoLoadApp() {
     );
 
     // Advance to Step 2: Capture
+    setCurrentStep(2);
+    setCurrentSection('capture');
+  };
+
+  // Load full historical report and scans from Inbuilt Database (IndexedDB) into active session
+  const handleSelectReport = async (caseId: string, targetStep: 4 | 5 = 5) => {
+    setSelectedCaseId(caseId);
+
+    // Fetch full uncompressed case from IndexedDB
+    let fullCase = await dbService.getCase(caseId);
+    if (!fullCase) {
+      fullCase = cases.find((c) => c.id === caseId);
+    }
+
+    if (fullCase) {
+      // Update cases in memory
+      setCases((prev) => {
+        const exists = prev.some((c) => c.id === fullCase!.id);
+        if (exists) {
+          return prev.map((c) => (c.id === fullCase!.id ? { ...c, ...fullCase } : c));
+        }
+        return [fullCase!, ...prev];
+      });
+
+      // Sync active patient
+      if (fullCase.patientId) {
+        setSelectedPatientId(fullCase.patientId);
+      }
+
+      // Hydrate left foot scan
+      if (fullCase.rawScanDataUrl) {
+        setLeftFoot({
+          rawDataUrl: fullCase.rawScanDataUrl,
+          capturedAt: fullCase.createdAt?.slice(11, 19) || '10:00:00',
+          sizePx: '1240 × 1754 px',
+          scalePxMm: '11.8 px/mm',
+          confidence: fullCase.qcResult?.score ?? 95,
+          markersCount: 4,
+          lightingOk: true,
+          sharp: true,
+        });
+      } else {
+        setLeftFoot(null);
+      }
+
+      // Hydrate right foot scan
+      if (fullCase.rightRawScanDataUrl) {
+        setRightFoot({
+          rawDataUrl: fullCase.rightRawScanDataUrl,
+          capturedAt: fullCase.createdAt?.slice(11, 19) || '10:00:00',
+          sizePx: '1240 × 1754 px',
+          scalePxMm: '11.8 px/mm',
+          confidence: fullCase.qcResult?.score ?? 95,
+          markersCount: 4,
+          lightingOk: true,
+          sharp: true,
+        });
+      } else {
+        setRightFoot(null);
+      }
+
+      // Hydrate heatmaps
+      setLeftHeatmapUrl(fullCase.processedHeatMapDataUrl || null);
+      setRightHeatmapUrl(fullCase.rightProcessedHeatMapDataUrl || null);
+
+      // Hydrate analysis
+      if (fullCase.regionalAnalysis || fullCase.orthoticMeasurements) {
+        const analysisData = {
+          regionalAnalysis: fullCase.regionalAnalysis,
+          orthoticMeasurements: fullCase.orthoticMeasurements,
+          landmarks: fullCase.landmarks,
+        };
+        setLeftAnalysis(analysisData);
+        setRightAnalysis(analysisData);
+      }
+    }
+
+    // Navigate to target step (4 for Results, 5 for Report)
+    setCurrentStep(targetStep);
+    setCurrentSection(targetStep === 4 ? 'results' : 'report');
+  };
+
+  const handleStartNewReportForPatient = (patient: Patient) => {
+    setSelectedPatientId(patient.id);
+    setSelectedCaseId('');
+    setLeftFoot(null);
+    setRightFoot(null);
+    setLeftHeatmapUrl(null);
+    setRightHeatmapUrl(null);
+    setLeftAnalysis(null);
+    setRightAnalysis(null);
     setCurrentStep(2);
     setCurrentSection('capture');
   };
@@ -597,9 +693,12 @@ export function PodoLoadApp() {
           {currentSection === 'registration' && (
             <PodoLoadRegistration
               patients={patients}
+              cases={cases}
               selectedPatient={selectedPatient}
               onSavePatient={handleSavePatient}
-              onSelectPatient={(p) => setSelectedPatientId(p.id)}
+              onSelectPatient={(p) => setSelectedPatientId(p ? p.id : '')}
+              onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
+              onStartNewReportForPatient={handleStartNewReportForPatient}
               onCancel={handleStartNewExam}
             />
           )}
@@ -675,18 +774,18 @@ export function PodoLoadApp() {
               cases={cases}
               selectedPatientId={selectedPatientId}
               onSelectPatient={(p) => setSelectedPatientId(p.id)}
-              onStartNewExamForPatient={(p) => {
-                setSelectedPatientId(p.id);
-                setCurrentStep(2);
-                setCurrentSection('capture');
-              }}
+              onSelectCase={(cid, step = 5) => handleSelectReport(cid, step)}
+              onStartNewExamForPatient={handleStartNewReportForPatient}
               onAddNewPatient={() => {
+                setSelectedPatientId('');
+                setSelectedCaseId('');
                 setCurrentStep(1);
                 setCurrentSection('registration');
               }}
               onDeletePatient={(pid) => {
                 setPatients((prev) => prev.filter((p) => p.id !== pid));
                 setCases((prev) => prev.filter((c) => c.patientId !== pid));
+                dbService.deletePatient(pid);
               }}
             />
           )}
@@ -698,11 +797,7 @@ export function PodoLoadApp() {
               onRefreshCloud={refreshCloudStatus}
               cases={cases}
               patients={patients}
-              onSelectCase={(cid) => {
-                setSelectedCaseId(cid);
-                setCurrentStep(5);
-                setCurrentSection('report');
-              }}
+              onSelectCase={(cid) => handleSelectReport(cid, 5)}
             />
           )}
 
