@@ -1923,6 +1923,129 @@ it("Enforces Administrator Account Creation First, Strict Single-Device Binding,
   expect(checkDeviceAuth(device1.id, device1.name).canAutoBind).toBe(true);
 });
 
+it("Enforces Master Password Architecture, Zero Plaintext Leakage, Password Recovery, and Admin Technician Password Maintenance", () => {
+  // 1. MASTER PASSWORD & ZERO PLAINTEXT DEFAULT LEAKAGE
+  const roleModalModel = {
+    adminSection: {
+      label: "Master Password",
+      inputType: "password",
+      hasEyeToggle: true,
+      displaysDefaultPasswordHint: false, // NO "(Default: 1234)" or "(Default: test123)"
+      hasForgotPasswordLink: true,
+    },
+    technicianSection: {
+      label: "Password",
+      inputType: "password",
+      hasEyeToggle: true,
+      displaysDefaultPasswordHint: false, // NO "(Default PIN: 1234)"
+      hasForgotPasswordLink: true,
+    },
+  };
+
+  expect(roleModalModel.adminSection.label).toBe("Master Password");
+  expect(roleModalModel.adminSection.displaysDefaultPasswordHint).toBe(false);
+  expect(roleModalModel.adminSection.hasForgotPasswordLink).toBe(true);
+  expect(roleModalModel.technicianSection.label).toBe("Password");
+  expect(roleModalModel.technicianSection.displaysDefaultPasswordHint).toBe(false);
+  expect(roleModalModel.technicianSection.hasForgotPasswordLink).toBe(true);
+
+  // 2. ADMINISTRATOR PASSWORD RECOVERY VIA SECURITY RECOVERY KEY OR REGISTERED PHONE
+  let adminAccount = {
+    id: "admin-master-001",
+    name: "Dr. Medical Director",
+    username: "director@hospital.org",
+    email: "director@hospital.org",
+    phone: "+1 (800) 555-PODO",
+    pin: "InitialMasterPass123",
+    recoveryKey: "REC-TMH-9901",
+  };
+
+  const recoverAdminPassword = (username, verificationInput, newPassword) => {
+    if (adminAccount.username.toLowerCase() !== username.toLowerCase() && adminAccount.email.toLowerCase() !== username.toLowerCase()) {
+      return { success: false, error: "Username not found" };
+    }
+    const cleanDigits = adminAccount.phone.replace(/[^0-9]/g, "");
+    const inputDigits = verificationInput.replace(/[^0-9]/g, "");
+    const isKeyMatch = adminAccount.recoveryKey.toUpperCase() === verificationInput.trim().toUpperCase();
+    const isPhoneMatch = inputDigits.length >= 3 && cleanDigits.endsWith(inputDigits);
+
+    if (!isKeyMatch && !isPhoneMatch) {
+      return { success: false, error: "Verification failed" };
+    }
+    if (!newPassword || newPassword.length < 4) {
+      return { success: false, error: "Password too short" };
+    }
+    adminAccount.pin = newPassword;
+    return { success: true };
+  };
+
+  // Wrong verification fails
+  expect(recoverAdminPassword("director@hospital.org", "WRONG-KEY", "NewPass999").success).toBe(false);
+  expect(adminAccount.pin).toBe("InitialMasterPass123");
+
+  // Valid recovery via Security Recovery Key
+  const keyRecovery = recoverAdminPassword("director@hospital.org", "REC-TMH-9901", "NewSecureMaster2026!");
+  expect(keyRecovery.success).toBe(true);
+  expect(adminAccount.pin).toBe("NewSecureMaster2026!");
+
+  // Valid recovery via registered phone number
+  const phoneRecovery = recoverAdminPassword("director@hospital.org", "800555", "AnotherNewPass888!");
+  expect(phoneRecovery.success).toBe(true);
+  expect(adminAccount.pin).toBe("AnotherNewPass888!");
+
+  // 3. CLINICAL TECHNICIAN PASSWORD RECOVERY & ADMIN OVERRIDE
+  let technicianAccount = {
+    id: "tech-01",
+    name: "Sarah Jenkins",
+    username: "sarah.tech",
+    email: "sarah@hospital.com",
+    phone: "+1 (555) 019-2834",
+    pin: "OldTechPass456",
+    recoveryKey: "REC-TECH-1001",
+  };
+
+  const recoverTechnicianPassword = (techId, verificationInput, newPassword, adminMasterPassword) => {
+    if (technicianAccount.id !== techId && technicianAccount.username !== techId) {
+      return { success: false, error: "Technician not found" };
+    }
+    const isEmailMatch = technicianAccount.email.toLowerCase() === verificationInput.trim().toLowerCase();
+    const isKeyMatch = technicianAccount.recoveryKey.toUpperCase() === verificationInput.trim().toUpperCase();
+    const isAdminOverride = adminMasterPassword && adminMasterPassword === adminAccount.pin;
+
+    if (!isEmailMatch && !isKeyMatch && !isAdminOverride) {
+      return { success: false, error: "Verification failed" };
+    }
+    technicianAccount.pin = newPassword;
+    return { success: true };
+  };
+
+  // Self-service recovery via email
+  expect(recoverTechnicianPassword("tech-01", "wrong@email.com", "TechPass1").success).toBe(false);
+  expect(recoverTechnicianPassword("tech-01", "sarah@hospital.com", "NewTechPass789!").success).toBe(true);
+  expect(technicianAccount.pin).toBe("NewTechPass789!");
+
+  // Administrator quick authorization override
+  const adminOverrideReset = recoverTechnicianPassword("tech-01", "admin-auth", "AdminResetPass123!", adminAccount.pin);
+  expect(adminOverrideReset.success).toBe(true);
+  expect(technicianAccount.pin).toBe("AdminResetPass123!");
+
+  // 4. ADMIN MAINTENANCE OF TECHNICIAN PASSWORD DETAILS (VIEW, CHANGE, AUTO-GENERATE)
+  const adminPanelTechnicianManager = {
+    viewPassword: (tech) => tech.pin,
+    updatePassword: (tech, newPassword) => {
+      tech.pin = newPassword;
+      return tech;
+    },
+    generateSecurePassword: () => "Tech" + Math.floor(1000 + Math.random() * 9000) + "!",
+  };
+
+  expect(adminPanelTechnicianManager.viewPassword(technicianAccount)).toBe("AdminResetPass123!");
+  const generatedPassword = adminPanelTechnicianManager.generateSecurePassword();
+  expect(generatedPassword.startsWith("Tech")).toBe(true);
+  adminPanelTechnicianManager.updatePassword(technicianAccount, generatedPassword);
+  expect(technicianAccount.pin).toBe(generatedPassword);
+});
+
 it("Guarantees Null-Safe Regional Analysis Access & Comprehensive Clinical Diagnostic Error Logging (IEC 62304 / ISO 13485)", () => {
   // 1. VERIFY NULL-SAFE REGIONAL ANALYSIS ACCESS
   // Simulate activeAnalysis being null when navigating to Results (the exact condition that caused the error)

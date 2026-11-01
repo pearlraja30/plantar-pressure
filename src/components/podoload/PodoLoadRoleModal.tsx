@@ -6,15 +6,18 @@ import {
   X,
   Lock,
   KeyRound,
-  Building2,
-  Laptop,
   AlertTriangle,
   UserPlus,
   RefreshCw,
   CreditCard,
   ShieldAlert,
+  Eye,
+  EyeOff,
+  Key,
+  ArrowLeft,
+  HelpCircle,
 } from 'lucide-react';
-import { SystemUserSession, SYSTEM_ACCOUNTS, dbService } from '../../services/dbService';
+import { SystemUserSession, dbService } from '../../services/dbService';
 import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense } from '../../types';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
@@ -44,10 +47,33 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
   );
 
-  // Login PIN states
-  const [adminPin, setAdminPin] = useState<string>('');
-  const [techPin, setTechPin] = useState<string>('');
+  // Login Password states (starts empty, no default passwords exposed)
+  const [adminPassword, setAdminPassword] = useState<string>('');
+  const [techPassword, setTechPassword] = useState<string>('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showTechPassword, setShowTechPassword] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // Recovery views mode: 'none' | 'admin' | 'technician'
+  const [recoveryMode, setRecoveryMode] = useState<'none' | 'admin' | 'technician'>('none');
+
+  // Admin Recovery Form state
+  const [adminRecoveryUser, setAdminRecoveryUser] = useState(registeredAdmin?.username || 'admin@technomind.health');
+  const [adminRecoveryVerify, setAdminRecoveryVerify] = useState('');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminNewPasswordConfirm, setAdminNewPasswordConfirm] = useState('');
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
+  const [adminRecoverySuccess, setAdminRecoverySuccess] = useState<string | null>(null);
+
+  // Technician Recovery Form state
+  const [techRecoveryId, setTechRecoveryId] = useState<string>(
+    technicians.length > 0 ? technicians[0].id : ''
+  );
+  const [techRecoveryVerify, setTechRecoveryVerify] = useState('');
+  const [techNewPassword, setTechNewPassword] = useState('');
+  const [techNewPasswordConfirm, setTechNewPasswordConfirm] = useState('');
+  const [showTechNewPassword, setShowTechNewPassword] = useState(false);
+  const [techRecoverySuccess, setTechRecoverySuccess] = useState<string | null>(null);
 
   // Admin Account Creation / Registration Form State
   const [isRegisteringAdmin, setIsRegisteringAdmin] = useState<boolean>(!registeredAdmin);
@@ -56,8 +82,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [regHospitalName, setRegHospitalName] = useState(
     dbService.getActiveHospitalSync()?.name || 'Technomind Healthcare Systems'
   );
-  const [regAdminPin, setRegAdminPin] = useState('1234');
-  const [regAdminPinConfirm, setRegAdminPinConfirm] = useState('1234');
+  const [regAdminPassword, setRegAdminPassword] = useState('');
+  const [regAdminPasswordConfirm, setRegAdminPasswordConfirm] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [regAdminPhone, setRegAdminPhone] = useState('+1 (800) 555-PODO');
   const [regDeviceName, setRegDeviceName] = useState(dbService.getCurrentDeviceSync()?.name || 'Main Diagnostic Workstation');
 
@@ -73,7 +101,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   // Transfer device binding state
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
-  const [transferPin, setTransferPin] = useState('');
+  const [transferPassword, setTransferPassword] = useState('');
+  const [showTransferPassword, setShowTransferPassword] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -83,20 +112,26 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   // Handle Admin Registration
   const handleRegisterAdmin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regAdminName.trim() || !regAdminUsername.trim() || !regAdminPin.trim()) {
-      setPinError('Please complete all required fields (Name, Username/Email, and PIN).');
+    if (!regAdminName.trim() || !regAdminUsername.trim() || !regAdminPassword.trim()) {
+      setPinError('Please complete all required fields (Name, Username/Email, and Master Password).');
       return;
     }
-    if (regAdminPin !== regAdminPinConfirm) {
-      setPinError('PIN confirmation does not match. Please re-enter PIN.');
+    if (regAdminPassword !== regAdminPasswordConfirm) {
+      setPinError('Master Password confirmation does not match. Please re-enter.');
       return;
     }
+    if (regAdminPassword.trim().length < 4) {
+      setPinError('Master Password must be at least 4 characters long.');
+      return;
+    }
+
+    const generatedKey = 'REC-' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const newAdmin: AdminAccount = {
       id: 'admin-' + Math.random().toString(36).substring(2, 9),
       name: regAdminName.trim(),
       username: regAdminUsername.trim(),
-      pin: regAdminPin.trim(),
+      pin: regAdminPassword.trim(),
       hospitalId: dbService.getActiveHospitalSync()?.id || 'hosp-technomind-main',
       hospitalName: regHospitalName.trim(),
       phone: regAdminPhone.trim(),
@@ -104,6 +139,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       role: 'admin',
       createdAt: new Date().toISOString(),
       status: 'active',
+      recoveryKey: generatedKey,
     };
 
     // Save admin account, register active station, and bind device
@@ -130,10 +166,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         return;
       }
 
-      // 2. Validate Credentials
-      const auth = dbService.authenticateAdmin(registeredAdmin.username, adminPin);
+      if (!adminPassword.trim()) {
+        setPinError('Please enter your Administrator Master Password.');
+        return;
+      }
+
+      // 2. Validate Credentials strictly
+      const auth = dbService.authenticateAdmin(registeredAdmin.username, adminPassword);
       if (!auth.success) {
-        setPinError(auth.error || 'Incorrect Admin PIN. Default PIN is 1234');
+        setPinError(auth.error || 'Incorrect Master Password. Please try again or use "Forgot Master Password" to recover your account.');
         return;
       }
 
@@ -161,8 +202,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       // Technician authentication
       const techToAuth = technicians.find((t) => t.id === selectedTechId);
       if (techToAuth) {
-        if (techToAuth.pin && techPin.trim() && techPin.trim() !== techToAuth.pin && techPin.trim() !== '1234') {
-          setPinError(`Incorrect Technician PIN for ${techToAuth.name}. (Default: ${techToAuth.pin || '1234'})`);
+        if (techToAuth.pin && techPassword.trim() !== techToAuth.pin) {
+          setPinError(`Incorrect password for technician ${techToAuth.name}. Please try again or use "Forgot Password".`);
           return;
         }
         setPinError(null);
@@ -177,19 +218,19 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   // Handle Device Transfer
   const handleConfirmTransfer = () => {
-    if (!transferPin.trim()) {
-      setPinError('Please enter your Administrator Master PIN to authorize device transfer.');
+    if (!transferPassword.trim()) {
+      setPinError('Please enter your Administrator Master Password to authorize device transfer.');
       return;
     }
-    const cleanPin = transferPin.trim();
-    const correctPin = registeredAdmin?.pin || '1234';
+    const cleanPassword = transferPassword.trim();
+    const correctPassword = registeredAdmin?.pin || '1234';
 
-    if (cleanPin !== correctPin && cleanPin !== '1234' && cleanPin !== 'admin') {
-      setPinError('Incorrect Administrator PIN. Transfer authorization failed.');
+    if (cleanPassword !== correctPassword) {
+      setPinError('Incorrect Administrator Master Password. Transfer authorization failed.');
       return;
     }
 
-    dbService.transferDeviceBinding(cleanPin);
+    dbService.transferDeviceBinding(cleanPassword);
     setTransferSuccess('Single-device license successfully transferred and bound to this hardware terminal!');
     setDeviceLockout(null);
     setShowTransferConfirm(false);
@@ -199,6 +240,86 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       onSelectRole('admin', registeredAdmin?.name, undefined, registeredAdmin?.hospitalId, registeredAdmin?.hospitalName);
       onClose();
     }, 1200);
+  };
+
+  // Handle Administrator Password Recovery
+  const handleRecoverAdminPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    setAdminRecoverySuccess(null);
+
+    if (!adminRecoveryUser.trim()) {
+      setPinError('Please enter your Administrator username or registered email.');
+      return;
+    }
+    if (!adminRecoveryVerify.trim()) {
+      setPinError('Please provide your Security Recovery Key or registered phone number.');
+      return;
+    }
+    if (!adminNewPassword.trim() || adminNewPassword.trim().length < 4) {
+      setPinError('New Master Password must be at least 4 characters long.');
+      return;
+    }
+    if (adminNewPassword !== adminNewPasswordConfirm) {
+      setPinError('Password confirmation does not match.');
+      return;
+    }
+
+    const res = dbService.recoverAdminPassword(adminRecoveryUser, adminRecoveryVerify, adminNewPassword);
+    if (!res.success) {
+      setPinError(res.error || 'Password recovery failed. Please verify your credentials.');
+      return;
+    }
+
+    const updated = dbService.getAdminAccountSync();
+    setRegisteredAdmin(updated);
+    setAdminPassword(adminNewPassword);
+    setAdminRecoverySuccess('✓ Master Password successfully updated! You can now log in.');
+
+    setTimeout(() => {
+      setRecoveryMode('none');
+      setAdminRecoverySuccess(null);
+      setPinError(null);
+    }, 1600);
+  };
+
+  // Handle Technician Password Recovery
+  const handleRecoverTechPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    setTechRecoverySuccess(null);
+
+    if (!techRecoveryId) {
+      setPinError('Please select a technician account.');
+      return;
+    }
+    if (!techRecoveryVerify.trim()) {
+      setPinError('Please enter technician registered email, phone, recovery key, or Administrator Master Password.');
+      return;
+    }
+    if (!techNewPassword.trim() || techNewPassword.trim().length < 4) {
+      setPinError('New technician password must be at least 4 characters long.');
+      return;
+    }
+    if (techNewPassword !== techNewPasswordConfirm) {
+      setPinError('Password confirmation does not match.');
+      return;
+    }
+
+    const res = dbService.recoverTechnicianPassword(techRecoveryId, techRecoveryVerify, techNewPassword);
+    if (!res.success) {
+      setPinError(res.error || 'Technician password recovery failed.');
+      return;
+    }
+
+    setTechPassword(techNewPassword);
+    setTechRecoverySuccess('✓ Technician password successfully reset! You can now log in.');
+
+    setTimeout(() => {
+      setRecoveryMode('none');
+      setTechRecoverySuccess(null);
+      setPinError(null);
+    }, 1600);
   };
 
   return (
@@ -215,14 +336,22 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               <KeyRound className="w-5 h-5 text-teal-600" />
               <div>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0c2328' }}>
-                  {isRegisteringAdmin
+                  {recoveryMode === 'admin'
+                    ? 'Hospital Administrator — Password Recovery'
+                    : recoveryMode === 'technician'
+                    ? 'Clinical Technician — Password Recovery'
+                    : isRegisteringAdmin
                     ? 'Create Administration Account (First-Time Setup)'
                     : deviceLockout
                     ? 'Device Binding Security Lockout'
                     : 'Account & Role Switcher'}
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
-                  {isRegisteringAdmin
+                  {recoveryMode === 'admin'
+                    ? 'Verify registered clinic credentials or Security Recovery Key to reset your Master Password'
+                    : recoveryMode === 'technician'
+                    ? 'Reset technician login credentials via registered email/phone or Administrator Master Password'
+                    : isRegisteringAdmin
                     ? 'Initialize medical facility administration and bind this primary diagnostic station'
                     : deviceLockout
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
@@ -326,14 +455,33 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       This will revoke access on the previous station and register this machine as your single authorized terminal.
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                      <input
-                        type="password"
-                        placeholder="Master Admin PIN (1234)"
-                        value={transferPin}
-                        onChange={(e) => setTransferPin(e.target.value)}
-                        className="podoload-input"
-                        style={{ width: '160px', fontSize: '0.74rem' }}
-                      />
+                      <div style={{ position: 'relative', width: '200px' }}>
+                        <input
+                          type={showTransferPassword ? 'text' : 'password'}
+                          placeholder="Administrator Master Password"
+                          value={transferPassword}
+                          onChange={(e) => setTransferPassword(e.target.value)}
+                          className="podoload-input"
+                          style={{ width: '100%', fontSize: '0.74rem', paddingRight: '2rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowTransferPassword(!showTransferPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '2px',
+                          }}
+                        >
+                          {showTransferPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className="podoload-btn-primary"
@@ -391,8 +539,270 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </div>
                 )}
               </div>
+            ) : recoveryMode === 'admin' ? (
+              /* VIEW 2A: ADMINISTRATOR PASSWORD RECOVERY */
+              <form onSubmit={handleRecoverAdminPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#f0fdfa',
+                    border: '1px solid #99f6e4',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    fontSize: '0.74rem',
+                    color: '#0f766e',
+                  }}
+                >
+                  <Key className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Reset Administrator Master Password:</strong> Verify identity using your registered administrator username/email and either your Security Recovery Key or registered phone number.
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Administrator Username / Email *
+                    </label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={adminRecoveryUser}
+                      onChange={(e) => setAdminRecoveryUser(e.target.value)}
+                      placeholder="admin@technomind.health"
+                      style={{ fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Security Recovery Key OR Registered Phone *
+                    </label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={adminRecoveryVerify}
+                      onChange={(e) => setAdminRecoveryVerify(e.target.value)}
+                      placeholder="e.g. REC-TMH-9901 or phone digits"
+                      style={{ fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      New Master Password *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showAdminNewPassword ? 'text' : 'password'}
+                        className="podoload-input"
+                        value={adminNewPassword}
+                        onChange={(e) => setAdminNewPassword(e.target.value)}
+                        placeholder="Min. 4 characters"
+                        style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminNewPassword(!showAdminNewPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          padding: '2px',
+                        }}
+                      >
+                        {showAdminNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Confirm New Master Password *
+                    </label>
+                    <input
+                      type={showAdminNewPassword ? 'text' : 'password'}
+                      className="podoload-input"
+                      value={adminNewPasswordConfirm}
+                      onChange={(e) => setAdminNewPasswordConfirm(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={{ fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => {
+                      setRecoveryMode('none');
+                      setPinError(null);
+                    }}
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Login</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="podoload-btn-primary"
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Reset Master Password</span>
+                  </button>
+                </div>
+              </form>
+            ) : recoveryMode === 'technician' ? (
+              /* VIEW 2B: TECHNICIAN PASSWORD RECOVERY */
+              <form onSubmit={handleRecoverTechPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    fontSize: '0.74rem',
+                    color: '#0369a1',
+                  }}
+                >
+                  <KeyRound className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Reset Clinical Technician Password:</strong> Enter the technician registered contact details or have your Hospital Administrator authorize with their Master Password.
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.65rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Select Technician Account *
+                    </label>
+                    <select
+                      className="podoload-input"
+                      value={techRecoveryId}
+                      onChange={(e) => setTechRecoveryId(e.target.value)}
+                      style={{ fontSize: '0.76rem' }}
+                      required
+                    >
+                      {technicians.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.username}) · {t.hospitalName || 'Clinic'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Verification (Email / Phone / Master Password) *
+                    </label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      value={techRecoveryVerify}
+                      onChange={(e) => setTechRecoveryVerify(e.target.value)}
+                      placeholder="Technician email / phone / Master Password"
+                      style={{ fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      New Technician Password *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showTechNewPassword ? 'text' : 'password'}
+                        className="podoload-input"
+                        value={techNewPassword}
+                        onChange={(e) => setTechNewPassword(e.target.value)}
+                        placeholder="Min. 4 characters"
+                        style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTechNewPassword(!showTechNewPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          padding: '2px',
+                        }}
+                      >
+                        {showTechNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                      Confirm New Password *
+                    </label>
+                    <input
+                      type={showTechNewPassword ? 'text' : 'password'}
+                      className="podoload-input"
+                      value={techNewPasswordConfirm}
+                      onChange={(e) => setTechNewPasswordConfirm(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={{ fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => {
+                      setRecoveryMode('none');
+                      setPinError(null);
+                    }}
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Login</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="podoload-btn-primary"
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Reset Technician Password</span>
+                  </button>
+                </div>
+              </form>
             ) : isRegisteringAdmin ? (
-              /* VIEW 2: ADMIN ACCOUNT CREATION / REGISTRATION FORM */
+              /* VIEW 3: ADMIN ACCOUNT CREATION / REGISTRATION FORM */
               <form onSubmit={handleRegisterAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div
                   style={{
@@ -479,32 +889,70 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Master Admin PIN / Password *
+                      Master Password *
                     </label>
-                    <input
-                      type="password"
-                      className="podoload-input"
-                      value={regAdminPin}
-                      onChange={(e) => setRegAdminPin(e.target.value)}
-                      placeholder="e.g. 1234"
-                      style={{ fontSize: '0.78rem' }}
-                      required
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showRegPassword ? 'text' : 'password'}
+                        className="podoload-input"
+                        value={regAdminPassword}
+                        onChange={(e) => setRegAdminPassword(e.target.value)}
+                        placeholder="Create strong Master Password"
+                        style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          padding: '2px',
+                        }}
+                      >
+                        {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Confirm Master PIN *
+                      Confirm Master Password *
                     </label>
-                    <input
-                      type="password"
-                      className="podoload-input"
-                      value={regAdminPinConfirm}
-                      onChange={(e) => setRegAdminPinConfirm(e.target.value)}
-                      placeholder="Confirm PIN"
-                      style={{ fontSize: '0.78rem' }}
-                      required
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showRegConfirmPassword ? 'text' : 'password'}
+                        className="podoload-input"
+                        value={regAdminPasswordConfirm}
+                        onChange={(e) => setRegAdminPasswordConfirm(e.target.value)}
+                        placeholder="Confirm Master Password"
+                        style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          padding: '2px',
+                        }}
+                      >
+                        {showRegConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -521,7 +969,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     style={{ fontSize: '0.78rem' }}
                   />
                   <span style={{ fontSize: '0.66rem', color: '#64748b' }}>
-                    This machine ({dbService.getCurrentDeviceSync().id}) will be cryptographically bound as your single authorized terminal.
+                    This machine ({dbService.getCurrentDeviceSync().id}) will be cryptographically bound as your single authorized terminal. A Security Recovery Key will be generated upon creation.
                   </span>
                 </div>
 
@@ -529,7 +977,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   <button
                     type="button"
                     className="podoload-btn-secondary"
-                    onClick={() => setIsRegisteringAdmin(false)}
+                    onClick={() => {
+                      setIsRegisteringAdmin(false);
+                      setPinError(null);
+                    }}
                     style={{ fontSize: '0.72rem', alignSelf: 'flex-start', marginTop: '0.25rem' }}
                   >
                     ← Back to Login
@@ -537,7 +988,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 )}
               </form>
             ) : (
-              /* VIEW 3: STANDARD ROLE SWITCHER (Admin vs Technician) */
+              /* VIEW 4: STANDARD ROLE SWITCHER (Admin vs Technician) */
               <>
                 {/* Account 1: Hospital Administrator */}
                 <div
@@ -620,46 +1071,87 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <Lock className="w-3.5 h-3.5 text-slate-500" />
-                        <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Master PIN:</span>
-                        <input
-                          type="password"
-                          placeholder="1234"
-                          value={adminPin}
-                          onChange={(e) => {
-                            setAdminPin(e.target.value);
-                            setPinError(null);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            width: '80px',
-                            padding: '0.2rem 0.4rem',
-                            fontSize: '0.74rem',
-                            border: '1px solid #94a3b8',
-                            borderRadius: '4px',
-                          }}
-                        />
-                        <span style={{ fontSize: '0.64rem', color: '#94a3b8' }}>
-                          (Default: {registeredAdmin?.pin || '1234'})
-                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Master Password:</span>
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                          <input
+                            type={showAdminPassword ? 'text' : 'password'}
+                            placeholder="••••••••"
+                            value={adminPassword}
+                            onChange={(e) => {
+                              setAdminPassword(e.target.value);
+                              setPinError(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: '130px',
+                              padding: '0.2rem 1.6rem 0.2rem 0.4rem',
+                              fontSize: '0.74rem',
+                              border: '1px solid #94a3b8',
+                              borderRadius: '4px',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAdminPassword(!showAdminPassword);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '4px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#64748b',
+                              padding: '1px',
+                            }}
+                          >
+                            {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </button>
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsRegisteringAdmin(true);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '0.68rem',
-                          color: '#0f766e',
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        + Register New Admin Account
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRecoveryMode('admin');
+                            setPinError(null);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '0.68rem',
+                            color: '#0f766e',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Forgot Master Password?
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsRegisteringAdmin(true);
+                            setPinError(null);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '0.68rem',
+                            color: '#0f766e',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + Register New Admin Account
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -763,29 +1255,73 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         </select>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           <Lock className="w-3.5 h-3.5 text-slate-500" />
-                          <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Login PIN:</span>
-                          <input
-                            type="password"
-                            placeholder="1234"
-                            value={techPin}
-                            onChange={(e) => {
-                              setTechPin(e.target.value);
+                          <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Password:</span>
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <input
+                              type={showTechPassword ? 'text' : 'password'}
+                              placeholder="••••••••"
+                              value={techPassword}
+                              onChange={(e) => {
+                                setTechPassword(e.target.value);
+                                setPinError(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: '130px',
+                                padding: '0.2rem 1.6rem 0.2rem 0.4rem',
+                                fontSize: '0.74rem',
+                                border: '1px solid #94a3b8',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowTechPassword(!showTechPassword);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                right: '4px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#64748b',
+                                padding: '1px',
+                              }}
+                            >
+                              {showTechPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRecoveryMode('technician');
+                              setTechRecoveryId(selectedTechId);
                               setPinError(null);
                             }}
-                            onClick={(e) => e.stopPropagation()}
                             style={{
-                              width: '80px',
-                              padding: '0.2rem 0.4rem',
-                              fontSize: '0.74rem',
-                              border: '1px solid #94a3b8',
-                              borderRadius: '4px',
+                              background: 'none',
+                              border: 'none',
+                              fontSize: '0.68rem',
+                              color: '#0284c7',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
                             }}
-                          />
-                          <span style={{ fontSize: '0.64rem', color: '#94a3b8' }}>
-                            (Default PIN: {currentActiveTech?.pin || '1234'})
+                          >
+                            Forgot Password?
+                          </button>
+                          <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                            (Admin can also view/reset in Admin Panel)
                           </span>
                         </div>
                       </div>
@@ -811,6 +1347,38 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               </div>
             )}
 
+            {adminRecoverySuccess && (
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  color: '#166534',
+                  fontWeight: 600,
+                }}
+              >
+                {adminRecoverySuccess}
+              </div>
+            )}
+
+            {techRecoverySuccess && (
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  color: '#166534',
+                  fontWeight: 600,
+                }}
+              >
+                {techRecoverySuccess}
+              </div>
+            )}
+
             {transferSuccess && (
               <div
                 style={{
@@ -829,7 +1397,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           </div>
 
           {/* Modal Actions */}
-          {!deviceLockout && (
+          {!deviceLockout && recoveryMode === 'none' && (
             <div className="podoload-modal-footer" style={{ justifyContent: 'space-between' }}>
               <button type="button" className="podoload-btn-secondary" onClick={onClose}>
                 Cancel

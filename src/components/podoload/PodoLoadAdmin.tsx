@@ -27,6 +27,8 @@ import {
   Key,
   ShieldAlert,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
 import { dbService } from '../../services/dbService';
@@ -105,11 +107,19 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [showAddTech, setShowAddTech] = useState(false);
   const [newTechName, setNewTechName] = useState('');
   const [newTechUsername, setNewTechUsername] = useState('');
-  const [newTechPin, setNewTechPin] = useState('1234');
+  const [newTechPin, setNewTechPin] = useState('');
+  const [showNewTechPin, setShowNewTechPin] = useState(false);
   const [newTechHospitalId, setNewTechHospitalId] = useState(activeHospital.id);
   const [newTechPhone, setNewTechPhone] = useState('');
   const [newTechEmail, setNewTechEmail] = useState('');
   const [newTechNotes, setNewTechNotes] = useState('');
+
+  // Admin Technician Password Maintenance State
+  const [visibleTechPasswords, setVisibleTechPasswords] = useState<{ [id: string]: boolean }>({});
+  const [editingTechPassword, setEditingTechPassword] = useState<TechnicianUser | null>(null);
+  const [techEditPasswordVal, setTechEditPasswordVal] = useState('');
+  const [showTechEditPasswordVal, setShowTechEditPasswordVal] = useState(false);
+  const [techPasswordModalError, setTechPasswordModalError] = useState<string | null>(null);
 
   // Hospital-wise Patient Details filtering state
   const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('ALL');
@@ -287,12 +297,13 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     }
 
     const assignedHosp = hospitals.find((h) => h.id === newTechHospitalId) || activeHospital;
+    const generatedPass = 'Tech' + Math.floor(1000 + Math.random() * 9000);
 
     const newTech: TechnicianUser = {
       id: `tech-${Date.now()}`,
       name: newTechName.trim(),
       username: newTechUsername.trim().toLowerCase(),
-      pin: newTechPin.trim() || '1234',
+      pin: newTechPin.trim() || generatedPass,
       hospitalId: assignedHosp.id,
       hospitalName: assignedHosp.name,
       role: 'technician',
@@ -301,6 +312,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       phone: newTechPhone.trim(),
       email: newTechEmail.trim(),
       notes: newTechNotes.trim(),
+      recoveryKey: 'REC-TECH-' + Math.floor(1000 + Math.random() * 9000),
     };
 
     await dbService.saveTechnician(newTech);
@@ -308,12 +320,29 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setShowAddTech(false);
     setNewTechName('');
     setNewTechUsername('');
-    setNewTechPin('1234');
+    setNewTechPin('');
+    setShowNewTechPin(false);
     setNewTechPhone('');
     setNewTechEmail('');
     setNewTechNotes('');
 
     setSaveSuccess(`✓ Technician login created: ${newTech.name} (${assignedHosp.name})`);
+    setTimeout(() => setSaveSuccess(null), 3500);
+  };
+
+  const handleSaveTechPassword = async () => {
+    if (!editingTechPassword) return;
+    if (!techEditPasswordVal.trim() || techEditPasswordVal.trim().length < 4) {
+      setTechPasswordModalError('Technician password must be at least 4 characters long.');
+      return;
+    }
+
+    await dbService.updateTechnicianPassword(editingTechPassword.id, techEditPasswordVal.trim());
+    setTechniciansList(dbService.getTechniciansSync());
+    setSaveSuccess(`✓ Password successfully updated for technician "${editingTechPassword.name}".`);
+    setEditingTechPassword(null);
+    setTechEditPasswordVal('');
+    setTechPasswordModalError(null);
     setTimeout(() => setSaveSuccess(null), 3500);
   };
 
@@ -853,14 +882,47 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                       />
                     </div>
                     <div className="podoload-form-group">
-                      <label className="podoload-label">Login PIN</label>
-                      <input
-                        type="password"
-                        className="podoload-input"
-                        placeholder="1234"
-                        value={newTechPin}
-                        onChange={(e) => setNewTechPin(e.target.value)}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <label className="podoload-label">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const gen = 'Tech' + Math.floor(1000 + Math.random() * 9000);
+                            setNewTechPin(gen);
+                            setShowNewTechPin(true);
+                          }}
+                          style={{ background: 'none', border: 'none', fontSize: '0.62rem', color: '#0d9488', cursor: 'pointer', padding: 0 }}
+                        >
+                          ⚡ Auto-Gen
+                        </button>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showNewTechPin ? 'text' : 'password'}
+                          className="podoload-input"
+                          placeholder="Enter password"
+                          value={newTechPin}
+                          onChange={(e) => setNewTechPin(e.target.value)}
+                          style={{ paddingRight: '1.8rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewTechPin(!showNewTechPin)}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '1px',
+                          }}
+                        >
+                          {showNewTechPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="podoload-form-group">
                       <label className="podoload-label">Assigned Hospital Facility</label>
@@ -928,7 +990,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                     <th style={{ textAlign: 'left' }}>TECHNICIAN NAME</th>
                     <th style={{ textAlign: 'left' }}>LOGIN USERNAME</th>
                     <th style={{ textAlign: 'left' }}>ASSIGNED HOSPITAL</th>
-                    <th style={{ textAlign: 'left' }}>PIN</th>
+                    <th style={{ textAlign: 'left' }}>PASSWORD & CREDENTIALS</th>
                     <th style={{ textAlign: 'center' }}>STATUS</th>
                     <th style={{ textAlign: 'right' }}>ACTIONS</th>
                   </tr>
@@ -953,7 +1015,34 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
                         </span>
                       </td>
                       <td>
-                        <span style={{ letterSpacing: '0.1em', color: '#64748b' }}>••••</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <code style={{ fontSize: '0.72rem', backgroundColor: '#f8fafc', padding: '2px 5px', borderRadius: '3px', letterSpacing: visibleTechPasswords[tech.id] ? 'normal' : '0.12em', color: visibleTechPasswords[tech.id] ? '#0f766e' : '#64748b' }}>
+                            {visibleTechPasswords[tech.id] ? (tech.pin || '••••••••') : '••••••••'}
+                          </code>
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+                            onClick={() => setVisibleTechPasswords((prev) => ({ ...prev, [tech.id]: !prev[tech.id] }))}
+                            title={visibleTechPasswords[tech.id] ? 'Hide password' : 'View technician password'}
+                          >
+                            {visibleTechPasswords[tech.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            className="podoload-btn-secondary"
+                            style={{ fontSize: '0.62rem', padding: '0.15rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            onClick={() => {
+                              setEditingTechPassword(tech);
+                              setTechEditPasswordVal(tech.pin || '');
+                              setShowTechEditPasswordVal(false);
+                              setTechPasswordModalError(null);
+                            }}
+                            title="Admin Maintenance: Reset or update password for this technician"
+                          >
+                            <Key className="w-3 h-3 text-teal-600" />
+                            <span>Change</span>
+                          </button>
+                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <button
@@ -1967,6 +2056,154 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Admin Technician Password Maintenance Modal */}
+      {editingTechPassword && (
+        <div
+          className="podoload-modal-backdrop"
+          onClick={() => setEditingTechPassword(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="podoload-modal-box"
+            style={{ maxWidth: '440px', width: '92%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="podoload-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <KeyRound className="w-5 h-5 text-teal-600" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#0c2328' }}>
+                    Maintain Technician Password
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                    Update or reset password for {editingTechPassword.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="podoload-modal-close-btn"
+                onClick={() => setEditingTechPassword(null)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div
+                style={{
+                  backgroundColor: '#f0fdfa',
+                  border: '1px solid #99f6e4',
+                  borderRadius: '6px',
+                  padding: '0.6rem 0.75rem',
+                  fontSize: '0.72rem',
+                  color: '#0f766e',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div><strong>Login Username:</strong> <code>{editingTechPassword.username}</code></div>
+                <div><strong>Assigned Clinic:</strong> {editingTechPassword.hospitalName || 'Clinic'}</div>
+                {editingTechPassword.recoveryKey && (
+                  <div><strong>Security Recovery Key:</strong> <code>{editingTechPassword.recoveryKey}</code></div>
+                )}
+              </div>
+
+              <div className="podoload-form-group">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label className="podoload-label">New Technician Password *</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const gen = 'Tech' + Math.floor(1000 + Math.random() * 9000) + '!';
+                      setTechEditPasswordVal(gen);
+                      setShowTechEditPasswordVal(true);
+                      setTechPasswordModalError(null);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '0.66rem',
+                      color: '#0d9488',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ⚡ Generate Password
+                  </button>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showTechEditPasswordVal ? 'text' : 'password'}
+                    className="podoload-input"
+                    value={techEditPasswordVal}
+                    onChange={(e) => {
+                      setTechEditPasswordVal(e.target.value);
+                      setTechPasswordModalError(null);
+                    }}
+                    placeholder="Enter new password (min. 4 characters)"
+                    style={{ fontSize: '0.76rem', paddingRight: '2rem' }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTechEditPasswordVal(!showTechEditPasswordVal)}
+                    style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                      padding: '2px',
+                    }}
+                  >
+                    {showTechEditPasswordVal ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {techPasswordModalError && (
+                <div
+                  style={{
+                    color: '#b91c1c',
+                    fontSize: '0.72rem',
+                    backgroundColor: '#fef2f2',
+                    padding: '0.4rem 0.6rem',
+                    borderRadius: '4px',
+                    border: '1px solid #fecaca',
+                  }}
+                >
+                  {techPasswordModalError}
+                </div>
+              )}
+            </div>
+
+            <div className="podoload-modal-footer">
+              <button
+                type="button"
+                className="podoload-btn-secondary"
+                onClick={() => setEditingTechPassword(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={handleSaveTechPassword}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Check className="w-4 h-4" />
+                <span>Save New Password</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Multi-Device Payment & License Expansion Modal */}
       <PodoLoadDevicePaymentModal

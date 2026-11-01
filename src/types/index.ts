@@ -257,7 +257,7 @@ export interface TechnicianUser {
   id: string;
   name: string;
   username: string; // Login ID, e.g. sarah.tech or tech@hospital.com
-  pin: string; // Login PIN or password, e.g. 1234
+  pin: string; // Login Password
   hospitalId: string; // Associated hospital ID
   hospitalName?: string;
   role: 'technician';
@@ -267,6 +267,7 @@ export interface TechnicianUser {
   phone?: string;
   email?: string;
   notes?: string;
+  recoveryKey?: string;
 }
 
 export interface HospitalProfile {
@@ -298,7 +299,7 @@ export interface AdminAccount {
   id: string;
   name: string;
   username: string; // Login ID / Email, e.g. admin@technomind.health
-  pin: string; // Master Admin Password / PIN
+  pin: string; // Master Admin Password
   hospitalId: string;
   hospitalName: string;
   role: 'admin';
@@ -308,6 +309,7 @@ export interface AdminAccount {
   lastLoginAt?: string;
   primaryDeviceId?: string;
   status: 'active' | 'suspended';
+  recoveryKey?: string;
 }
 
 export interface BoundDevice {

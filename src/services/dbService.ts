@@ -162,6 +162,7 @@ export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
   email: 'admin@technomind.health',
   createdAt: '2026-01-01T00:00:00.000Z',
   status: 'active',
+  recoveryKey: 'REC-TMH-9901',
 };
 
 export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
@@ -178,6 +179,7 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
     phone: '+1 (800) 555-PODO',
     email: 'tech@technomind.health',
     notes: 'Primary Clinical Lab Technician',
+    recoveryKey: 'REC-TECH-1001',
   },
   {
     id: 'tech-user-02',
@@ -192,6 +194,7 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
     phone: '+1 (800) 555-METRO',
     email: 'kavita@metropodiatry.com',
     notes: 'Outpatient Biomechanics Technician',
+    recoveryKey: 'REC-TECH-1002',
   },
 ];
 
@@ -1138,7 +1141,7 @@ class PodoPressDatabase {
       (t) =>
         t.status === 'active' &&
         (t.username.toLowerCase() === normalizedUser || t.email?.toLowerCase() === normalizedUser) &&
-        (!t.pin || t.pin === cleanPin || cleanPin === '1234' || cleanPin === 'admin')
+        (!t.pin || t.pin === cleanPin)
     );
 
     return tech || null;
@@ -1269,6 +1272,7 @@ class PodoPressDatabase {
       id: account.id || 'admin-' + Math.random().toString(36).substring(2, 9),
       createdAt: account.createdAt || new Date().toISOString(),
       status: 'active',
+      recoveryKey: account.recoveryKey || 'REC-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
     };
 
     try {
@@ -1319,7 +1323,7 @@ class PodoPressDatabase {
       const matchUser =
         registered.username.toLowerCase() === cleanUser ||
         (registered.email && registered.email.toLowerCase() === cleanUser);
-      const matchPin = registered.pin === cleanPin || cleanPin === '1234' || cleanPin === 'admin';
+      const matchPin = registered.pin === cleanPin;
 
       if (matchUser && matchPin) {
         registered.lastLoginAt = new Date().toISOString();
@@ -1330,7 +1334,7 @@ class PodoPressDatabase {
         }
         return { success: true, account: registered };
       }
-      return { success: false, error: 'Invalid Administrator username or PIN.' };
+      return { success: false, error: 'Invalid Administrator username or Master Password.' };
     }
 
     // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
@@ -1339,6 +1343,114 @@ class PodoPressDatabase {
     }
 
     return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
+  }
+
+  public recoverAdminPassword(
+    usernameOrEmail: string,
+    verificationCodeOrPhone: string,
+    newPassword: string
+  ): { success: boolean; error?: string } {
+    const registered = this.getAdminAccountSync();
+    if (!registered) {
+      return { success: false, error: 'No administrator account found on this station.' };
+    }
+
+    const cleanUser = usernameOrEmail.trim().toLowerCase();
+    const matchUser =
+      registered.username.toLowerCase() === cleanUser ||
+      (registered.email && registered.email.toLowerCase() === cleanUser);
+
+    if (!matchUser) {
+      return { success: false, error: 'Username or email does not match the registered Administrator account.' };
+    }
+
+    const cleanVerify = verificationCodeOrPhone.trim().toUpperCase();
+    const cleanPhone = (registered.phone || '').replace(/[^0-9]/g, '');
+    const inputDigits = verificationCodeOrPhone.replace(/[^0-9]/g, '');
+
+    const keyMatches = registered.recoveryKey && registered.recoveryKey.toUpperCase() === cleanVerify;
+    const phoneMatches = inputDigits.length >= 4 && cleanPhone.endsWith(inputDigits);
+    const emailMatches = registered.email && registered.email.toLowerCase() === verificationCodeOrPhone.trim().toLowerCase();
+
+    if (!keyMatches && !phoneMatches && !emailMatches) {
+      return {
+        success: false,
+        error: 'Verification failed. Please provide your Security Recovery Key, registered phone number, or email.',
+      };
+    }
+
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, error: 'New Master Password must be at least 4 characters long.' };
+    }
+
+    registered.pin = newPassword.trim();
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
+      const list = this.getAdminAccountsListSync();
+      const idx = list.findIndex((a) => a.id === registered.id);
+      if (idx >= 0) list[idx] = registered;
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+
+    return { success: true };
+  }
+
+  public recoverTechnicianPassword(
+    technicianIdOrUsername: string,
+    verificationCodeOrEmail: string,
+    newPassword: string
+  ): { success: boolean; error?: string } {
+    const list = this.getTechniciansSync();
+    const cleanId = technicianIdOrUsername.trim().toLowerCase();
+    const tech = list.find(
+      (t) =>
+        t.id.toLowerCase() === cleanId ||
+        t.username.toLowerCase() === cleanId ||
+        (t.email && t.email.toLowerCase() === cleanId)
+    );
+
+    if (!tech) {
+      return { success: false, error: 'Technician account not found.' };
+    }
+
+    const cleanVerify = verificationCodeOrEmail.trim().toUpperCase();
+    const techDigits = (tech.phone || '').replace(/[^0-9]/g, '');
+    const inputDigits = verificationCodeOrEmail.replace(/[^0-9]/g, '');
+
+    const keyMatches = tech.recoveryKey && tech.recoveryKey.toUpperCase() === cleanVerify;
+    const phoneMatches = inputDigits.length >= 4 && techDigits.endsWith(inputDigits);
+    const emailMatches = tech.email && tech.email.toLowerCase() === verificationCodeOrEmail.trim().toLowerCase();
+
+    // Also check if admin master password provided as authorized reset
+    const adminAccount = this.getAdminAccountSync();
+    const adminOverride = adminAccount && adminAccount.pin === verificationCodeOrEmail.trim();
+
+    if (!keyMatches && !phoneMatches && !emailMatches && !adminOverride) {
+      return {
+        success: false,
+        error: 'Verification failed. Please enter the technician registered email/phone or have an Administrator authorize with Master Password.',
+      };
+    }
+
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, error: 'New password must be at least 4 characters long.' };
+    }
+
+    tech.pin = newPassword.trim();
+    this.saveTechnician(tech);
+    return { success: true };
+  }
+
+  public async updateTechnicianPassword(technicianId: string, newPassword: string): Promise<boolean> {
+    const list = this.getTechniciansSync();
+    const tech = list.find((t) => t.id === technicianId);
+    if (!tech) return false;
+
+    tech.pin = newPassword.trim();
+    await this.saveTechnician(tech);
+    return true;
   }
 
   // =========================================================================
