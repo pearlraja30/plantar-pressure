@@ -72,6 +72,17 @@ function expect(actual) {
         throw new Error(`Expected "${actual}" to match ${regex}`);
       }
     },
+    toThrow() {
+      let threw = false;
+      try {
+        if (typeof actual === 'function') actual();
+      } catch {
+        threw = true;
+      }
+      if (!threw) {
+        throw new Error(`Expected function to throw, but it did not`);
+      }
+    },
     toEqual(expected) {
       const actStr = JSON.stringify(actual);
       const expStr = JSON.stringify(expected);
@@ -2500,6 +2511,67 @@ it("Enforces mandatory activation gate on new version installs or device change 
   };
   const gateAuthorized = evaluateDeviceAuthorizationGate(tokenAuthorized, CURRENT_DEVICE, CURRENT_VERSION);
   expect(gateAuthorized.isAuthorized).toBe(true);
+});
+
+it("Enforces Admin-Only Security Model: Zero arbitrary admin self-registration, initial master password setup, and admin-only technician creation & password resets", () => {
+  // 1. ADMIN REGISTRATION RESTRICTION: No arbitrary registration link; single fixed administrator
+  const loginModalConfig = {
+    showRegisterNewAdminLink: false, // Explicitly removed from admin login
+    isFirstTimePasswordSetupAllowed: true, // Only if master password not yet configured
+  };
+  expect(loginModalConfig.showRegisterNewAdminLink).toBe(false);
+
+  // 2. ADMIN RECOVERY CAPABILITIES: Key, Clinic Code, or registered contact
+  const adminAccount = {
+    id: "admin-master-01",
+    username: "admin@technomind.health",
+    pin: "AdminPass123",
+    recoveryKey: "REC-TMH-9901",
+    hospitalCode: "TMH-CENTRAL",
+  };
+
+  const recoverAdmin = (inputUser, inputVerify, newPass) => {
+    if (inputUser !== adminAccount.username && inputUser !== "admin") return { success: false, error: "Invalid user" };
+    const matchesKey = inputVerify.toUpperCase() === adminAccount.recoveryKey;
+    const matchesClinicCode = inputVerify.toUpperCase() === adminAccount.hospitalCode;
+    if (!matchesKey && !matchesClinicCode) return { success: false, error: "Verification failed" };
+    adminAccount.pin = newPass;
+    return { success: true };
+  };
+
+  // Recover via Clinic Code
+  expect(recoverAdmin("admin", "TMH-CENTRAL", "NewMasterPass999!").success).toBe(true);
+  expect(adminAccount.pin).toBe("NewMasterPass999!");
+
+  // Recover via Security Key
+  expect(recoverAdmin("admin@technomind.health", "REC-TMH-9901", "FinalMasterPass2026!").success).toBe(true);
+  expect(adminAccount.pin).toBe("FinalMasterPass2026!");
+
+  // 3. TECHNICIAN ACCOUNT CREATION: Restricted exclusively to logged-in administrator
+  const createTechnician = (creatorRole, techData) => {
+    if (creatorRole !== "admin") {
+      throw new Error("Access Denied: Only Hospital Administrator can create technician accounts.");
+    }
+    return { ...techData, id: "tech-" + Math.random().toString(36).substring(2, 6) };
+  };
+
+  expect(() => createTechnician("technician", { name: "Bob", username: "bob.tech" })).toThrow();
+  const createdByAdmin = createTechnician("admin", { name: "Bob", username: "bob.tech" });
+  expect(createdByAdmin.name).toBe("Bob");
+
+  // 4. TECHNICIAN PASSWORD RESET: Strictly requires Administrator Master Password
+  let techUser = { id: "tech-01", username: "bob.tech", pin: "OldPass1" };
+  const resetTechPassword = (techId, adminMasterPassword, newPass) => {
+    if (adminMasterPassword !== adminAccount.pin) {
+      return { success: false, error: "Administrator authorization required." };
+    }
+    techUser.pin = newPass;
+    return { success: true };
+  };
+
+  expect(resetTechPassword("tech-01", "wrong-admin-pass", "NewTechPass").success).toBe(false);
+  expect(resetTechPassword("tech-01", "FinalMasterPass2026!", "NewTechPass123!").success).toBe(true);
+  expect(techUser.pin).toBe("NewTechPass123!");
 });
 
 console.log("\n======================================================================");

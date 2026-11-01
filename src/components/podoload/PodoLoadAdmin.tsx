@@ -1388,7 +1388,7 @@ Once authenticated, the station operates 100% offline. Diagnostic reports will a
                             title="Admin Maintenance: Reset or update password for this technician"
                           >
                             <Key className="w-3 h-3 text-teal-600" />
-                            <span>Change</span>
+                            <span>Reset Password</span>
                           </button>
                         </div>
                       </td>
@@ -2433,10 +2433,10 @@ Once authenticated, the station operates 100% offline. Diagnostic reports will a
                 <KeyRound className="w-5 h-5 text-teal-600" />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#0c2328' }}>
-                    Maintain Technician Password
+                    Reset Technician Password (Admin Authorization)
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
-                    Update or reset password for {editingTechPassword.name}
+                    Admin-controlled credential reset &amp; password generation for {editingTechPassword.name}
                   </p>
                 </div>
               </div>

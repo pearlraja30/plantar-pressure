@@ -329,6 +329,7 @@ export interface AdminAccount {
   primaryDeviceId?: string;
   status: 'active' | 'suspended';
   recoveryKey?: string;
+  isInitialSetupCompleted?: boolean;
 }
 
 export interface BoundDevice {

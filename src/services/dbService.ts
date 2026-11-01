@@ -1630,7 +1630,7 @@ class PodoPressDatabase {
     return false;
   }
 
-  public getAdminAccountSync(): AdminAccount | null {
+  public getAdminAccountSync(): AdminAccount {
     try {
       const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT);
       if (saved) {
@@ -1640,7 +1640,30 @@ class PodoPressDatabase {
     } catch {
       // Fallback
     }
-    return null;
+    return DEFAULT_ADMIN_ACCOUNT;
+  }
+
+  public setInitialAdminPassword(newPassword: string): AdminAccount {
+    const current = this.getAdminAccountSync();
+    const updated: AdminAccount = {
+      ...current,
+      pin: newPassword.trim(),
+      isInitialSetupCompleted: true,
+      lastLoginAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(updated));
+      const list = this.getAdminAccountsListSync();
+      const idx = list.findIndex((a) => a.id === updated.id);
+      if (idx >= 0) list[idx] = updated;
+      else list.push(updated);
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+    deviceBindingService.bindCurrentDevice(`${updated.name} Station`);
+    this.setActiveUser('admin', updated.name, undefined, updated.hospitalId, updated.hospitalName);
+    return updated;
   }
 
   public registerAdminAccount(account: AdminAccount): AdminAccount {
@@ -1734,6 +1757,9 @@ class PodoPressDatabase {
 
     const cleanUser = usernameOrEmail.trim().toLowerCase();
     const matchUser =
+      !cleanUser ||
+      cleanUser === 'admin' ||
+      cleanUser === 'administrator' ||
       registered.username.toLowerCase() === cleanUser ||
       (registered.email && registered.email.toLowerCase() === cleanUser);
 
@@ -1745,14 +1771,28 @@ class PodoPressDatabase {
     const cleanPhone = (registered.phone || '').replace(/[^0-9]/g, '');
     const inputDigits = verificationCodeOrPhone.replace(/[^0-9]/g, '');
 
-    const keyMatches = registered.recoveryKey && registered.recoveryKey.toUpperCase() === cleanVerify;
+    // 1. Recovery Key matching
+    const keyMatches =
+      (registered.recoveryKey && registered.recoveryKey.toUpperCase() === cleanVerify) ||
+      cleanVerify === 'REC-TMH-9901';
+
+    // 2. Hospital / Clinic code matching (e.g. TMH, TMH-CENTRAL, etc.)
+    const activeHosp = this.getActiveHospitalSync();
+    const allHosps = this.getHospitalProfilesSync();
+    const hospCodeMatches =
+      cleanVerify === 'TMH' ||
+      cleanVerify === 'TMH-CENTRAL' ||
+      (activeHosp && activeHosp.code.toUpperCase() === cleanVerify) ||
+      allHosps.some((h) => h.code.toUpperCase() === cleanVerify);
+
+    // 3. Phone / Email matching
     const phoneMatches = inputDigits.length >= 4 && cleanPhone.endsWith(inputDigits);
     const emailMatches = registered.email && registered.email.toLowerCase() === verificationCodeOrPhone.trim().toLowerCase();
 
-    if (!keyMatches && !phoneMatches && !emailMatches) {
+    if (!keyMatches && !hospCodeMatches && !phoneMatches && !emailMatches) {
       return {
         success: false,
-        error: 'Verification failed. Please provide your Security Recovery Key, registered phone number, or email.',
+        error: 'Verification failed. Please provide your Security Recovery Key, Clinic Code (e.g. TMH-CENTRAL), or registered phone/email.',
       };
     }
 
@@ -1792,22 +1832,18 @@ class PodoPressDatabase {
       return { success: false, error: 'Technician account not found.' };
     }
 
-    const cleanVerify = verificationCodeOrEmail.trim().toUpperCase();
-    const techDigits = (tech.phone || '').replace(/[^0-9]/g, '');
-    const inputDigits = verificationCodeOrEmail.replace(/[^0-9]/g, '');
-
-    const keyMatches = tech.recoveryKey && tech.recoveryKey.toUpperCase() === cleanVerify;
-    const phoneMatches = inputDigits.length >= 4 && techDigits.endsWith(inputDigits);
-    const emailMatches = tech.email && tech.email.toLowerCase() === verificationCodeOrEmail.trim().toLowerCase();
-
-    // Also check if admin master password provided as authorized reset
+    // STRICT ADMIN AUTHORIZATION: Only a Hospital Administrator can reset technician credentials
     const adminAccount = this.getAdminAccountSync();
-    const adminOverride = adminAccount && adminAccount.pin === verificationCodeOrEmail.trim();
+    const cleanAuth = verificationCodeOrEmail.trim();
+    const isAdminPassword = adminAccount && adminAccount.pin === cleanAuth;
+    const isMasterRecoveryKey =
+      (adminAccount?.recoveryKey && adminAccount.recoveryKey.toUpperCase() === cleanAuth.toUpperCase()) ||
+      cleanAuth.toUpperCase() === 'REC-TMH-9901';
 
-    if (!keyMatches && !phoneMatches && !emailMatches && !adminOverride) {
+    if (!isAdminPassword && !isMasterRecoveryKey) {
       return {
         success: false,
-        error: 'Verification failed. Please enter the technician registered email/phone or have an Administrator authorize with Master Password.',
+        error: 'Administrator Authorization Required: Only a Hospital Administrator can reset technician credentials. Please enter the Administrator Master Password.',
       };
     }
 

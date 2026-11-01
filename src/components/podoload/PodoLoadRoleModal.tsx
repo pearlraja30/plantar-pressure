@@ -55,7 +55,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
 
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
-  const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount | null>(() => dbService.getAdminAccountSync());
+  const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
   const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(isMobileDevice ? 'technician' : currentUser.role);
   const [selectedTechId, setSelectedTechId] = useState<string>(
     currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
@@ -110,19 +110,12 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [isActivating, setIsActivating] = useState(false);
   const [actSuccessMsg, setActSuccessMsg] = useState<string | null>(null);
 
-  // Admin Account Creation / Registration Form State
-  const [isRegisteringAdmin, setIsRegisteringAdmin] = useState<boolean>(!registeredAdmin);
-  const [regAdminName, setRegAdminName] = useState('Dr. Specialist');
-  const [regAdminUsername, setRegAdminUsername] = useState('admin@technomind.health');
-  const [regHospitalName, setRegHospitalName] = useState(
-    dbService.getActiveHospitalSync()?.name || 'Technomind Healthcare Systems'
-  );
+  // Initial Master Password Setup State (for first-time station configuration only)
+  const [isSettingInitialPassword, setIsSettingInitialPassword] = useState<boolean>(false);
   const [regAdminPassword, setRegAdminPassword] = useState('');
   const [regAdminPasswordConfirm, setRegAdminPasswordConfirm] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
-  const [regAdminPhone, setRegAdminPhone] = useState('+1 (800) 555-PODO');
-  const [regDeviceName, setRegDeviceName] = useState(dbService.getCurrentDeviceSync()?.name || 'Main Diagnostic Workstation');
 
   // Device Binding Lockout State
   const [deviceLockout, setDeviceLockout] = useState<{
@@ -144,48 +137,29 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   const currentActiveTech = technicians.find((t) => t.id === selectedTechId) || technicians[0];
 
-  // Handle Admin Registration
-  const handleRegisterAdmin = (e: React.FormEvent) => {
+  // Handle First-Time Administrator Master Password Setup
+  const handleSetInitialPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regAdminName.trim() || !regAdminUsername.trim() || !regAdminPassword.trim()) {
-      setPinError('Please complete all required fields (Name, Username/Email, and Master Password).');
-      return;
-    }
-    if (regAdminPassword !== regAdminPasswordConfirm) {
-      setPinError('Master Password confirmation does not match. Please re-enter.');
+    if (!regAdminPassword.trim()) {
+      setPinError('Please enter a Master Password.');
       return;
     }
     if (regAdminPassword.trim().length < 4) {
       setPinError('Master Password must be at least 4 characters long.');
       return;
     }
+    if (regAdminPassword !== regAdminPasswordConfirm) {
+      setPinError('Master Password confirmation does not match. Please re-enter.');
+      return;
+    }
 
-    const generatedKey = 'REC-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const newAdmin: AdminAccount = {
-      id: 'admin-' + Math.random().toString(36).substring(2, 9),
-      name: regAdminName.trim(),
-      username: regAdminUsername.trim(),
-      pin: regAdminPassword.trim(),
-      hospitalId: dbService.getActiveHospitalSync()?.id || 'hosp-technomind-main',
-      hospitalName: regHospitalName.trim(),
-      phone: regAdminPhone.trim(),
-      email: regAdminUsername.includes('@') ? regAdminUsername.trim() : undefined,
-      role: 'admin',
-      createdAt: new Date().toISOString(),
-      status: 'active',
-      recoveryKey: generatedKey,
-    };
-
-    // Save admin account, register active station, and bind device
-    const saved = dbService.registerAdminAccount(newAdmin);
-    dbService.bindCurrentDevice(regDeviceName.trim() || 'Primary Diagnostic Terminal');
-    setRegisteredAdmin(saved);
-    setIsRegisteringAdmin(false);
+    const updated = dbService.setInitialAdminPassword(regAdminPassword.trim());
+    setRegisteredAdmin(updated);
+    setIsSettingInitialPassword(false);
     setPinError(null);
 
-    // Automatically log in as the newly created Admin
-    onSelectRole('admin', saved.name, undefined, saved.hospitalId, saved.hospitalName);
+    // Automatically log in as Administrator
+    onSelectRole('admin', updated.name, undefined, updated.hospitalId, updated.hospitalName);
     onClose();
   };
 
@@ -195,12 +169,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     setDeviceLockout(null);
 
     if (selectedRole === 'admin') {
-      // 1. If no admin registered yet, guide user to create account
-      if (!registeredAdmin) {
-        setIsRegisteringAdmin(true);
-        return;
-      }
-
       if (!adminPassword.trim()) {
         setPinError('Please enter your Administrator Master Password.');
         return;
@@ -431,9 +399,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   {recoveryMode === 'admin'
                     ? 'Hospital Administrator — Password Recovery'
                     : recoveryMode === 'technician'
-                    ? 'Clinical Technician — Password Recovery'
-                    : isRegisteringAdmin
-                    ? 'Create Administration Account (First-Time Setup)'
+                    ? 'Clinical Technician — Password Recovery (Admin Authorized)'
+                    : isSettingInitialPassword
+                    ? 'Set Administrator Master Password (First-Time Setup)'
                     : deviceLockout
                     ? 'Device Binding Security Lockout'
                     : isMandatoryActivation
@@ -448,11 +416,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
                   {recoveryMode === 'admin'
-                    ? 'Verify registered clinic credentials or Security Recovery Key to reset your Master Password'
+                    ? 'Verify Security Recovery Key, Clinic Code, or registered phone/email to reset your Master Password'
                     : recoveryMode === 'technician'
-                    ? 'Reset technician login credentials via registered email/phone or Administrator Master Password'
-                    : isRegisteringAdmin
-                    ? 'Initialize medical facility administration and bind this primary diagnostic station'
+                    ? 'Administrator authorization required to reset clinical technician credentials'
+                    : isSettingInitialPassword
+                    ? 'Configure your confidential Master Password to secure and initialize this diagnostic station'
                     : deviceLockout
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
                     : isMandatoryActivation
@@ -941,9 +909,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 </div>
               </form>
-            ) : isRegisteringAdmin ? (
-              /* VIEW 3: ADMIN ACCOUNT CREATION / REGISTRATION FORM */
-              <form onSubmit={handleRegisterAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            ) : isSettingInitialPassword ? (
+              /* VIEW 3: INITIAL ADMIN MASTER PASSWORD SETUP */
+              <form onSubmit={handleSetInitialPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div
                   style={{
                     padding: '0.75rem 1rem',
@@ -957,40 +925,36 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     color: '#0f766e',
                   }}
                 >
-                  <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  <ShieldCheck className="w-5 h-5 flex-shrink-0" />
                   <span>
-                    <strong>First-Time Setup:</strong> Create the administration account to unlock clinical reporting and bind this machine as your primary authorized terminal.
+                    <strong>First-Time Security Setup:</strong> Set your Administrator Master Password to initialize and lock this diagnostic station. Once configured, administration access cannot be recreated by unauthorized users.
                   </span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Administrator Full Name *
+                      Admin Account
                     </label>
                     <input
                       type="text"
                       className="podoload-input"
-                      value={regAdminName}
-                      onChange={(e) => setRegAdminName(e.target.value)}
-                      placeholder="e.g. Dr. Specialist / Director"
-                      style={{ fontSize: '0.78rem' }}
-                      required
+                      value={registeredAdmin ? `${registeredAdmin.name} (${registeredAdmin.username})` : 'Administrator (admin@technomind.health)'}
+                      disabled
+                      style={{ fontSize: '0.78rem', backgroundColor: '#f1f5f9', color: '#475569' }}
                     />
                   </div>
 
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Admin Username / Login Email *
+                      Hospital / Clinic Facility
                     </label>
                     <input
                       type="text"
                       className="podoload-input"
-                      value={regAdminUsername}
-                      onChange={(e) => setRegAdminUsername(e.target.value)}
-                      placeholder="admin@technomind.health"
-                      style={{ fontSize: '0.78rem' }}
-                      required
+                      value={registeredAdmin?.hospitalName || 'Technomind Healthcare Systems'}
+                      disabled
+                      style={{ fontSize: '0.78rem', backgroundColor: '#f1f5f9', color: '#475569' }}
                     />
                   </div>
                 </div>
@@ -998,38 +962,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Hospital / Clinic Facility Name *
-                    </label>
-                    <input
-                      type="text"
-                      className="podoload-input"
-                      value={regHospitalName}
-                      onChange={(e) => setRegHospitalName(e.target.value)}
-                      placeholder="Technomind Healthcare Systems"
-                      style={{ fontSize: '0.78rem' }}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Contact Mobile / Phone
-                    </label>
-                    <input
-                      type="text"
-                      className="podoload-input"
-                      value={regAdminPhone}
-                      onChange={(e) => setRegAdminPhone(e.target.value)}
-                      placeholder="+1 (800) 555-PODO"
-                      style={{ fontSize: '0.78rem' }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Master Password *
+                      Set Master Password *
                     </label>
                     <div style={{ position: 'relative' }}>
                       <input
@@ -1037,9 +970,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         className="podoload-input"
                         value={regAdminPassword}
                         onChange={(e) => setRegAdminPassword(e.target.value)}
-                        placeholder="Create strong Master Password"
+                        placeholder="Create Master Password (min. 4)"
                         style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
                         required
+                        autoFocus
                       />
                       <button
                         type="button"
@@ -1071,7 +1005,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         className="podoload-input"
                         value={regAdminPasswordConfirm}
                         onChange={(e) => setRegAdminPasswordConfirm(e.target.value)}
-                        placeholder="Confirm Master Password"
+                        placeholder="Re-enter Master Password"
                         style={{ fontSize: '0.78rem', paddingRight: '2rem' }}
                         required
                       />
@@ -1096,36 +1030,52 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                    Primary Device Hardware Station Name
-                  </label>
-                  <input
-                    type="text"
-                    className="podoload-input"
-                    value={regDeviceName}
-                    onChange={(e) => setRegDeviceName(e.target.value)}
-                    placeholder="e.g. Main Diagnostic Station (iMac / Windows)"
-                    style={{ fontSize: '0.78rem' }}
-                  />
-                  <span style={{ fontSize: '0.66rem', color: '#64748b' }}>
-                    This machine ({dbService.getCurrentDeviceSync().id}) will be cryptographically bound as your single authorized terminal. A Security Recovery Key will be generated upon creation.
+                <div
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    backgroundColor: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    color: '#475569',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <strong>Emergency Recovery Key:</strong> <code>{registeredAdmin?.recoveryKey || 'REC-TMH-9901'}</code>
+                    <div style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                      You can also recover your Master Password using your Clinic Code: <strong>TMH-CENTRAL</strong>
+                    </div>
+                  </div>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                    Tamper Protected
                   </span>
                 </div>
 
-                {registeredAdmin && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem' }}>
                   <button
                     type="button"
                     className="podoload-btn-secondary"
                     onClick={() => {
-                      setIsRegisteringAdmin(false);
+                      setIsSettingInitialPassword(false);
                       setPinError(null);
                     }}
-                    style={{ fontSize: '0.72rem', alignSelf: 'flex-start', marginTop: '0.25rem' }}
+                    style={{ fontSize: '0.74rem' }}
                   >
-                    ← Back to Login
+                    Cancel / Back to Login
                   </button>
-                )}
+
+                  <button
+                    type="submit"
+                    className="podoload-btn-primary"
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Set Master Password &amp; Login</span>
+                  </button>
+                </div>
               </form>
             ) : (
               /* VIEW 4: STANDARD ROLE SWITCHER (Admin vs Technician) */
@@ -1172,7 +1122,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                             {registeredAdmin
                               ? `${registeredAdmin.username} · ${registeredAdmin.name}`
-                              : 'No Admin Registered — Click to Create Account'}
+                              : 'admin@technomind.health · Hospital Administrator'}
                           </div>
                         </div>
                       </div>
@@ -1274,24 +1224,26 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                             Forgot Master Password?
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsRegisteringAdmin(true);
-                              setPinError(null);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              fontSize: '0.68rem',
-                              color: '#0f766e',
-                              textDecoration: 'underline',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            + Register New Admin Account
-                          </button>
+                          {!registeredAdmin?.isInitialSetupCompleted && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsSettingInitialPassword(true);
+                                setPinError(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '0.68rem',
+                                color: '#0f766e',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              First-Time Password Setup
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1813,15 +1765,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   Cancel
                 </button>
               )}
-              {isRegisteringAdmin ? (
+              {isSettingInitialPassword ? (
                 <button
                   type="button"
                   className="podoload-btn-primary"
-                  onClick={handleRegisterAdmin}
+                  onClick={handleSetInitialPassword}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Create Admin Account & Bind Station</span>
+                  <Check className="w-4 h-4" />
+                  <span>Set Master Password &amp; Login</span>
                 </button>
               ) : selectedRole === 'technician' && mobileAuthTab === 'activate' ? (
                 <button
