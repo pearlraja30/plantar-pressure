@@ -583,11 +583,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
         }
       });
     }
-
-    return () => {
-      stopCameraStream();
-    };
-  }, [isOpen, selectedCameraId, stopCameraStream]);
+  }, [isOpen, isMobileDevice]);
 
   // Live Gyroscope Level & Accelerometer Shake/Motion Detection for Smart Viewfinder
   useEffect(() => {
@@ -1290,6 +1286,185 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
     onClose();
   };
 
+  // Dedicated, full-screen, ultra-clean camera capture for Mobile Devices (Android / iOS)
+  // Shows camera directly without screen junk, telemetry debug logs, or raw sensor dumps
+  if (isMobileDevice && step === 1) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between overflow-hidden">
+        {/* Hidden System Inputs for Mobile Gallery & Native Camera fallback */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+        />
+        <input
+          id="scanner-gallery-input"
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+        />
+
+        {/* Live Video Element filling the whole mobile viewport */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          className="absolute inset-0 w-full h-full object-cover z-0"
+        />
+
+        {/* Top Floating Action Bar: Back/Close, Target Foot Pill & Flash */}
+        <div className="relative z-20 flex items-center justify-between p-4 pt-6 bg-gradient-to-b from-black/80 via-black/30 to-transparent">
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => {
+              stopCameraStream();
+              onClose();
+            }}
+            className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md border border-white/20 active:scale-95 transition-transform"
+            aria-label="Close camera"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Foot Side Selector Pill: 1-tap flip between Left & Right */}
+          <button
+            type="button"
+            onClick={() => setFootSide((prev) => (prev === 'Left' ? 'Right' : 'Left'))}
+            className="px-4 py-1.5 rounded-full bg-teal-600/90 text-white font-bold text-xs flex items-center gap-1.5 backdrop-blur-md shadow-lg border border-teal-400/40 active:scale-95 transition-transform"
+            title="Tap to switch target foot"
+          >
+            <span>🦶</span>
+            <span>{footSide} Foot</span>
+            <span className="text-[10px] text-teal-200 underline ml-0.5">⇄ Switch</span>
+          </button>
+
+          {/* Flash / Torch Toggle */}
+          <div className="flex items-center gap-2">
+            {hwCaps.supportsTorch ? (
+              <button
+                type="button"
+                onClick={toggleTorch}
+                className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
+                  torchEnabled
+                    ? 'bg-amber-500 text-black border-amber-300 font-bold'
+                    : 'bg-black/60 text-white border-white/20'
+                }`}
+                aria-label="Toggle camera flash"
+              >
+                <Zap className="w-5 h-5" />
+              </button>
+            ) : (
+              <div className="w-10 h-10" />
+            )}
+          </div>
+        </div>
+
+        {/* Center Framing Guide Box Overlay */}
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 pointer-events-none">
+          <div
+            ref={frameBoxRef}
+            className={`w-[85vw] max-w-[340px] h-[55vh] max-h-[460px] rounded-2xl border-2 transition-all duration-300 relative flex flex-col items-center justify-between p-4 ${
+              isLevel && isSteady
+                ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_24px_rgba(52,211,153,0.35)]'
+                : 'border-white/60 bg-black/15'
+            }`}
+          >
+            {/* Corner Indicators */}
+            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-inherit rounded-tl-xl" />
+            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-inherit rounded-tr-xl" />
+            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-inherit rounded-bl-xl" />
+            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-inherit rounded-br-xl" />
+
+            {/* Top Prompt */}
+            <div className="text-[11px] font-semibold text-white/95 bg-black/70 px-3.5 py-1 rounded-full backdrop-blur-md text-center">
+              Align {footSide} Foot or Harris Mat paper inside box
+            </div>
+
+            {/* Level / Status Pill */}
+            <div>
+              {isLevel && isSteady ? (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500 text-black font-extrabold text-xs shadow-md animate-pulse">
+                  <span>✓ READY TO CAPTURE</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/60 text-white/80 font-medium text-[11px] backdrop-blur-md">
+                  <span>Hold steady parallel to paper</span>
+                </div>
+              )}
+            </div>
+
+            {/* Anatomical Marker Guide */}
+            <div className="text-[10px] text-white/60 font-mono tracking-widest text-center">
+              ▲ TOES (ANTERIOR) | HEEL (POSTERIOR) ▼
+            </div>
+          </div>
+
+          {/* Camera Error / Permission Fallback Prompt */}
+          {cameraError && (
+            <div className="mt-4 px-4 py-2.5 bg-red-950/90 border border-red-500/50 rounded-xl text-red-200 text-xs text-center pointer-events-auto max-w-xs shadow-xl">
+              <div className="font-bold mb-1">Camera Feed Unavailable</div>
+              <div className="text-[11px] opacity-90 mb-2">Tap below to capture using your phone's native camera.</div>
+              <button
+                type="button"
+                onClick={handleNativeMobileCamera}
+                className="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs"
+              >
+                Launch Native Phone Camera
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Shutter & Quick Access Bar */}
+        <div className="relative z-20 flex flex-col items-center pb-8 pt-4 px-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent gap-3">
+          <div className="flex items-center justify-around w-full max-w-sm">
+            {/* Gallery / Image File Choice */}
+            <button
+              type="button"
+              onClick={() => document.getElementById('scanner-gallery-input')?.click()}
+              className="text-white/80 text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform"
+            >
+              <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
+                <Upload className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[11px] font-medium">Gallery</span>
+            </button>
+
+            {/* Shutter Button */}
+            <button
+              type="button"
+              onClick={handleCaptureFromCamera}
+              className="w-20 h-20 rounded-full border-4 border-white p-1 flex items-center justify-center active:scale-90 transition-transform shadow-2xl focus:outline-none"
+              aria-label="Capture photo"
+            >
+              <div className="w-full h-full rounded-full bg-teal-500 hover:bg-teal-400 active:bg-emerald-400 transition-colors flex items-center justify-center shadow-inner">
+                <Camera className="w-8 h-8 text-white" />
+              </div>
+            </button>
+
+            {/* Native Camera Choice */}
+            <button
+              type="button"
+              onClick={handleNativeMobileCamera}
+              className="text-white/80 text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform"
+            >
+              <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
+                <Smartphone className="w-5 h-5 text-teal-300" />
+              </div>
+              <span className="text-[11px] font-medium">Native Cam</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-backdrop z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="modal-container w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
@@ -1329,6 +1504,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 accept="image/*"
                 capture="environment"
                 className="hidden"
+                style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
               <input
@@ -1336,6 +1512,7 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                 type="file"
                 accept="image/*"
                 className="hidden"
+                style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
 
@@ -1371,46 +1548,6 @@ export const ScannerWizardModal: React.FC<ScannerWizardModalProps> = ({
                     <span className="foot-choice-name">Right Foot</span>
                   </button>
                 </div>
-              </div>
-
-              {/* Live Clinical Debug & Diagnostic Telemetry HUD */}
-              <div className="p-2.5 bg-slate-950/90 border border-slate-700/80 rounded-lg text-[11px] font-mono shadow-inner space-y-1">
-                <div className="flex items-center justify-between text-teal-400 font-bold border-b border-slate-800 pb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isCameraActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-                    <span>Live Diagnostic Telemetry HUD</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                    <span>Mobile: <strong className="text-slate-200">{isMobileDevice ? 'YES' : 'NO'}</strong></span>
-                    <span>•</span>
-                    <span>Status: <strong className={isCameraActive ? 'text-emerald-400' : 'text-amber-400'}>{isCameraActive ? 'ACTIVE' : 'IDLE'}</strong></span>
-                    <span>•</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsDebugOpen((v) => !v)}
-                      className="text-cyan-400 hover:text-cyan-300 underline font-semibold"
-                    >
-                      {isDebugOpen ? 'Hide' : 'Show Logs'}
-                    </button>
-                  </div>
-                </div>
-                {isDebugOpen && (
-                  <div className="space-y-0.5 text-[10px] text-cyan-300 max-h-24 overflow-y-auto pt-0.5">
-                    <div className="text-slate-400 text-[9px] flex items-center justify-between">
-                      <span>Tilt: {tiltDegrees}° ({isLevel ? 'Level ✓' : 'Tilted ⚠️'})</span>
-                      <span>Steady: {isSteady ? 'YES ✓' : 'Detecting...'}</span>
-                      <span>Light: {ambientLuminance} lx</span>
-                      <span>Torch: {torchEnabled ? 'ON' : 'OFF'}</span>
-                    </div>
-                    {debugLogs.length === 0 ? (
-                      <div className="text-slate-500 italic">Initializing camera diagnostic telemetry...</div>
-                    ) : (
-                      debugLogs.map((log, i) => (
-                        <div key={i} className="truncate">{log}</div>
-                      ))
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* 2. Acquisition Mode (Camera on Mobile vs Clean File Upload on Windows/Web) */}

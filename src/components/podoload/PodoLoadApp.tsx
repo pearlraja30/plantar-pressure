@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import './podoload.css';
 import { PodoLoadSidebar, PodoLoadNavSection } from './PodoLoadSidebar';
 import { PodoLoadHeader } from './PodoLoadHeader';
@@ -47,6 +48,12 @@ if (typeof window !== 'undefined') {
 }
 
 export function PodoLoadApp() {
+  const isMobileDevice =
+    Capacitor.isNativePlatform() ||
+    (typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
+
   // Navigation & Step state
   const [currentSection, setCurrentSection] = useState<PodoLoadNavSection>('registration');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -256,6 +263,20 @@ export function PodoLoadApp() {
     }
   };
 
+  // On mobile devices (Android / iOS), clinical technicians operate the station.
+  // Administrative & system configuration features are reserved for desktop workstations.
+  useEffect(() => {
+    if (isMobileDevice && currentUser.role === 'admin') {
+      const technicians = dbService.getTechniciansSync();
+      const primaryTech = technicians.length > 0 ? technicians[0] : null;
+      if (primaryTech) {
+        handleSelectRole('technician', primaryTech.name, primaryTech.id, primaryTech.hospitalId, primaryTech.hospitalName);
+      } else {
+        handleSelectRole('technician', 'Clinical Specialist', 'tech-001');
+      }
+    }
+  }, [isMobileDevice]);
+
   // Selected patient & case (Active loaded case priority, strict matching)
   const currentCase =
     activeLoadedCase && activeLoadedCase.id === selectedCaseId
@@ -394,6 +415,12 @@ export function PodoLoadApp() {
 
   // Navigation handlers
   const handleNavClick = (section: PodoLoadNavSection) => {
+    // Restrict mobile devices strictly to clinical workflows
+    if (isMobileDevice && (section === 'admin' || section === 'settings' || section === 'database')) {
+      setCurrentSection('registration');
+      setCurrentStep(1);
+      return;
+    }
     setCurrentSection(section);
     if (section === 'registration') setCurrentStep(1);
     else if (section === 'capture') setCurrentStep(2);
@@ -942,7 +969,9 @@ export function PodoLoadApp() {
           clinicName={activeHospital.name}
           currentUser={currentUser}
           onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
-          onOpenAdmin={() => setCurrentSection('admin')}
+          onOpenAdmin={() => {
+            if (!isMobileDevice) setCurrentSection('admin');
+          }}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 

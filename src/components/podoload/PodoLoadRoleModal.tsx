@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   ShieldCheck,
   UserCheck,
@@ -40,9 +41,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   currentUser,
   onSelectRole,
 }) => {
+  const isMobileDevice =
+    Capacitor.isNativePlatform() ||
+    (typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
+
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount | null>(() => dbService.getAdminAccountSync());
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(currentUser.role);
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(isMobileDevice ? 'technician' : currentUser.role);
   const [selectedTechId, setSelectedTechId] = useState<string>(
     currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
   );
@@ -344,6 +351,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Create Administration Account (First-Time Setup)'
                     : deviceLockout
                     ? 'Device Binding Security Lockout'
+                    : isMobileDevice
+                    ? 'Clinical Technician Login'
                     : 'Account & Role Switcher'}
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
@@ -355,6 +364,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Initialize medical facility administration and bind this primary diagnostic station'
                     : deviceLockout
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
+                    : isMobileDevice
+                    ? 'Sign in with your technician account created by the Administrator'
                     : 'Select between Hospital Administrator (Full System Control) or Clinical Technician'}
                 </p>
               </div>
@@ -990,171 +1001,173 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             ) : (
               /* VIEW 4: STANDARD ROLE SWITCHER (Admin vs Technician) */
               <>
-                {/* Account 1: Hospital Administrator */}
-                <div
-                  onClick={() => {
-                    setSelectedRole('admin');
-                    setPinError(null);
-                  }}
-                  style={{
-                    padding: '0.85rem 1rem',
-                    borderRadius: '8px',
-                    border: selectedRole === 'admin' ? '2px solid #0d9488' : '1px solid #cbd5e1',
-                    backgroundColor: selectedRole === 'admin' ? '#f0fdfa' : '#ffffff',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.45rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {/* Account 1: Hospital Administrator (Desktop / Web only) */}
+                {!isMobileDevice && (
+                  <div
+                    onClick={() => {
+                      setSelectedRole('admin');
+                      setPinError(null);
+                    }}
+                    style={{
+                      padding: '0.85rem 1rem',
+                      borderRadius: '8px',
+                      border: selectedRole === 'admin' ? '2px solid #0d9488' : '1px solid #cbd5e1',
+                      backgroundColor: selectedRole === 'admin' ? '#f0fdfa' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            backgroundColor: '#ccfbf1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#0f766e',
+                          }}
+                        >
+                          <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
+                            Hospital Administrator
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            {registeredAdmin
+                              ? `${registeredAdmin.username} · ${registeredAdmin.name}`
+                              : 'No Admin Registered — Click to Create Account'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {currentUser.role === 'admin' && (
+                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                            Active
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            border: selectedRole === 'admin' ? '5px solid #0d9488' : '2px solid #cbd5e1',
+                            backgroundColor: '#fff',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
+                      <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
+                    </div>
+
+                    {selectedRole === 'admin' && (
                       <div
                         style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '8px',
-                          backgroundColor: '#ccfbf1',
+                          marginTop: '0.35rem',
+                          paddingLeft: '2.5rem',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#0f766e',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
                         }}
                       >
-                        <ShieldCheck className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
-                          Hospital Administrator
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Lock className="w-3.5 h-3.5 text-slate-500" />
+                          <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Master Password:</span>
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <input
+                              type={showAdminPassword ? 'text' : 'password'}
+                              placeholder="••••••••"
+                              value={adminPassword}
+                              onChange={(e) => {
+                                setAdminPassword(e.target.value);
+                                setPinError(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: '130px',
+                                padding: '0.2rem 1.6rem 0.2rem 0.4rem',
+                                fontSize: '0.74rem',
+                                border: '1px solid #94a3b8',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowAdminPassword(!showAdminPassword);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                right: '4px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#64748b',
+                                padding: '1px',
+                              }}
+                            >
+                              {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                          {registeredAdmin
-                            ? `${registeredAdmin.username} · ${registeredAdmin.name}`
-                            : 'No Admin Registered — Click to Create Account'}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {currentUser.role === 'admin' && (
-                        <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
-                          Active
-                        </span>
-                      )}
-                      <div
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '50%',
-                          border: selectedRole === 'admin' ? '5px solid #0d9488' : '2px solid #cbd5e1',
-                          backgroundColor: '#fff',
-                        }}
-                      />
-                    </div>
-                  </div>
 
-                  <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
-                    <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
-                  </div>
-
-                  {selectedRole === 'admin' && (
-                    <div
-                      style={{
-                        marginTop: '0.35rem',
-                        paddingLeft: '2.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Lock className="w-3.5 h-3.5 text-slate-500" />
-                        <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Master Password:</span>
-                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                          <input
-                            type={showAdminPassword ? 'text' : 'password'}
-                            placeholder="••••••••"
-                            value={adminPassword}
-                            onChange={(e) => {
-                              setAdminPassword(e.target.value);
-                              setPinError(null);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              width: '130px',
-                              padding: '0.2rem 1.6rem 0.2rem 0.4rem',
-                              fontSize: '0.74rem',
-                              border: '1px solid #94a3b8',
-                              borderRadius: '4px',
-                            }}
-                          />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowAdminPassword(!showAdminPassword);
+                              setRecoveryMode('admin');
+                              setPinError(null);
                             }}
                             style={{
-                              position: 'absolute',
-                              right: '4px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
                               background: 'none',
                               border: 'none',
+                              fontSize: '0.68rem',
+                              color: '#0f766e',
+                              textDecoration: 'underline',
                               cursor: 'pointer',
-                              color: '#64748b',
-                              padding: '1px',
                             }}
                           >
-                            {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            Forgot Master Password?
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsRegisteringAdmin(true);
+                              setPinError(null);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              fontSize: '0.68rem',
+                              color: '#0f766e',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            + Register New Admin Account
                           </button>
                         </div>
                       </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRecoveryMode('admin');
-                            setPinError(null);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '0.68rem',
-                            color: '#0f766e',
-                            textDecoration: 'underline',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Forgot Master Password?
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsRegisteringAdmin(true);
-                            setPinError(null);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            fontSize: '0.68rem',
-                            color: '#0f766e',
-                            textDecoration: 'underline',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          + Register New Admin Account
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Account 2: Clinical Technician */}
                 <div

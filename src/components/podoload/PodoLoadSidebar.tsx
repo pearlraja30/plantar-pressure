@@ -168,67 +168,71 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
               <span>Reports and cloud</span>
             </button>
 
-            <button
-              type="button"
-              className={`podoload-nav-item ${currentSection === 'database' ? 'active' : ''}`}
-              onClick={() => handleItemClick('database')}
-            >
-              <Database className="podoload-nav-item-icon" />
-              <span>Database records</span>
-            </button>
-          </nav>
-        </div>
-
-        {/* Section 3: ADMINISTRATION & SYSTEM */}
-        <div className="podoload-nav-section">
-          <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>ADMIN & SYSTEM</span>
-            {currentUser?.role === 'technician' && (
-              <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <Lock className="w-2.5 h-2.5" /> Admin Only
-              </span>
+            {!isMobileDevice && (
+              <button
+                type="button"
+                className={`podoload-nav-item ${currentSection === 'database' ? 'active' : ''}`}
+                onClick={() => handleItemClick('database')}
+              >
+                <Database className="podoload-nav-item-icon" />
+                <span>Database records</span>
+              </button>
             )}
-          </div>
-          <nav className="podoload-nav-list">
-            <button
-              type="button"
-              className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
-              onClick={() => {
-                if (currentUser?.role === 'technician') {
-                  if (onOpenUserSwitcher) onOpenUserSwitcher();
-                } else {
-                  handleItemClick('admin');
-                }
-              }}
-              title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Hospital profile & clinic accounts'}
-            >
-              <Building2 className="podoload-nav-item-icon" />
-              <span style={{ flex: 1, textAlign: 'left' }}>Hospital & Admin</span>
-              {currentUser?.role === 'technician' && (
-                <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
-              onClick={() => {
-                if (currentUser?.role === 'technician') {
-                  if (onOpenUserSwitcher) onOpenUserSwitcher();
-                } else {
-                  handleItemClick('settings');
-                }
-              }}
-              title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Clinical device settings & system maintenance'}
-            >
-              <Sliders className="podoload-nav-item-icon" />
-              <span style={{ flex: 1, textAlign: 'left' }}>Settings</span>
-              {currentUser?.role === 'technician' && (
-                <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-              )}
-            </button>
           </nav>
         </div>
+
+        {/* Section 3: ADMINISTRATION & SYSTEM (Desktop / Web Only) */}
+        {!isMobileDevice && (
+          <div className="podoload-nav-section">
+            <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>ADMIN & SYSTEM</span>
+              {currentUser?.role === 'technician' && (
+                <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <Lock className="w-2.5 h-2.5" /> Admin Only
+                </span>
+              )}
+            </div>
+            <nav className="podoload-nav-list">
+              <button
+                type="button"
+                className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
+                onClick={() => {
+                  if (currentUser?.role === 'technician') {
+                    if (onOpenUserSwitcher) onOpenUserSwitcher();
+                  } else {
+                    handleItemClick('admin');
+                  }
+                }}
+                title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Hospital profile & clinic accounts'}
+              >
+                <Building2 className="podoload-nav-item-icon" />
+                <span style={{ flex: 1, textAlign: 'left' }}>Hospital & Admin</span>
+                {currentUser?.role === 'technician' && (
+                  <Lock className="w-3 h-3 text-amber-400 opacity-80" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
+                onClick={() => {
+                  if (currentUser?.role === 'technician') {
+                    if (onOpenUserSwitcher) onOpenUserSwitcher();
+                  } else {
+                    handleItemClick('settings');
+                  }
+                }}
+                title={currentUser?.role === 'technician' ? 'Requires Hospital Administrator login' : 'Clinical device settings & system maintenance'}
+              >
+                <Sliders className="podoload-nav-item-icon" />
+                <span style={{ flex: 1, textAlign: 'left' }}>Settings</span>
+                {currentUser?.role === 'technician' && (
+                  <Lock className="w-3 h-3 text-amber-400 opacity-80" />
+                )}
+              </button>
+            </nav>
+          </div>
+        )}
       </div>
 
       {/* User Login Profile & Switcher Card */}

@@ -133,10 +133,10 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             <button
               type="button"
               className="podoload-lang-badge"
-              onClick={onOpenAdmin}
-              title="Active Hospital Account (Click to open Admin Panel)"
+              onClick={isMobileDevice ? undefined : onOpenAdmin}
+              title={isMobileDevice ? `Facility: ${clinicName}` : "Active Hospital Account (Click to open Admin Panel)"}
               style={{
-                cursor: 'pointer',
+                cursor: isMobileDevice ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
