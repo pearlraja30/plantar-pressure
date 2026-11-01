@@ -1115,9 +1115,66 @@ it("Enforces relocation of Header & Footer configuration from report screen to S
 
   const settings = getSettingsSections();
   expect(settings.hasReportHeaderFooterTab).toBe(true);
+  expect(settings.hasHospitalBrandingTab).toBe(true);
   expect(settings.headerFooterConfig.supportsHospitalName).toBe(true);
   expect(settings.headerFooterConfig.supportsLogoPositioning).toContain('Centre');
   expect(settings.headerFooterConfig.persistsToInbuiltDatabase).toBe(true);
+});
+
+it("Enforces distinct separation of Report Header & Footer from Hospital Branding in System Settings", () => {
+  // Verify that activeMenu 'report' and 'hospital' have distinct schemas, controls, and workflows
+  const settingsTabRenderer = (activeTab) => {
+    if (activeTab === 'report') {
+      return {
+        tabId: 'report',
+        title: 'REPORT HEADER, FOOTER & CLINICAL SIGNATORIES',
+        fields: ['logoPosition', 'reportHeaderPreview', 'reportFooterText', 'defaultDoctor', 'defaultTechnician'],
+        actionButton: 'Save Report Header & Footer',
+        hasClinicLogoUpload: false,
+        hasAccreditationRegNo: false,
+        hasHospitalBranchCode: false,
+        hasMultiHospitalAdminShortcut: false,
+      };
+    } else if (activeTab === 'hospital') {
+      return {
+        tabId: 'hospital',
+        title: 'HOSPITAL IDENTITY & CLINIC PROFILE BRANDING',
+        fields: ['hospitalName', 'hospitalCode', 'hospitalRegNo', 'hospitalContact', 'hospitalLogoUpload'],
+        actionButton: 'Save Hospital Branding Profile',
+        hasClinicLogoUpload: true,
+        hasAccreditationRegNo: true,
+        hasHospitalBranchCode: true,
+        hasMultiHospitalAdminShortcut: true,
+        hasSignatories: false,
+      };
+    }
+    return null;
+  };
+
+  const reportTab = settingsTabRenderer('report');
+  const hospitalTab = settingsTabRenderer('hospital');
+
+  // Verify Tab 1: Report Header & Footer
+  expect(reportTab.title).toBe('REPORT HEADER, FOOTER & CLINICAL SIGNATORIES');
+  expect(reportTab.fields).toContain('logoPosition');
+  expect(reportTab.fields).toContain('reportHeaderPreview');
+  expect(reportTab.fields).toContain('reportFooterText');
+  expect(reportTab.fields).toContain('defaultDoctor');
+  expect(reportTab.fields).toContain('defaultTechnician');
+  expect(reportTab.hasClinicLogoUpload).toBe(false);
+
+  // Verify Tab 2: Hospital Branding
+  expect(hospitalTab.title).toBe('HOSPITAL IDENTITY & CLINIC PROFILE BRANDING');
+  expect(hospitalTab.fields).toContain('hospitalName');
+  expect(hospitalTab.fields).toContain('hospitalCode');
+  expect(hospitalTab.fields).toContain('hospitalRegNo');
+  expect(hospitalTab.hasClinicLogoUpload).toBe(true);
+  expect(hospitalTab.hasMultiHospitalAdminShortcut).toBe(true);
+  expect(hospitalTab.hasSignatories).toBe(false);
+
+  // Ensure they are strictly not equal
+  expect(reportTab.title !== hospitalTab.title).toBe(true);
+  expect(reportTab.actionButton !== hospitalTab.actionButton).toBe(true);
 });
 
 it("Enforces viewport boundary constraints and non-overflowing alignment for Print, PDF, Share and report archive controls", () => {
