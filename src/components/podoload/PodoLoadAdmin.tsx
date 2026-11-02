@@ -512,15 +512,29 @@ STEP 2: RETURNING STATION SESSIONS
 
   const handleShareVoucherWhatsApp = (tech: TechnicianUser) => {
     const text = getShareableVoucherText(tech);
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    try {
+      navigator.clipboard?.writeText(text);
+      setSaveSuccess(`✓ Activation voucher copied to clipboard! Opening WhatsApp...`);
+      setTimeout(() => setSaveSuccess(null), 3500);
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      // Safe fallback
+    }
   };
 
   const handleShareVoucherEmail = (tech: TechnicianUser) => {
     const text = getShareableVoucherText(tech);
-    const subject = `PodoPress Diagnostic Station — App Login Voucher for ${tech.name}`;
-    const url = `mailto:${tech.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    try {
+      navigator.clipboard?.writeText(text);
+      setSaveSuccess(`✓ Activation voucher copied to clipboard! Opening Email...`);
+      setTimeout(() => setSaveSuccess(null), 3500);
+      const subject = `PodoPress Diagnostic Station — App Login Voucher for ${tech.name}`;
+      const url = `mailto:${tech.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      // Safe fallback
+    }
   };
 
   const handleShareNative = async (tech: TechnicianUser) => {
@@ -734,9 +748,9 @@ STEP 2: RETURNING STATION SESSIONS
       : hospitals.find((h) => h.id === selectedHospitalFilter) || activeHospital;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Top Banner */}
-      <div className="podoload-card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="podoload-card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <div
             style={{
@@ -783,9 +797,9 @@ STEP 2: RETURNING STATION SESSIONS
       </div>
 
       {/* 2-Column Settings Layout */}
-      <div className="podoload-settings-layout" style={{ flex: 1 }}>
+      <div className="podoload-settings-layout" style={{ flex: 1, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {/* Left Sidebar Menu */}
-        <div className="podoload-settings-sidebar" style={{ minWidth: '215px' }}>
+        <div className="podoload-settings-sidebar">
           <div className="podoload-settings-menu">
             <button
               type="button"
@@ -885,10 +899,10 @@ STEP 2: RETURNING STATION SESSIONS
         </div>
 
         {/* Right Active Configuration Panel */}
-        <div className="podoload-settings-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div className="podoload-settings-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {/* TAB 1: HOSPITAL BRANDING & LOGO */}
           {activeTab === 'branding' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
               {/* Left Column: Branding Details */}
               <div className="podoload-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <h4 className="podoload-card-title" style={{ margin: 0 }}>
@@ -1205,7 +1219,7 @@ STEP 2: RETURNING STATION SESSIONS
                         borderRadius: '8px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '260px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
                         <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
                           Select Technician:
                         </label>
@@ -1213,7 +1227,7 @@ STEP 2: RETURNING STATION SESSIONS
                           className="podoload-input"
                           value={currentHubTech.id}
                           onChange={(e) => setHubSelectedTechId(e.target.value)}
-                          style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.35rem 0.6rem', flex: 1 }}
+                          style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.35rem 0.6rem', flex: 1, minWidth: '160px', maxWidth: '100%' }}
                         >
                           {techniciansList.map((t) => (
                             <option key={t.id} value={t.id}>
@@ -1232,6 +1246,7 @@ STEP 2: RETURNING STATION SESSIONS
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.3rem',
+                            flexShrink: 0,
                           }}
                           title="Create another technician login for Android, iOS, or Windows"
                         >
@@ -1259,8 +1274,10 @@ STEP 2: RETURNING STATION SESSIONS
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                         gap: '0.65rem',
+                        width: '100%',
+                        boxSizing: 'border-box',
                       }}
                     >
                       {/* Box 1: Hospital / Clinic Code */}
@@ -1273,6 +1290,9 @@ STEP 2: RETURNING STATION SESSIONS
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.35rem',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1281,21 +1301,21 @@ STEP 2: RETURNING STATION SESSIONS
                           </span>
                           <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>Required</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '1rem', fontWeight: 900, color: '#166534', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
+                          <code style={{ fontSize: '0.92rem', fontWeight: 900, color: '#166534', fontFamily: 'monospace', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={techHosp.code}>
                             {techHosp.code}
                           </code>
                           <button
                             type="button"
                             className="podoload-btn-secondary podoload-btn-sm"
-                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}
                             onClick={() => handleCopyText(techHosp.code, 'hospCode')}
                           >
                             <Copy className="w-3 h-3 text-emerald-600" />
                             <span>{copiedLabel === 'hospCode' ? '✓ Copied' : 'Copy'}</span>
                           </button>
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={techHosp.name}>
                           Facility: {techHosp.name}
                         </div>
                       </div>
@@ -1313,9 +1333,12 @@ STEP 2: RETURNING STATION SESSIONS
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '0.35rem',
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              boxSizing: 'border-box',
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
                               <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
                                 2. Activation Voucher Code
                               </span>
@@ -1334,11 +1357,11 @@ STEP 2: RETURNING STATION SESSIONS
                                 </button>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                              <code style={{ fontSize: '1rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
+                              <code style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={timed.code}>
                                 {timed.code}
                               </code>
-                              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
                                 <button
                                   type="button"
                                   className="podoload-btn-secondary podoload-btn-sm"
@@ -1359,7 +1382,7 @@ STEP 2: RETURNING STATION SESSIONS
                                 </button>
                               </div>
                             </div>
-                            <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                            <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               Enter in "Activation Voucher Code" on app · Policy: <strong>{timed.policyLabel}</strong>
                             </div>
                           </div>
@@ -1376,6 +1399,9 @@ STEP 2: RETURNING STATION SESSIONS
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.35rem',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1384,21 +1410,21 @@ STEP 2: RETURNING STATION SESSIONS
                           </span>
                           <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Desired User ID</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
+                          <code style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentHubTech.username}>
                             {currentHubTech.username}
                           </code>
                           <button
                             type="button"
                             className="podoload-btn-secondary podoload-btn-sm"
-                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}
                             onClick={() => handleCopyText(currentHubTech.username, 'username')}
                           >
                             <Copy className="w-3 h-3 text-slate-600" />
                             <span>{copiedLabel === 'username' ? '✓ Copied' : 'Copy'}</span>
                           </button>
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentHubTech.name}>
                           Technician: {currentHubTech.name}
                         </div>
                       </div>
@@ -1413,6 +1439,9 @@ STEP 2: RETURNING STATION SESSIONS
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.35rem',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1421,11 +1450,11 @@ STEP 2: RETURNING STATION SESSIONS
                           </span>
                           <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Admin Managed</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '0.85rem', fontWeight: 800, color: visibleTechPasswords[currentHubTech.id] ? '#0f766e' : '#64748b', fontFamily: 'monospace', letterSpacing: visibleTechPasswords[currentHubTech.id] ? 'normal' : '0.12em' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
+                          <code style={{ fontSize: '0.82rem', fontWeight: 800, color: visibleTechPasswords[currentHubTech.id] ? '#0f766e' : '#64748b', fontFamily: 'monospace', letterSpacing: visibleTechPasswords[currentHubTech.id] ? 'normal' : '0.12em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {visibleTechPasswords[currentHubTech.id] ? (currentHubTech.pin || '1234') : '••••••••'}
                           </code>
-                          <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
                             <button
                               type="button"
                               className="podoload-btn-secondary podoload-btn-sm"
@@ -1870,7 +1899,8 @@ STEP 2: RETURNING STATION SESSIONS
               </div>
 
               {/* Technicians Table */}
-              <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                <table className="podoload-device-table" style={{ width: '100%', minWidth: '680px', fontSize: '0.74rem' }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>TECHNICIAN NAME</th>
@@ -2013,6 +2043,7 @@ STEP 2: RETURNING STATION SESSIONS
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -2218,7 +2249,8 @@ STEP 2: RETURNING STATION SESSIONS
               </div>
 
               {/* Patients Table */}
-              <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                <table className="podoload-device-table" style={{ width: '100%', minWidth: '600px', fontSize: '0.74rem' }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>PATIENT NAME & MRN</th>
@@ -2311,6 +2343,7 @@ STEP 2: RETURNING STATION SESSIONS
                   )}
                 </tbody>
               </table>
+              </div>
 
               {/* Reassign Hospital Modal */}
               {reassigningPatient && (
@@ -2498,7 +2531,7 @@ STEP 2: RETURNING STATION SESSIONS
               </div>
 
               {/* Multi-Device License Quota Overview */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
                 <div style={{ padding: '0.85rem', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', color: '#0f766e', fontWeight: 700 }}>ACTIVE CLINICAL TIER</span>
@@ -2543,7 +2576,8 @@ STEP 2: RETURNING STATION SESSIONS
                 <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
                   AUTHORIZED HARDWARE TERMINALS FLEET
                 </h5>
-                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                  <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left' }}>STATION NAME</th>
@@ -2598,6 +2632,7 @@ STEP 2: RETURNING STATION SESSIONS
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* Invoices & License Billing History */}
@@ -2606,7 +2641,8 @@ STEP 2: RETURNING STATION SESSIONS
                   <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
                     LICENSE INVOICES & PAYMENT RECEIPTS
                   </h5>
-                  <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                  <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                    <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                     <thead>
                       <tr>
                         <th style={{ textAlign: 'left' }}>INVOICE ID</th>
@@ -2642,6 +2678,7 @@ STEP 2: RETURNING STATION SESSIONS
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -2708,7 +2745,8 @@ STEP 2: RETURNING STATION SESSIONS
               )}
 
               {/* Hospitals Table */}
-              <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>HOSPITAL / CLINIC</th>
@@ -2750,6 +2788,7 @@ STEP 2: RETURNING STATION SESSIONS
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -2824,7 +2863,8 @@ STEP 2: RETURNING STATION SESSIONS
               )}
 
               {/* Doctors Table */}
-              <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>DOCTOR NAME</th>
@@ -2856,6 +2896,7 @@ STEP 2: RETURNING STATION SESSIONS
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -2866,7 +2907,7 @@ STEP 2: RETURNING STATION SESSIONS
                 HOSPITAL LOGIN & ROLE ACCESS CONTROL
               </h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
                 <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
                   <div style={{ fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>Active Session</div>
                   <div>User ID: <strong>{adminAccount.username}</strong></div>
@@ -3148,7 +3189,8 @@ STEP 2: RETURNING STATION SESSIONS
                   </div>
                 </div>
 
-                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                  <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left' }}>LOG ID & TIME</th>
@@ -3221,6 +3263,7 @@ STEP 2: RETURNING STATION SESSIONS
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* Security & System Audit Trail Table */}
@@ -3254,7 +3297,8 @@ STEP 2: RETURNING STATION SESSIONS
                   </button>
                 </div>
 
-                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                  <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left' }}>TIMESTAMP</th>
@@ -3293,6 +3337,7 @@ STEP 2: RETURNING STATION SESSIONS
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* Selected Detail Trace Modal */}

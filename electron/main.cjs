@@ -36,6 +36,18 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5200');
   }
 
+  // Disallow any external web navigation inside Electron window (keeps 100% offline & local)
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!navigationUrl.startsWith('file://') && !navigationUrl.includes('localhost:') && !navigationUrl.includes('127.0.0.1:')) {
+      event.preventDefault();
+    }
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    // Prevent opening unexpected external windows or tabs
+    return { action: 'deny' };
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

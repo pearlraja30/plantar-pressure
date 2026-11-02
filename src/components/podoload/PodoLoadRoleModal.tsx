@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
   ShieldCheck,
@@ -409,9 +409,21 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     }, 1600);
   };
 
+  // Prevent accidental Escape routing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <>
-      <div className="podoload-modal-backdrop" onClick={isMandatoryActivation ? undefined : onClose} role="dialog" aria-modal="true">
+      <div className="podoload-modal-backdrop" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div
           className="podoload-modal-box"
           style={{ maxWidth: '640px', width: '92%', maxHeight: '92vh', overflowY: 'auto' }}
