@@ -249,6 +249,7 @@ export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
   createdAt: '2026-01-01T00:00:00.000Z',
   status: 'active',
   recoveryKey: 'REC-TMH-9901',
+  isInitialSetupCompleted: true,
 };
 
 export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
