@@ -321,23 +321,36 @@ export function PodoLoadApp() {
     };
   }, [currentUser.role, isMobileDevice]);
 
-  // Global keyboard shortcut: Ctrl+Shift+A (or Cmd+Shift+A) unlocks Master Administrator access anywhere
+  // Global keyboard shortcut: Ctrl+Shift+A (or Cmd+Shift+A) & Electron menu event unlocks Master Administrator access
   useEffect(() => {
+    const triggerAdmin = () => {
+      if (currentUser.role === 'admin') {
+        if (!isMobileDevice) {
+          setCurrentSection('admin');
+        }
+      } else {
+        setRoleModalAdminMode(true);
+        setIsRoleModalOpen(true);
+      }
+    };
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
-        if (currentUser.role === 'admin') {
-          if (!isMobileDevice) {
-            setCurrentSection('admin');
-          }
-        } else {
-          setRoleModalAdminMode(true);
-          setIsRoleModalOpen(true);
-        }
+        triggerAdmin();
       }
     };
+
+    const handleCustomAdminEvent = () => {
+      triggerAdmin();
+    };
+
     window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('podoload:admin-requested', handleCustomAdminEvent);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('podoload:admin-requested', handleCustomAdminEvent);
+    };
   }, [currentUser.role, isMobileDevice]);
 
   // On mobile devices (Android / iOS), clinical technicians operate the station.

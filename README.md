@@ -118,9 +118,12 @@ The system includes an automated clinical verification battery covering all test
 ### 3. Public Login Screen Lockdown, Single Administrator Governance & Separated `/admin` Context
 * **Default Technician-Only Flow (Zero Admin Clutter on New Devices)**: When installing the application on any new station (**Windows Desktop .exe**, **Android .apk**, or **iOS .ipa**), the station sign-in dialog opens exclusively in **Clinical Technician Station Login** mode. The "Hospital Administrator" card and account selector are completely invisible, preventing technician confusion, staff curiosity, and unauthorized tampering.
 * **Dedicated `/admin` Context for Web & Intranet**: Navigating directly to `/admin`, `#/admin`, or `?mode=admin` in any browser instantly opens the **Hospital Administrator Portal** with Master Password authentication.
-* **Discreet Administrator Access for Native Desktop & Mobile**:
-  * **Windows Desktop (.exe)**: Press **`Ctrl + Shift + A`** (or `Cmd + Shift + A` on macOS) anywhere on the window, or click the subtle, low-contrast footer link `🔐 Admin Portal` to reveal the Master Administrator login prompt.
-  * **Mobile Kiosk Gesture (Android / iOS)**: Tapping the header lock icon or title **5 times in 2.5 seconds** unlocks the Master Administrator prompt.
+* **Discreet Administrator Access for Native Desktop & Mobile (Zero On-Screen Admin Buttons)**:
+  * **100% Clean Kiosk Interface**: The clinical sign-in screen contains **zero** visible admin buttons, icons, or links, preventing staff curiosity and accidental tampering.
+  * **Windows Desktop (.exe) Method 1 — Silent Hotkey**: Press **`Ctrl + Shift + A`** (or `Cmd + Shift + A` on macOS) anywhere on the window to silently reveal the Master Administrator prompt.
+  * **Windows Desktop (.exe) Method 2 — Dedicated Admin Shortcut**: Launching via Windows shortcut with the `--admin` flag (`PodoPress.exe --admin`) opens directly into the Hospital Administrator Portal. Regular technicians click the default shortcut without flags.
+  * **Windows Desktop (.exe) Method 3 — Native Security Menu**: Accessible via the native application menu bar under **Security $\rightarrow$ Hospital Administrator Console... (`Ctrl+Shift+A`)**.
+  * **Mobile Kiosk Gesture (Android / iOS)**: Tapping the header lock icon or title **5 times within 2.5 seconds** unlocks the Master Administrator prompt.
   * **Quick Reversal**: The Admin login prompt features a prominent `← Back to Technician Login` button to effortlessly return to the standard clinical technician view.
 * **Strict Single Administrator Setup**: Exactly one Hospital Administrator possesses master administrative authority over each station. Initial master credentials (`admin@technomind.health` / default `1234`) allow the designated clinic head to perform initial setup.
 * **Protected Password Updates (Admin Only)**: Master Password changes are strictly confined inside the authenticated **Hospital Administrator Panel** (`Admin security` tab). Inputs are masked (`••••••••`) by default with current-password verification to prevent onlookers or operators from viewing or modifying credentials.

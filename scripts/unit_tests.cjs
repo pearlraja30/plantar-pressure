@@ -3175,6 +3175,14 @@ it("Enforces Separated /admin Context & Default Technician-Only Station Flow", (
 
   expect(simulateTapSequence(3)).toBe(false); // 3 taps: does not unlock
   expect(simulateTapSequence(5)).toBe(true);  // 5 taps: unlocks Master Admin
+
+  // 5. Electron Native Desktop Flag Detection (--admin / -admin / /admin)
+  const checkElectronArgv = (argv) => {
+    return argv.some((arg) => arg === '--admin' || arg === '/admin' || arg === '-admin');
+  };
+  expect(checkElectronArgv(['node', 'PodoPress.exe'])).toBe(false);
+  expect(checkElectronArgv(['node', 'PodoPress.exe', '--admin'])).toBe(true);
+  expect(checkElectronArgv(['node', 'PodoPress.exe', '/admin'])).toBe(true);
 });
 
 console.log("\n======================================================================");

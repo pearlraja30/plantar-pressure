@@ -1656,41 +1656,13 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </div>
                 </>
               ) : (
-                /* Normal Technician Flow: Discreet Admin Portal on Left, Actions on Right */
+                /* Normal Technician Flow: 100% Clean Kiosk (Zero Visible Admin Clutter) */
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAdminContext(true);
-                        setSelectedRole('admin');
-                        setPinError(null);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94a3b8',
-                        fontSize: '0.68rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.25rem 0.4rem',
-                        borderRadius: '4px',
-                        transition: 'color 0.15s ease',
-                      }}
-                      title="Switch to Master Administrator Login (Ctrl+Shift+A)"
-                    >
-                      <Lock className="w-3 h-3 text-slate-400" />
-                      <span>Admin Portal</span>
+                  {!isMandatoryActivation && (
+                    <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
+                      Cancel
                     </button>
-
-                    {!isMandatoryActivation && (
-                      <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
-                        Cancel
-                      </button>
-                    )}
-                  </div>
+                  )}
 
                   {mobileAuthTab === 'activate' ? (
                     <button

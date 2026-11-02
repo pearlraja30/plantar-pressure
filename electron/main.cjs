@@ -1,5 +1,5 @@
 // Electron Native Desktop Main Process (PPA-SW-TF-001)
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -25,16 +25,56 @@ function createWindow() {
   });
 
   const distPath = path.join(__dirname, '../dist/index.html');
+  const isAdminLaunch = process.argv.some((arg) => arg === '--admin' || arg === '/admin' || arg === '-admin');
+  const targetHash = isAdminLaunch ? '#/admin' : '';
 
   if (app.isPackaged) {
-    mainWindow.loadFile(distPath);
+    mainWindow.loadFile(distPath, { hash: targetHash });
   } else if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL + (targetHash ? targetHash : ''));
   } else if (fs.existsSync(distPath)) {
-    mainWindow.loadFile(distPath);
+    mainWindow.loadFile(distPath, { hash: targetHash });
   } else {
-    mainWindow.loadURL('http://localhost:5200');
+    mainWindow.loadURL('http://localhost:5200' + (targetHash ? targetHash : ''));
   }
+
+  // Application menu with native CmdOrCtrl+Shift+A Administrator shortcut
+  const menuTemplate = [
+    {
+      label: 'Application',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Security',
+      submenu: [
+        {
+          label: 'Hospital Administrator Console...',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.executeJavaScript(
+                `window.dispatchEvent(new CustomEvent('podoload:admin-requested'));`
+              );
+            }
+          },
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
   // Disallow any external web navigation inside Electron window (keeps 100% offline & local)
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
