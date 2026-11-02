@@ -242,9 +242,26 @@ export function PodoLoadApp() {
   }, [selectedCaseId]);
 
   // User Authentication & Role Access Control (Admin vs Technician)
+  const checkIsAdminUrl = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return (
+      path === '/admin' ||
+      path.startsWith('/admin/') ||
+      hash === '#admin' ||
+      hash === '#/admin' ||
+      search.includes('admin=true') ||
+      search.includes('admin=1') ||
+      search.includes('mode=admin')
+    );
+  };
+
   const [currentUser, setCurrentUser] = useState<SystemUserSession>(() => dbService.getActiveUserSync());
   const [deviceAuthStatus, setDeviceAuthStatus] = useState(() => dbService.checkDeviceAuthorizationStatus());
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(!deviceAuthStatus.isAuthorized);
+  const [roleModalAdminMode, setRoleModalAdminMode] = useState<boolean>(() => checkIsAdminUrl());
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(() => !deviceAuthStatus.isAuthorized || checkIsAdminUrl());
   const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
 
   const handleSelectRole = (
@@ -258,11 +275,19 @@ export function PodoLoadApp() {
     setCurrentUser(session);
     if (role === 'admin') {
       dbService.authorizeStationForAdmin();
+      if (!isMobileDevice) {
+        setCurrentSection('admin');
+      }
+    } else {
+      if (currentSection === 'admin' || currentSection === 'settings') {
+        setCurrentSection('registration');
+      }
     }
     const updatedStatus = dbService.checkDeviceAuthorizationStatus();
     setDeviceAuthStatus(updatedStatus);
     if (updatedStatus.isAuthorized || role === 'admin') {
       setIsRoleModalOpen(false);
+      setRoleModalAdminMode(false);
     }
     if (hospitalId) {
       const allHosps = dbService.getHospitalProfilesSync();
@@ -272,6 +297,48 @@ export function PodoLoadApp() {
       }
     }
   };
+
+  // Synchronize /admin, #/admin, or ?mode=admin URL routing
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      if (checkIsAdminUrl()) {
+        if (currentUser.role === 'admin') {
+          if (!isMobileDevice) {
+            setCurrentSection('admin');
+          }
+        } else {
+          setRoleModalAdminMode(true);
+          setIsRoleModalOpen(true);
+        }
+      }
+    };
+    handleUrlRoute();
+    window.addEventListener('popstate', handleUrlRoute);
+    window.addEventListener('hashchange', handleUrlRoute);
+    return () => {
+      window.removeEventListener('popstate', handleUrlRoute);
+      window.removeEventListener('hashchange', handleUrlRoute);
+    };
+  }, [currentUser.role, isMobileDevice]);
+
+  // Global keyboard shortcut: Ctrl+Shift+A (or Cmd+Shift+A) unlocks Master Administrator access anywhere
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        if (currentUser.role === 'admin') {
+          if (!isMobileDevice) {
+            setCurrentSection('admin');
+          }
+        } else {
+          setRoleModalAdminMode(true);
+          setIsRoleModalOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [currentUser.role, isMobileDevice]);
 
   // On mobile devices (Android / iOS), clinical technicians operate the station.
   // Administrative & system configuration features are reserved for desktop workstations.
@@ -290,6 +357,7 @@ export function PodoLoadApp() {
   // Strictly guard Admin Panel: only authenticated Hospital Administrators can open
   const handleOpenAdminSection = () => {
     if (currentUser.role !== 'admin') {
+      setRoleModalAdminMode(true);
       setIsRoleModalOpen(true);
       return;
     }
@@ -1001,7 +1069,14 @@ export function PodoLoadApp() {
         onNavigate={handleNavClick}
         onStartNewExam={handleStartNewExam}
         currentUser={currentUser}
-        onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
+        onOpenUserSwitcher={(mode) => {
+          if (mode === 'admin') {
+            setRoleModalAdminMode(true);
+          } else {
+            setRoleModalAdminMode(false);
+          }
+          setIsRoleModalOpen(true);
+        }}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
@@ -1297,12 +1372,14 @@ export function PodoLoadApp() {
           setDeviceAuthStatus(status);
           if (status.isAuthorized || currentUser.role === 'admin') {
             setIsRoleModalOpen(false);
+            setRoleModalAdminMode(false);
           }
         }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
         isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin'}
         activationReason={deviceAuthStatus.reason}
+        initialAdminMode={roleModalAdminMode}
       />
     </div>
   );

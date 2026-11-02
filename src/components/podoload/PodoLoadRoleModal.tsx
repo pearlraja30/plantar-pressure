@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
   ShieldCheck,
@@ -39,6 +39,7 @@ interface PodoLoadRoleModalProps {
   ) => void;
   isMandatoryActivation?: boolean;
   activationReason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician';
+  initialAdminMode?: boolean;
 }
 
 export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
@@ -48,6 +49,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   onSelectRole,
   isMandatoryActivation = false,
   activationReason,
+  initialAdminMode = false,
 }) => {
   const isMobileDevice =
     Capacitor.isNativePlatform() ||
@@ -57,10 +59,49 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(isMobileDevice ? 'technician' : currentUser.role);
+  const [isAdminContext, setIsAdminContext] = useState<boolean>(() => Boolean(initialAdminMode));
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(
+    initialAdminMode ? 'admin' : isMobileDevice ? 'technician' : currentUser.role
+  );
   const [selectedTechId, setSelectedTechId] = useState<string>(
     currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
   );
+
+  // Sync admin mode when initialAdminMode prop changes or modal opens
+  useEffect(() => {
+    if (initialAdminMode) {
+      setIsAdminContext(true);
+      setSelectedRole('admin');
+    } else {
+      setIsAdminContext(false);
+      setSelectedRole('technician');
+    }
+  }, [initialAdminMode, isOpen]);
+
+  // Discreet 5-tap header gesture tracking
+  const [headerTapCount, setHeaderTapCount] = useState(0);
+  const lastHeaderTapRef = useRef<number>(0);
+
+  const handleHeaderTap = () => {
+    const now = Date.now();
+    if (now - lastHeaderTapRef.current < 700) {
+      const next = headerTapCount + 1;
+      if (next >= 5) {
+        setIsAdminContext((prev) => {
+          const toggled = !prev;
+          setSelectedRole(toggled ? 'admin' : 'technician');
+          setPinError(null);
+          return toggled;
+        });
+        setHeaderTapCount(0);
+      } else {
+        setHeaderTapCount(next);
+      }
+    } else {
+      setHeaderTapCount(1);
+    }
+    lastHeaderTapRef.current = now;
+  };
 
   // Login Password states (starts empty, no default passwords exposed)
   const [adminPassword, setAdminPassword] = useState<string>('');
@@ -148,13 +189,23 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [showTransferPassword, setShowTransferPassword] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
-  // Prevent accidental Escape routing (must be declared before any early returns to obey React Rules of Hooks)
+  // Prevent accidental Escape routing & support Ctrl+Shift+A for Admin Portal
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsAdminContext((prev) => {
+          const toggled = !prev;
+          setSelectedRole(toggled ? 'admin' : 'technician');
+          setPinError(null);
+          return toggled;
+        });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -415,9 +466,22 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           {/* Modal Header */}
           <div className="podoload-modal-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <KeyRound className="w-5 h-5 text-teal-600" />
+              <div
+                onClick={handleHeaderTap}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                title="Clinical Station Security (Tap 5x for Master Administrator Portal)"
+              >
+                {isAdminContext ? (
+                  <ShieldCheck className="w-5 h-5 text-teal-600" />
+                ) : (
+                  <KeyRound className="w-5 h-5 text-teal-600" />
+                )}
+              </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0c2328' }}>
+                <h3
+                  onClick={handleHeaderTap}
+                  style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0c2328', cursor: 'pointer', userSelect: 'none' }}
+                >
                   {recoveryMode === 'admin'
                     ? 'Hospital Administrator — Password Recovery'
                     : recoveryMode === 'technician'
@@ -430,9 +494,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       : activationReason === 'new_device'
                       ? 'New Hardware Device Detected — Registration Required'
                       : 'Station Activation & Enrollment Required'
-                    : isMobileDevice
-                    ? 'Clinical Technician Login'
-                    : 'Account & Role Switcher'}
+                    : isAdminContext
+                    ? 'Hospital Administrator Portal'
+                    : 'Clinical Technician Station Sign-In'}
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
                   {recoveryMode === 'admin'
@@ -443,9 +507,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
                     : isMandatoryActivation
                     ? 'Security Policy: Enter your Clinic Code and Activation Voucher to authorize this station before proceeding with clinical examinations.'
-                    : isMobileDevice
-                    ? 'Sign in with your technician User ID and password assigned by the Administrator'
-                    : 'Select between Hospital Administrator (Full System Control) or Clinical Technician'}
+                    : isAdminContext
+                    ? 'Authenticate with your Master Password for clinic administration, technician management, and system setup.'
+                    : 'Sign in with your Technician User ID & Password assigned by your Hospital Administrator.'}
                 </p>
               </div>
             </div>
@@ -928,171 +992,133 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 </div>
               </form>
             ) : (
-              /* VIEW 3: STANDARD ROLE SWITCHER (Admin vs Technician) */
-              <>
-                {/* Account 1: Hospital Administrator (Desktop / Web only) */}
-                {!isMobileDevice && (
-                  <div
-                    onClick={() => {
-                      setSelectedRole('admin');
-                      setPinError(null);
-                    }}
-                    style={{
-                      padding: '0.85rem 1rem',
-                      borderRadius: '8px',
-                      border: selectedRole === 'admin' ? '2px solid #0d9488' : '1px solid #cbd5e1',
-                      backgroundColor: selectedRole === 'admin' ? '#f0fdfa' : '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.45rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            backgroundColor: '#ccfbf1',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#0f766e',
-                          }}
-                        >
-                          <ShieldCheck className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
-                            Hospital Administrator
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                            {registeredAdmin
-                              ? `${registeredAdmin.username} · ${registeredAdmin.name}`
-                              : 'admin@technomind.health · Hospital Administrator'}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {currentUser.role === 'admin' && (
-                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
-                            Active
-                          </span>
-                        )}
-                        <div
-                          style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            border: selectedRole === 'admin' ? '5px solid #0d9488' : '2px solid #cbd5e1',
-                            backgroundColor: '#fff',
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
-                      <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
-                    </div>
-
-                    {selectedRole === 'admin' && (
+              /* VIEW 3: SEPARATED CONTEXT (Admin Portal vs Clinical Technician Login) */
+              isAdminContext ? (
+                /* Account 1: Hospital Administrator (Dedicated Admin Context) */
+                <div
+                  style={{
+                    padding: '0.95rem 1rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #0d9488',
+                    backgroundColor: '#f0fdfa',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <div
                         style={{
-                          marginTop: '0.45rem',
-                          paddingLeft: '2.5rem',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          backgroundColor: '#ccfbf1',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#0f766e',
                         }}
                       >
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1.2fr 1fr',
-                            gap: '0.65rem',
-                            backgroundColor: '#ffffff',
-                            padding: '0.6rem 0.75rem',
-                            borderRadius: '6px',
-                            border: '1px solid #ccfbf1',
-                          }}
-                        >
-                          <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
-                              <User className="w-3 h-3 text-teal-600" />
-                              <span>Admin User ID / Username *</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="podoload-input"
-                              placeholder="Enter Admin User ID"
-                              value={adminUsernameInput}
-                              autoComplete="username"
-                              onChange={(e) => {
-                                setAdminUsernameInput(e.target.value);
-                                setPinError(null);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
-                              <Lock className="w-3 h-3 text-teal-600" />
-                              <span>Master Password *</span>
-                            </label>
-                            <div style={{ position: 'relative' }}>
-                              <input
-                                type={showAdminPassword ? 'text' : 'password'}
-                                className="podoload-input"
-                                placeholder="••••••••"
-                                value={adminPassword}
-                                autoComplete="current-password"
-                                onChange={(e) => {
-                                  setAdminPassword(e.target.value);
-                                  setPinError(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSwitchAccount();
-                                  }
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ fontSize: '0.76rem', padding: '0.25rem 1.8rem 0.25rem 0.5rem' }}
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowAdminPassword(!showAdminPassword);
-                                }}
-                                style={{
-                                  position: 'absolute',
-                                  right: '4px',
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: '#64748b',
-                                  padding: '1px',
-                                }}
-                              >
-                                {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          </div>
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328' }}>
+                          Hospital Administrator Portal
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          {registeredAdmin
+                            ? `${registeredAdmin.username} · ${registeredAdmin.name}`
+                            : 'admin@technomind.health · Hospital Administrator'}
                         </div>
                       </div>
-                    )}
+                    </div>
+                    <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                      Master Access
+                    </span>
                   </div>
-                )}
 
-                {/* Account 2: Clinical Technician */}
+                  <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                    <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.2fr 1fr',
+                      gap: '0.65rem',
+                      backgroundColor: '#ffffff',
+                      padding: '0.6rem 0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #ccfbf1',
+                    }}
+                  >
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                        <User className="w-3 h-3 text-teal-600" />
+                        <span>Admin User ID / Username *</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="podoload-input"
+                        placeholder="Enter Admin User ID"
+                        value={adminUsernameInput}
+                        autoComplete="username"
+                        onChange={(e) => {
+                          setAdminUsernameInput(e.target.value);
+                          setPinError(null);
+                        }}
+                        style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                        <Lock className="w-3 h-3 text-teal-600" />
+                        <span>Master Password *</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showAdminPassword ? 'text' : 'password'}
+                          className="podoload-input"
+                          placeholder="••••••••"
+                          value={adminPassword}
+                          autoComplete="current-password"
+                          onChange={(e) => {
+                            setAdminPassword(e.target.value);
+                            setPinError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSwitchAccount();
+                            }
+                          }}
+                          style={{ fontSize: '0.76rem', padding: '0.25rem 1.8rem 0.25rem 0.5rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '4px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '1px',
+                          }}
+                        >
+                          {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Account 2: Clinical Technician (Default Normal Flow - Zero Admin Clutter) */
                 <div
                   onClick={() => {
                     setSelectedRole('technician');
@@ -1101,10 +1127,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   style={{
                     padding: '0.85rem 1rem',
                     borderRadius: '8px',
-                    border: selectedRole === 'technician' ? '2px solid #0d9488' : '1px solid #cbd5e1',
-                    backgroundColor: selectedRole === 'technician' ? '#f0fdfa' : '#ffffff',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    border: '1.5px solid #0d9488',
+                    backgroundColor: '#f0fdfa',
+                    cursor: 'default',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.45rem',
@@ -1509,7 +1534,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     </div>
                   )}
                 </div>
-              </>
+              )
             )}
 
             {pinError && (
@@ -1595,45 +1620,111 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
           {/* Modal Actions */}
           {!deviceLockout && recoveryMode === 'none' && (
-            <div className="podoload-modal-footer" style={{ justifyContent: isMandatoryActivation ? 'flex-end' : 'space-between' }}>
-              {!isMandatoryActivation && (
-                <button type="button" className="podoload-btn-secondary" onClick={onClose}>
-                  Cancel
-                </button>
-              )}
-              {selectedRole === 'technician' && mobileAuthTab === 'activate' ? (
-                <button
-                  type="button"
-                  className="podoload-btn-primary"
-                  onClick={handleActivateDevice}
-                  disabled={isActivating || Boolean(actSuccessMsg)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>
-                    {isActivating
-                      ? 'Registering Device...'
-                      : actSuccessMsg
-                      ? '✓ Registered! Logging in...'
-                      : '🚀 Authorize & Register Device'}
-                  </span>
-                </button>
+            <div className="podoload-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              {isAdminContext ? (
+                /* Admin Context Footer: Back to Technician Login on Left, Actions on Right */
+                <>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => {
+                      setIsAdminContext(false);
+                      setSelectedRole('technician');
+                      setPinError(null);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem' }}
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Technician Login</span>
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {!isMandatoryActivation && (
+                      <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      onClick={handleSwitchAccount}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Log In as Hospital Administrator</span>
+                    </button>
+                  </div>
+                </>
               ) : (
-                <button
-                  type="button"
-                  className="podoload-btn-primary"
-                  onClick={handleSwitchAccount}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>
-                    {selectedRole === 'admin'
-                      ? 'Log In as Hospital Administrator'
-                      : techUsernameInput.trim()
-                      ? `Log In as ${techUsernameInput.trim()}`
-                      : 'Log In as Clinical Technician'}
-                  </span>
-                </button>
+                /* Normal Technician Flow: Discreet Admin Portal on Left, Actions on Right */
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminContext(true);
+                        setSelectedRole('admin');
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.25rem 0.4rem',
+                        borderRadius: '4px',
+                        transition: 'color 0.15s ease',
+                      }}
+                      title="Switch to Master Administrator Login (Ctrl+Shift+A)"
+                    >
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      <span>Admin Portal</span>
+                    </button>
+
+                    {!isMandatoryActivation && (
+                      <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+
+                  {mobileAuthTab === 'activate' ? (
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      onClick={handleActivateDevice}
+                      disabled={isActivating || Boolean(actSuccessMsg)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>
+                        {isActivating
+                          ? 'Registering Device...'
+                          : actSuccessMsg
+                          ? '✓ Registered! Logging in...'
+                          : '🚀 Authorize & Register Device'}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      onClick={handleSwitchAccount}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>
+                        {techUsernameInput.trim()
+                          ? `Log In as ${techUsernameInput.trim()}`
+                          : 'Log In as Clinical Technician'}
+                      </span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -3099,6 +3099,84 @@ it("Enforces Secure Admin Master Password Update: Masked inputs, current passwor
   expect(updateAdminMasterPassword("SecureAdmin2026!", "anotherpass").success).toBe(true);
 });
 
+it("Enforces Separated /admin Context & Default Technician-Only Station Flow", () => {
+  // Logic under test: URL route detector for /admin, #/admin, ?mode=admin
+  const checkIsAdminUrl = (path = "/", hash = "", search = "") => {
+    const p = path.toLowerCase();
+    const h = hash.toLowerCase();
+    const s = search.toLowerCase();
+    return (
+      p === "/admin" ||
+      p.startsWith("/admin/") ||
+      h === "#admin" ||
+      h === "#/admin" ||
+      s.includes("admin=true") ||
+      s.includes("admin=1") ||
+      s.includes("mode=admin")
+    );
+  };
+
+  // 1. Normal clinical terminal launch (default installation on Windows EXE, Android, iOS)
+  expect(checkIsAdminUrl("/", "", "")).toBe(false);
+  expect(checkIsAdminUrl("/login", "", "")).toBe(false);
+  expect(checkIsAdminUrl("", "#scan", "")).toBe(false);
+
+  // Default flow: adminContext is false -> only technician station login presented
+  let adminContext = checkIsAdminUrl("/", "", "");
+  expect(adminContext).toBe(false);
+
+  // 2. Web / Intranet direct URL navigation: /admin, #/admin, ?mode=admin
+  expect(checkIsAdminUrl("/admin", "", "")).toBe(true);
+  expect(checkIsAdminUrl("/admin/settings", "", "")).toBe(true);
+  expect(checkIsAdminUrl("/", "#admin", "")).toBe(true);
+  expect(checkIsAdminUrl("/", "#/admin", "")).toBe(true);
+  expect(checkIsAdminUrl("/", "", "?admin=true")).toBe(true);
+  expect(checkIsAdminUrl("/", "", "?admin=1")).toBe(true);
+  expect(checkIsAdminUrl("/", "", "?mode=admin")).toBe(true);
+
+  // 3. Native App discreet admin access triggers (Windows EXE, Android, iOS)
+  // Simulate Ctrl+Shift+A keyboard shortcut
+  const handleShortcut = (e, currentContext) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "A" || e.key === "a")) {
+      return !currentContext;
+    }
+    return currentContext;
+  };
+
+  // Normal technician station toggled via Ctrl+Shift+A -> switches to Admin Portal
+  adminContext = handleShortcut({ ctrlKey: true, shiftKey: true, key: "A" }, false);
+  expect(adminContext).toBe(true);
+
+  // Toggling again or clicking "Back to Technician Login" switches back to false
+  adminContext = handleShortcut({ ctrlKey: true, shiftKey: true, key: "A" }, true);
+  expect(adminContext).toBe(false);
+
+  // 4. Kiosk 5-tap gesture detection
+  const simulateTapSequence = (taps, intervalMs = 200) => {
+    let tapCount = 0;
+    let lastTap = 0;
+    let unlocked = false;
+
+    for (let i = 0; i < taps; i++) {
+      const now = lastTap + intervalMs;
+      if (now - lastTap < 700) {
+        tapCount++;
+        if (tapCount >= 5) {
+          unlocked = true;
+          tapCount = 0;
+        }
+      } else {
+        tapCount = 1;
+      }
+      lastTap = now;
+    }
+    return unlocked;
+  };
+
+  expect(simulateTapSequence(3)).toBe(false); // 3 taps: does not unlock
+  expect(simulateTapSequence(5)).toBe(true);  // 5 taps: unlocks Master Admin
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

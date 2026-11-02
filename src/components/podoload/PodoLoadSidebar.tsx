@@ -35,7 +35,7 @@ interface PodoLoadSidebarProps {
   onNavigate: (section: PodoLoadNavSection) => void;
   onStartNewExam: () => void;
   currentUser?: SystemUserSession;
-  onOpenUserSwitcher?: () => void;
+  onOpenUserSwitcher?: (mode?: 'admin' | 'technician') => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -198,7 +198,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
                 onClick={() => {
                   if (currentUser?.role === 'technician') {
-                    if (onOpenUserSwitcher) onOpenUserSwitcher();
+                    if (onOpenUserSwitcher) onOpenUserSwitcher('admin');
                   } else {
                     handleItemClick('admin');
                   }
@@ -217,7 +217,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
                 onClick={() => {
                   if (currentUser?.role === 'technician') {
-                    if (onOpenUserSwitcher) onOpenUserSwitcher();
+                    if (onOpenUserSwitcher) onOpenUserSwitcher('admin');
                   } else {
                     handleItemClick('settings');
                   }
@@ -239,7 +239,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
       <div
         className="podoload-sidebar-user-card"
         onClick={() => {
-          if (onOpenUserSwitcher) onOpenUserSwitcher();
+          if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'admin' ? 'admin' : 'technician');
           if (onCloseMobile) onCloseMobile();
         }}
         title="Click to switch between Hospital Administrator and Clinical Technician"

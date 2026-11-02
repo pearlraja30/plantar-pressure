@@ -115,7 +115,13 @@ The system includes an automated clinical verification battery covering all test
 * **Dynamic Multi-Technician Roaming**: Diagnostic terminals are no longer locked to a single static operator name. Any authorized technician enrolled under the clinic can sign in, acquire footprints, and generate authenticated clinical reports.
 * **Clear Credential Diagnostics**: Case-insensitive user lookup with distinct verification messages (`User ID not found` vs `Incorrect password`).
 
-### 3. Public Login Screen Lockdown & Single Administrator Governance
+### 3. Public Login Screen Lockdown, Single Administrator Governance & Separated `/admin` Context
+* **Default Technician-Only Flow (Zero Admin Clutter on New Devices)**: When installing the application on any new station (**Windows Desktop .exe**, **Android .apk**, or **iOS .ipa**), the station sign-in dialog opens exclusively in **Clinical Technician Station Login** mode. The "Hospital Administrator" card and account selector are completely invisible, preventing technician confusion, staff curiosity, and unauthorized tampering.
+* **Dedicated `/admin` Context for Web & Intranet**: Navigating directly to `/admin`, `#/admin`, or `?mode=admin` in any browser instantly opens the **Hospital Administrator Portal** with Master Password authentication.
+* **Discreet Administrator Access for Native Desktop & Mobile**:
+  * **Windows Desktop (.exe)**: Press **`Ctrl + Shift + A`** (or `Cmd + Shift + A` on macOS) anywhere on the window, or click the subtle, low-contrast footer link `🔐 Admin Portal` to reveal the Master Administrator login prompt.
+  * **Mobile Kiosk Gesture (Android / iOS)**: Tapping the header lock icon or title **5 times in 2.5 seconds** unlocks the Master Administrator prompt.
+  * **Quick Reversal**: The Admin login prompt features a prominent `← Back to Technician Login` button to effortlessly return to the standard clinical technician view.
 * **Strict Single Administrator Setup**: Exactly one Hospital Administrator possesses master administrative authority over each station. Initial master credentials (`admin@technomind.health` / default `1234`) allow the designated clinic head to perform initial setup.
 * **Protected Password Updates (Admin Only)**: Master Password changes are strictly confined inside the authenticated **Hospital Administrator Panel** (`Admin security` tab). Inputs are masked (`••••••••`) by default with current-password verification to prevent onlookers or operators from viewing or modifying credentials.
 * **Zero Public Backdoors**: All "Register Admin", "First-Time Password Setup", and "Forgot Password" options have been permanently eliminated from the login/role-switcher dialog, preventing unauthorized users or operators from hijacking or resetting station credentials.
@@ -136,11 +142,11 @@ The system includes an automated clinical verification battery covering all test
 * **Navigation Isolation**: Electron main process blocks unvetted external navigation (`will-navigate`) and denies popup window creation; a global capture-phase web listener intercepts links to prevent accidental routing to external domains.
 * **React Rules of Hooks Integrity**: All lifecycle hooks hoisted above early returns across components, guaranteeing zero hook mismatch exceptions (`DIAG-MVYLWFK2-384`).
 
-### 7. Inbuilt Live Database Records Explorer & Test Suite (64 Unit Tests)
+### 7. Inbuilt Live Database Records Explorer & Test Suite (65 Unit Tests)
 * Direct in-app inspection of all 7 database stores (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `audit_logs`, `settings`).
 * Accessible via sidebar (**`Database records`**) and Settings (**`Patient ID & Database`** $\rightarrow$ **`Live Records Explorer`**).
 * Real-time search, live row count metrics, pretty-printed JSON inspection modal with one-click copy, and atomic Export/Import JSON backup.
-* **64/64 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, and security policies.
+* **65/65 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, and separated `/admin` routing.
 
 ---
 
