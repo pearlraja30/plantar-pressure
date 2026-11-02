@@ -2319,6 +2319,57 @@ class PodoPressDatabase {
     return admin;
   }
 
+  public updateAdminMasterPassword(
+    currentPassword: string,
+    newPassword: string
+  ): { success: boolean; error?: string; account?: AdminAccount } {
+    const admin = this.getAdminAccountSync();
+    if (!admin) {
+      return { success: false, error: 'No administrator account found on this station.' };
+    }
+
+    const cleanCurrent = currentPassword.trim();
+    const cleanNew = newPassword.trim();
+
+    if (!cleanCurrent) {
+      return { success: false, error: 'Please enter your current Master Password.' };
+    }
+    const expectedPin = admin.pin || '1234';
+    if (cleanCurrent !== expectedPin) {
+      return { success: false, error: 'Incorrect current Master Password. Verification failed.' };
+    }
+    if (!cleanNew || cleanNew.length < 4) {
+      return { success: false, error: 'New Master Password must be at least 4 characters.' };
+    }
+    if (cleanNew === expectedPin) {
+      return { success: false, error: 'New password cannot be identical to the current password.' };
+    }
+
+    admin.pin = cleanNew;
+    admin.isInitialSetupCompleted = true;
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(admin));
+      const list = this.getAdminAccountsListSync();
+      const idx = list.findIndex((a) => a.id === admin.id);
+      if (idx >= 0) list[idx] = admin;
+      else list.push(admin);
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+
+    logAuditEvent(
+      'ADMIN_PASSWORD_UPDATED',
+      `Administrator ${admin.name} (${admin.username}) updated their Master Password securely from the Admin Panel.`,
+      admin.username,
+      undefined,
+      'info',
+      'admin'
+    );
+
+    return { success: true, account: admin };
+  }
+
   public getAuditLogsSync(): AuditEvent[] {
     return getAuditEvents();
   }

@@ -117,6 +117,16 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [desiredAdminName, setDesiredAdminName] = useState(adminAccount.name);
   const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(() => dbService.getAuditLogsSync());
 
+  // Admin Master Password Change State (Masked & Security Protected)
+  const [currentAdminPassword, setCurrentAdminPassword] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [showCurrentAdminPassword, setShowCurrentAdminPassword] = useState(false);
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
+  const [showConfirmAdminPassword, setShowConfirmAdminPassword] = useState(false);
+  const [adminPasswordChangeError, setAdminPasswordChangeError] = useState<string | null>(null);
+  const [adminPasswordChangeSuccess, setAdminPasswordChangeSuccess] = useState<string | null>(null);
+
   // Form states for the currently selected hospital
   const [name, setName] = useState(activeHospital.name);
   const [code, setCode] = useState(activeHospital.code);
@@ -486,6 +496,39 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setAuditLogs(dbService.getAuditLogsSync());
     setSaveSuccess(`✓ Admin User ID updated to "${updated.username}". Future logins require this User ID.`);
     setTimeout(() => setSaveSuccess(null), 4000);
+  };
+
+  const handleUpdateMasterPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPasswordChangeError(null);
+    setAdminPasswordChangeSuccess(null);
+
+    if (!currentAdminPassword.trim()) {
+      setAdminPasswordChangeError('Please enter your current Master Password.');
+      return;
+    }
+    if (!newAdminPassword.trim() || newAdminPassword.trim().length < 4) {
+      setAdminPasswordChangeError('New Master Password must be at least 4 characters long.');
+      return;
+    }
+    if (newAdminPassword !== confirmAdminPassword) {
+      setAdminPasswordChangeError('New Master Password and Confirm Password do not match.');
+      return;
+    }
+
+    const res = dbService.updateAdminMasterPassword(currentAdminPassword, newAdminPassword);
+    if (!res.success) {
+      setAdminPasswordChangeError(res.error || 'Failed to update Master Password.');
+      return;
+    }
+
+    setAdminAccount(res.account || dbService.getAdminAccountSync());
+    setAuditLogs(dbService.getAuditLogsSync());
+    setCurrentAdminPassword('');
+    setNewAdminPassword('');
+    setConfirmAdminPassword('');
+    setAdminPasswordChangeSuccess('✓ Master Password successfully updated! Your new credentials are active immediately.');
+    setTimeout(() => setAdminPasswordChangeSuccess(null), 5000);
   };
 
   const getShareableVoucherText = (tech: TechnicianUser) => {
@@ -2980,6 +3023,202 @@ STEP 2: RETURNING STATION SESSIONS
                     Save User ID
                   </button>
                 </div>
+              </div>
+
+              {/* Administrator Master Password Change (Masked & Security Protected) */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #ccfbf1',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <KeyRound className="w-4 h-4 text-teal-600" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
+                      Master Password &amp; Credential Security (Admin Only)
+                    </span>
+                  </div>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                    Masked Input Protection Active
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                  Change your Administrator Master Password securely. Input fields are strictly masked to prevent onlookers or unauthorized viewers from capturing your credentials.
+                </div>
+
+                <form onSubmit={handleUpdateMasterPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.65rem' }}>
+                    {/* Current Master Password */}
+                    <div className="podoload-form-group">
+                      <label className="podoload-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Lock className="w-3 h-3 text-slate-400" />
+                        <span>Current Master Password *</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showCurrentAdminPassword ? 'text' : 'password'}
+                          className="podoload-input"
+                          placeholder="••••••••"
+                          value={currentAdminPassword}
+                          onChange={(e) => setCurrentAdminPassword(e.target.value)}
+                          style={{ paddingRight: '2rem', fontSize: '0.78rem' }}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentAdminPassword(!showCurrentAdminPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '0.4rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '2px',
+                          }}
+                          title={showCurrentAdminPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showCurrentAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* New Master Password */}
+                    <div className="podoload-form-group">
+                      <label className="podoload-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Key className="w-3 h-3 text-slate-400" />
+                        <span>New Master Password (min. 4) *</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showNewAdminPassword ? 'text' : 'password'}
+                          className="podoload-input"
+                          placeholder="••••••••"
+                          value={newAdminPassword}
+                          onChange={(e) => setNewAdminPassword(e.target.value)}
+                          style={{ paddingRight: '2rem', fontSize: '0.78rem' }}
+                          required
+                          minLength={4}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '0.4rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '2px',
+                          }}
+                          title={showNewAdminPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showNewAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirm New Master Password */}
+                    <div className="podoload-form-group">
+                      <label className="podoload-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Check className="w-3 h-3 text-slate-400" />
+                        <span>Confirm New Master Password *</span>
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showConfirmAdminPassword ? 'text' : 'password'}
+                          className="podoload-input"
+                          placeholder="••••••••"
+                          value={confirmAdminPassword}
+                          onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                          style={{ paddingRight: '2rem', fontSize: '0.78rem' }}
+                          required
+                          minLength={4}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmAdminPassword(!showConfirmAdminPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '0.4rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '2px',
+                          }}
+                          title={showConfirmAdminPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {adminPasswordChangeError && (
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#b91c1c',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        padding: '0.35rem 0.6rem',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                      }}
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{adminPasswordChangeError}</span>
+                    </div>
+                  )}
+
+                  {adminPasswordChangeSuccess && (
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#15803d',
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        padding: '0.35rem 0.6rem',
+                        borderRadius: '4px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                      }}
+                    >
+                      <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{adminPasswordChangeSuccess}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.2rem' }}>
+                    <button
+                      type="submit"
+                      className="podoload-btn-primary podoload-btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', height: '32px' }}
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Update Master Password</span>
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* Technician Activation Voucher Expiry & Rotation Security Policy */}

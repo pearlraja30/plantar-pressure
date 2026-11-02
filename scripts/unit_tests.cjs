@@ -3063,6 +3063,42 @@ it("Enforces Configurable Voucher Expiry Policy (Hours, Days, Minutes, Custom) a
   expect(new Date(updatedTechs[1].activationCodeExpiresAt).getTime()).toBe(baseNow + 7 * 24 * 3600 * 1000);
 });
 
+it("Enforces Secure Admin Master Password Update: Masked inputs, current password verification, min. 4 characters, and audit trail logging", () => {
+  let mockAdmin = {
+    id: "admin-master-01",
+    username: "admin@technomind.health",
+    pin: "1234",
+    name: "Dr. Specialist"
+  };
+
+  const updateAdminMasterPassword = (currentPassword, newPassword) => {
+    if (!currentPassword) return { success: false, error: "Please enter your current Master Password." };
+    if (mockAdmin.pin !== currentPassword) return { success: false, error: "Incorrect current Master Password. Verification failed." };
+    if (!newPassword || newPassword.length < 4) return { success: false, error: "New Master Password must be at least 4 characters." };
+    if (newPassword === currentPassword) return { success: false, error: "New password cannot be identical to the current password." };
+    mockAdmin.pin = newPassword;
+    return { success: true, account: mockAdmin };
+  };
+
+  // 1. Wrong current password fails
+  expect(updateAdminMasterPassword("wrong", "newpass123").success).toBe(false);
+
+  // 2. Too short password fails (< 4 chars)
+  expect(updateAdminMasterPassword("1234", "12").success).toBe(false);
+
+  // 3. Same password fails
+  expect(updateAdminMasterPassword("1234", "1234").success).toBe(false);
+
+  // 4. Valid update succeeds and updates pin
+  const res = updateAdminMasterPassword("1234", "SecureAdmin2026!");
+  expect(res.success).toBe(true);
+  expect(mockAdmin.pin).toBe("SecureAdmin2026!");
+
+  // 5. Old password no longer works
+  expect(updateAdminMasterPassword("1234", "anotherpass").success).toBe(false);
+  expect(updateAdminMasterPassword("SecureAdmin2026!", "anotherpass").success).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

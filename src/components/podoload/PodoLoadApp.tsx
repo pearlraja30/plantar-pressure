@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, KeyRound } from 'lucide-react';
 import './podoload.css';
 import { PodoLoadSidebar, PodoLoadNavSection } from './PodoLoadSidebar';
 import { PodoLoadHeader } from './PodoLoadHeader';
@@ -286,6 +286,17 @@ export function PodoLoadApp() {
       }
     }
   }, [isMobileDevice]);
+
+  // Strictly guard Admin Panel: only authenticated Hospital Administrators can open
+  const handleOpenAdminSection = () => {
+    if (currentUser.role !== 'admin') {
+      setIsRoleModalOpen(true);
+      return;
+    }
+    if (!isMobileDevice) {
+      setCurrentSection('admin');
+    }
+  };
 
   // Selected patient & case (Active loaded case priority, strict matching)
   const currentCase =
@@ -1014,9 +1025,7 @@ export function PodoLoadApp() {
           clinicName={activeHospital.name}
           currentUser={currentUser}
           onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
-          onOpenAdmin={() => {
-            if (!isMobileDevice) setCurrentSection('admin');
-          }}
+          onOpenAdmin={handleOpenAdminSection}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
@@ -1096,7 +1105,7 @@ export function PodoLoadApp() {
               }}
               onSaveToArchive={handleSaveToArchive}
               onOpenArchive={() => setCurrentSection('reports_cloud')}
-              onOpenAdmin={() => setCurrentSection('admin')}
+              onOpenAdmin={handleOpenAdminSection}
               onOpenSettings={() => setCurrentSection('settings')}
             />
           )}
@@ -1145,45 +1154,66 @@ export function PodoLoadApp() {
               }}
               onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
               onOpenSettings={() => setCurrentSection('settings')}
-              onOpenAdmin={() => setCurrentSection('admin')}
+              onOpenAdmin={handleOpenAdminSection}
             />
           )}
 
           {/* ADMINISTRATION: Hospital & Admin */}
           {currentSection === 'admin' && (
-            <PodoLoadAdmin
-              patients={patients}
-              cases={cases}
-              onHospitalChanged={(hosp) => {
-                setActiveHospital(hosp);
-              }}
-              onNavigateToReport={() => {
-                setCurrentStep(5);
-                setCurrentSection('report');
-              }}
-              onNavigateToRegistration={() => {
-                setCurrentStep(1);
-                setCurrentSection('registration');
-              }}
-              onSelectPatient={(p) => setSelectedPatientId(p.id)}
-              onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
-              onSwitchUser={handleSelectRole}
-              onRefreshData={() => {
-                dbService.getAllPatients().then((pats) => {
-                  if (pats) setPatients(pats);
-                });
-                dbService.getAllCases().then((cs) => {
-                  if (cs) setCases(cs);
-                });
-              }}
-            />
+            currentUser.role === 'admin' ? (
+              <PodoLoadAdmin
+                patients={patients}
+                cases={cases}
+                onHospitalChanged={(hosp) => {
+                  setActiveHospital(hosp);
+                }}
+                onNavigateToReport={() => {
+                  setCurrentStep(5);
+                  setCurrentSection('report');
+                }}
+                onNavigateToRegistration={() => {
+                  setCurrentStep(1);
+                  setCurrentSection('registration');
+                }}
+                onSelectPatient={(p) => setSelectedPatientId(p.id)}
+                onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
+                onSwitchUser={handleSelectRole}
+                onRefreshData={() => {
+                  dbService.getAllPatients().then((pats) => {
+                    if (pats) setPatients(pats);
+                  });
+                  dbService.getAllCases().then((cs) => {
+                    if (cs) setCases(cs);
+                  });
+                }}
+              />
+            ) : (
+              <div className="podoload-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', margin: '2rem auto', maxWidth: '520px' }}>
+                <ShieldAlert className="w-12 h-12 text-amber-500" style={{ margin: '0 auto 0.75rem auto' }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0c2328', margin: '0 0 0.5rem 0' }}>
+                  Hospital Administrator Access Required
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+                  The Admin Panel controls sensitive clinic settings, technician credentials, and station security. Only authenticated Hospital Administrators can access this area.
+                </p>
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={() => setIsRoleModalOpen(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', margin: '0 auto' }}
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>Log In as Hospital Administrator</span>
+                </button>
+              </div>
+            )
           )}
 
           {/* SYSTEM: Settings */}
           {currentSection === 'settings' && (
             <PodoLoadSettings
               onPurgeAllData={handlePurgeAllStaleData}
-              onOpenAdmin={() => setCurrentSection('admin')}
+              onOpenAdmin={handleOpenAdminSection}
             />
           )}
         </main>
