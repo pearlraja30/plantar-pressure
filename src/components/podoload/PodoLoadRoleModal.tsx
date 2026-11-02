@@ -148,6 +148,19 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [showTransferPassword, setShowTransferPassword] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
+  // Prevent accidental Escape routing (must be declared before any early returns to obey React Rules of Hooks)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentActiveTech = technicians.find((t) => t.id === selectedTechId) || technicians[0];
@@ -390,18 +403,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       setPinError(null);
     }, 1600);
   };
-
-  // Prevent accidental Escape routing
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   return (
     <>
