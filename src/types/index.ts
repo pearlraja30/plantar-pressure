@@ -272,10 +272,20 @@ export interface TechnicianUser {
   recoveryKey?: string;
   activationCode?: string; // Code-based enrollment voucher, e.g. "TMH-TECH-1001"
   activationCodeGeneratedAt?: string; // ISO date string of generation
-  activationCodeExpiresAt?: string; // ISO date string of hourly rotation (valid for 1 hour)
+  activationCodeExpiresAt?: string; // ISO date string of timed rotation (valid per configured policy)
   registeredDeviceId?: string; // Bound hardware device fingerprint
   isRegisteredOnDevice?: boolean;
   authorizedAt?: string;
+}
+
+export type VoucherExpiryUnit = 'minutes' | 'hours' | 'days';
+
+export interface VoucherExpiryPolicy {
+  duration: number; // e.g. 1, 2, 8, 24, 7, 30
+  unit: VoucherExpiryUnit; // 'minutes' | 'hours' | 'days'
+  autoRotateOnExpiry: boolean; // auto-rotate on expiration
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface DeviceAuthorizationToken {

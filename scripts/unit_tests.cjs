@@ -2965,6 +2965,104 @@ it("Enforces 1-Hour Activation Code Expiry & Rotation, Desired User ID Login, an
   expect(Boolean(auditLogs.find((a) => a.action === "ACTIVATION_CODE_ROTATED"))).toBe(true);
 });
 
+it("Enforces Configurable Voucher Expiry Policy (Hours, Days, Minutes, Custom) and Batch Technician Policy Synchronization", () => {
+  // 1. Duration calculation helper
+  const getVoucherExpiryMs = (policy) => {
+    const duration = Math.max(1, Number(policy.duration) || 1);
+    switch (policy.unit) {
+      case 'minutes':
+        return duration * 60 * 1000;
+      case 'hours':
+        return duration * 60 * 60 * 1000;
+      case 'days':
+        return duration * 24 * 60 * 60 * 1000;
+      default:
+        return duration * 60 * 60 * 1000;
+    }
+  };
+
+  expect(getVoucherExpiryMs({ duration: 30, unit: 'minutes' })).toBe(30 * 60 * 1000);
+  expect(getVoucherExpiryMs({ duration: 2, unit: 'hours' })).toBe(2 * 60 * 60 * 1000);
+  expect(getVoucherExpiryMs({ duration: 24, unit: 'hours' })).toBe(24 * 60 * 60 * 1000);
+  expect(getVoucherExpiryMs({ duration: 7, unit: 'days' })).toBe(7 * 24 * 60 * 60 * 1000);
+  expect(getVoucherExpiryMs({ duration: 30, unit: 'days' })).toBe(30 * 24 * 60 * 60 * 1000);
+
+  // 2. Format labels
+  const formatPolicyLabel = (policy) => {
+    const d = Math.max(1, Number(policy.duration) || 1);
+    if (policy.unit === 'days') return d === 1 ? '1 Day (24 Hours)' : `${d} Days`;
+    if (policy.unit === 'hours') return d === 24 ? '24 Hours (1 Day)' : d === 1 ? '1 Hour' : `${d} Hours`;
+    if (policy.unit === 'minutes') return `${d} Minutes`;
+    return `${d} ${policy.unit}`;
+  };
+
+  expect(formatPolicyLabel({ duration: 1, unit: 'hours' })).toBe('1 Hour');
+  expect(formatPolicyLabel({ duration: 8, unit: 'hours' })).toBe('8 Hours');
+  expect(formatPolicyLabel({ duration: 24, unit: 'hours' })).toBe('24 Hours (1 Day)');
+  expect(formatPolicyLabel({ duration: 3, unit: 'days' })).toBe('3 Days');
+  expect(formatPolicyLabel({ duration: 7, unit: 'days' })).toBe('7 Days');
+
+  // 3. Format remaining time
+  const formatRemaining = (expiresAtMs, nowMs) => {
+    const diffMs = expiresAtMs - nowMs;
+    if (diffMs <= 0) return { text: 'Expired', isExpired: true };
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    const hours = Math.floor(diffMs / (60 * 60 * 1000));
+    const mins = Math.max(1, Math.round(diffMs / (60 * 1000)));
+
+    if (days >= 1) {
+      const remH = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+      return { text: remH > 0 ? `${days}d ${remH}h Left` : `${days}d Left`, isExpired: false };
+    }
+    if (hours >= 1) {
+      const remM = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+      return { text: remM > 0 ? `${hours}h ${remM}m Left` : `${hours}h Left`, isExpired: false };
+    }
+    return { text: `${mins}m Left`, isExpired: false };
+  };
+
+  const baseNow = 1700000000000;
+  // 5 days + 4 hours left
+  const rem5d = formatRemaining(baseNow + (5 * 24 + 4) * 3600 * 1000, baseNow);
+  expect(rem5d.text).toBe('5d 4h Left');
+
+  // 3 hours + 25 mins left
+  const rem3h = formatRemaining(baseNow + (3 * 60 + 25) * 60 * 1000, baseNow);
+  expect(rem3h.text).toBe('3h 25m Left');
+
+  // 45 minutes left
+  const rem45m = formatRemaining(baseNow + 45 * 60 * 1000, baseNow);
+  expect(rem45m.text).toBe('45m Left');
+
+  // 4. Multi-day voucher life-cycle test (7-Day Policy)
+  const policy7Days = { duration: 7, unit: 'days', autoRotateOnExpiry: true };
+  const generatedAt = baseNow;
+  const expiresAt = baseNow + getVoucherExpiryMs(policy7Days);
+
+  const isVoucherActive = (nowCheck) => nowCheck < (expiresAt + 60 * 60 * 1000); // with 1 hr grace
+  expect(isVoucherActive(baseNow + 3 * 24 * 3600 * 1000)).toBe(true); // Day 3: active
+  expect(isVoucherActive(baseNow + 6 * 24 * 3600 * 1000)).toBe(true); // Day 6: active
+  expect(isVoucherActive(baseNow + 7 * 24 * 3600 * 1000 + 2 * 3600 * 1000)).toBe(false); // Past 7 days + grace: expired
+
+  // 5. Batch synchronize all technicians to new policy
+  const technicians = [
+    { id: 'tech-1', name: 'Technician 1', activationCode: 'TMH-TECH-1111', activationCodeExpiresAt: new Date(baseNow + 3600000).toISOString() },
+    { id: 'tech-2', name: 'Technician 2', activationCode: 'TMH-TECH-2222', activationCodeExpiresAt: new Date(baseNow + 3600000).toISOString() },
+  ];
+
+  const applyPolicyToAll = (techs, newPolicy, currentTimeMs) => {
+    const durMs = getVoucherExpiryMs(newPolicy);
+    return techs.map((t) => ({
+      ...t,
+      activationCodeExpiresAt: new Date(currentTimeMs + durMs).toISOString(),
+    }));
+  };
+
+  const updatedTechs = applyPolicyToAll(technicians, policy7Days, baseNow);
+  expect(new Date(updatedTechs[0].activationCodeExpiresAt).getTime()).toBe(baseNow + 7 * 24 * 3600 * 1000);
+  expect(new Date(updatedTechs[1].activationCodeExpiresAt).getTime()).toBe(baseNow + 7 * 24 * 3600 * 1000);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

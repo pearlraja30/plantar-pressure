@@ -39,9 +39,11 @@ import {
   MessageSquare,
   Printer,
   Cloud,
+  Clock,
+  Sliders,
 } from 'lucide-react';
-import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense, AdminAccount, AuditEvent } from '../../types';
-import { dbService } from '../../services/dbService';
+import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense, AdminAccount, AuditEvent, VoucherExpiryPolicy, VoucherExpiryUnit } from '../../types';
+import { dbService, DEFAULT_VOUCHER_EXPIRY_POLICY, formatVoucherPolicyLabel, formatRemainingTime } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
 import { diagnosticsLogger, DiagnosticErrorLog } from '../../services/diagnosticsLogger';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
@@ -160,6 +162,15 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [hubSelectedTechId, setHubSelectedTechId] = useState<string>(
     techniciansList.length > 0 ? techniciansList[0].id : 'tech-user-01'
   );
+
+  // Configurable Voucher Expiry & Rotation Policy State (Hours / Days / Minutes / Custom)
+  const [expiryPolicy, setExpiryPolicy] = useState<VoucherExpiryPolicy>(() => dbService.getVoucherExpiryPolicySync());
+  const [policyDurationInput, setPolicyDurationInput] = useState<number>(expiryPolicy.duration);
+  const [policyUnitInput, setPolicyUnitInput] = useState<VoucherExpiryUnit>(expiryPolicy.unit);
+  const [policyAutoRotate, setPolicyAutoRotate] = useState<boolean>(expiryPolicy.autoRotateOnExpiry);
+  const [policyFeedbackMsg, setPolicyFeedbackMsg] = useState<string | null>(null);
+  const [showPolicyConfig, setShowPolicyConfig] = useState(false);
+  const [applyToExisting, setApplyToExisting] = useState(true);
 
   // Hospital-wise Patient Details filtering state
   const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('ALL');
@@ -374,7 +385,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setNewTechEmail('');
     setNewTechNotes('');
 
-    setSaveSuccess(`✓ Technician login created for "${newTech.name}". User ID: ${newTech.username} | Voucher: ${timedVoucher.code} (Valid for 1 hour)`);
+    setSaveSuccess(`✓ Technician login created for "${newTech.name}". User ID: ${newTech.username} | Voucher: ${timedVoucher.code} (Valid for ${timedVoucher.policyLabel})`);
     setTimeout(() => setSaveSuccess(null), 5000);
   };
 
@@ -386,6 +397,36 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     } catch {
       // Fallback
     }
+  };
+
+  const handleSaveExpiryPolicy = async (customDuration?: number, customUnit?: VoucherExpiryUnit) => {
+    const dur = Math.max(1, Number(customDuration !== undefined ? customDuration : policyDurationInput));
+    const unit = customUnit || policyUnitInput;
+    const updated = await dbService.saveVoucherExpiryPolicy({
+      duration: dur,
+      unit,
+      autoRotateOnExpiry: policyAutoRotate,
+    });
+    setExpiryPolicy(updated);
+    setPolicyDurationInput(updated.duration);
+    setPolicyUnitInput(updated.unit);
+
+    if (applyToExisting) {
+      const refreshedTechs = dbService.applyExpiryPolicyToAllTechnicians(updated);
+      setTechniciansList(refreshedTechs);
+    } else {
+      setTechniciansList(dbService.getTechniciansSync());
+    }
+
+    setAuditLogs(dbService.getAuditLogsSync());
+    setPolicyFeedbackMsg(`✓ Expiry policy saved! Vouchers will now expire after ${formatVoucherPolicyLabel(updated)}.`);
+    setTimeout(() => setPolicyFeedbackMsg(null), 5000);
+  };
+
+  const handleApplyPresetPolicy = async (duration: number, unit: VoucherExpiryUnit) => {
+    setPolicyDurationInput(duration);
+    setPolicyUnitInput(unit);
+    await handleSaveExpiryPolicy(duration, unit);
   };
 
   const handleSaveTechPassword = async () => {
@@ -430,7 +471,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     if (updated) {
       setTechniciansList(dbService.getTechniciansSync());
       setAuditLogs(dbService.getAuditLogsSync());
-      setSaveSuccess(`✓ Activation code rotated for "${tech.name}": ${updated.activationCode}. Valid for 1 hour.`);
+      setSaveSuccess(`✓ Activation code rotated for "${tech.name}": ${updated.activationCode}. Valid for ${formatVoucherPolicyLabel(expiryPolicy)}.`);
       setTimeout(() => setSaveSuccess(null), 3500);
     }
   };
@@ -1259,7 +1300,7 @@ STEP 2: RETURNING STATION SESSIONS
                         </div>
                       </div>
 
-                      {/* Box 2: Activation Voucher Code (1-Hour Timed Policy) */}
+                      {/* Box 2: Activation Voucher Code (Configurable Timed Policy) */}
                       {(() => {
                         const timed = dbService.getOrRotateTechnicianActivationCode(currentHubTech.id);
                         return (
@@ -1278,9 +1319,20 @@ STEP 2: RETURNING STATION SESSIONS
                               <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
                                 2. Activation Voucher Code
                               </span>
-                              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>
-                                ⏱️ {timed.minutesRemaining}m Left (1-Hr Policy)
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>
+                                  ⏱️ {timed.remainingText} ({timed.policyLabel})
+                                </span>
+                                <button
+                                  type="button"
+                                  className="podoload-btn-secondary podoload-btn-sm"
+                                  style={{ fontSize: '0.58rem', padding: '1px 5px', color: '#0f766e' }}
+                                  onClick={() => setShowPolicyConfig(!showPolicyConfig)}
+                                  title="Configure activation voucher expiration & rotation duration (hours / days / custom)"
+                                >
+                                  ⚙️ Configure
+                                </button>
+                              </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
                               <code style={{ fontSize: '1rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
@@ -1292,7 +1344,7 @@ STEP 2: RETURNING STATION SESSIONS
                                   className="podoload-btn-secondary podoload-btn-sm"
                                   style={{ fontSize: '0.64rem', padding: '0.2rem 0.35rem' }}
                                   onClick={() => handleRegenerateActivationCode(currentHubTech)}
-                                  title="Rotate activation voucher code now (starts fresh 1-hour expiry)"
+                                  title={`Rotate activation voucher code now (starts fresh ${timed.policyLabel} expiry)`}
                                 >
                                   <RotateCw className="w-3 h-3 text-teal-600" />
                                 </button>
@@ -1308,7 +1360,7 @@ STEP 2: RETURNING STATION SESSIONS
                               </div>
                             </div>
                             <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
-                              Enter in "Activation Voucher Code" on app · Auto-rotates every 1 hour
+                              Enter in "Activation Voucher Code" on app · Policy: <strong>{timed.policyLabel}</strong>
                             </div>
                           </div>
                         );
@@ -1488,6 +1540,162 @@ STEP 2: RETURNING STATION SESSIONS
                         <Smartphone className="w-3.5 h-3.5 text-teal-600" />
                         <span>📱 View / Print Pairing Card</span>
                       </button>
+                    </div>
+
+                    {/* EXPIRY & ROTATION POLICY CONFIGURATION CARD */}
+                    <div
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: '1.5px solid #99f6e4',
+                        borderRadius: '8px',
+                        padding: '0.75rem 0.9rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.55rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Clock className="w-4 h-4 text-teal-600" />
+                          <h6 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
+                            Voucher Validity &amp; Rotation Policy Configuration
+                          </h6>
+                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                            Active: {formatVoucherPolicyLabel(expiryPolicy)}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                          Configurable validity duration in <strong>Hours</strong> or <strong>Days</strong> before technician vouchers rotate
+                        </span>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginRight: '0.2rem' }}>
+                          Quick Presets:
+                        </span>
+                        {[
+                          { label: '1 Hour', duration: 1, unit: 'hours' as const },
+                          { label: '2 Hours', duration: 2, unit: 'hours' as const },
+                          { label: '8 Hours', duration: 8, unit: 'hours' as const },
+                          { label: '24 Hours (1 Day)', duration: 24, unit: 'hours' as const },
+                          { label: '3 Days', duration: 3, unit: 'days' as const },
+                          { label: '7 Days (1 Wk)', duration: 7, unit: 'days' as const },
+                          { label: '30 Days (1 Mo)', duration: 30, unit: 'days' as const },
+                        ].map((preset) => {
+                          const isSelected = expiryPolicy.duration === preset.duration && expiryPolicy.unit === preset.unit;
+                          return (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => handleApplyPresetPolicy(preset.duration, preset.unit)}
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '4px',
+                                border: isSelected ? '1.5px solid #0d9488' : '1px solid #cbd5e1',
+                                backgroundColor: isSelected ? '#ccfbf1' : '#f8fafc',
+                                color: isSelected ? '#0f766e' : '#334155',
+                                fontWeight: isSelected ? 800 : 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Custom Input & Controls */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          flexWrap: 'wrap',
+                          padding: '0.5rem 0.75rem',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                            Custom Duration:
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            className="podoload-input"
+                            value={policyDurationInput}
+                            onChange={(e) => setPolicyDurationInput(Math.max(1, parseInt(e.target.value) || 1))}
+                            style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.75rem', fontWeight: 700 }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                            Unit:
+                          </label>
+                          <select
+                            className="podoload-input"
+                            value={policyUnitInput}
+                            onChange={(e) => setPolicyUnitInput(e.target.value as VoucherExpiryUnit)}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            <option value="hours">Hours</option>
+                            <option value="days">Days</option>
+                            <option value="minutes">Minutes</option>
+                          </select>
+                        </div>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: '#334155', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={policyAutoRotate}
+                            onChange={(e) => setPolicyAutoRotate(e.target.checked)}
+                          />
+                          <span>Auto-rotate on expiration</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: '#334155', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={applyToExisting}
+                            onChange={(e) => setApplyToExisting(e.target.checked)}
+                          />
+                          <span>Apply to all existing technicians</span>
+                        </label>
+
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            className="podoload-btn-primary"
+                            onClick={() => handleSaveExpiryPolicy()}
+                            style={{ fontSize: '0.72rem', padding: '0.3rem 0.75rem', fontWeight: 700 }}
+                          >
+                            Save &amp; Apply Policy
+                          </button>
+                        </div>
+                      </div>
+
+                      {policyFeedbackMsg && (
+                        <div
+                          style={{
+                            fontSize: '0.72rem',
+                            color: '#15803d',
+                            backgroundColor: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {policyFeedbackMsg}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1712,13 +1920,15 @@ STEP 2: RETURNING STATION SESSIONS
                             type="button"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0d9488' }}
                             onClick={() => handleRegenerateActivationCode(tech)}
-                            title="Rotate activation code now (starts fresh 1-hour validity)"
+                            title={`Rotate activation code now (starts fresh ${formatVoucherPolicyLabel(expiryPolicy)} validity)`}
                           >
                             <RotateCw className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px', fontSize: '0.62rem', color: '#64748b' }}>
-                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.56rem' }}>⏱️ 1-Hr Auto-Rotate</span>
+                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.56rem' }}>
+                            ⏱️ {formatVoucherPolicyLabel(expiryPolicy)} Auto-Rotate
+                          </span>
                           {tech.isRegisteredOnDevice ? (
                             <span style={{ color: '#16a34a' }}>📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'}</span>
                           ) : (
@@ -2729,6 +2939,161 @@ STEP 2: RETURNING STATION SESSIONS
                     Save User ID
                   </button>
                 </div>
+              </div>
+
+              {/* Technician Activation Voucher Expiry & Rotation Security Policy */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #ccfbf1',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <Clock className="w-4 h-4 text-teal-600" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
+                      Technician Activation Voucher Expiration &amp; Rotation Policy
+                    </span>
+                  </div>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                    Active: {formatVoucherPolicyLabel(expiryPolicy)}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                  Define how long activation codes remain valid before automatically rotating (Hours, Days, or Minutes). Prevents stale credentials and enforces periodic rotation across diagnostic terminals.
+                </div>
+
+                {/* Quick Presets */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginRight: '0.2rem' }}>
+                    Quick Presets:
+                  </span>
+                  {[
+                    { label: '1 Hour', duration: 1, unit: 'hours' as const },
+                    { label: '2 Hours', duration: 2, unit: 'hours' as const },
+                    { label: '8 Hours', duration: 8, unit: 'hours' as const },
+                    { label: '24 Hours (1 Day)', duration: 24, unit: 'hours' as const },
+                    { label: '3 Days', duration: 3, unit: 'days' as const },
+                    { label: '7 Days (1 Wk)', duration: 7, unit: 'days' as const },
+                    { label: '30 Days (1 Mo)', duration: 30, unit: 'days' as const },
+                  ].map((preset) => {
+                    const isSelected = expiryPolicy.duration === preset.duration && expiryPolicy.unit === preset.unit;
+                    return (
+                      <button
+                        key={`sec-${preset.label}`}
+                        type="button"
+                        onClick={() => handleApplyPresetPolicy(preset.duration, preset.unit)}
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '0.25rem 0.55rem',
+                          borderRadius: '4px',
+                          border: isSelected ? '1.5px solid #0d9488' : '1px solid #cbd5e1',
+                          backgroundColor: isSelected ? '#ccfbf1' : '#f8fafc',
+                          color: isSelected ? '#0f766e' : '#334155',
+                          fontWeight: isSelected ? 800 : 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Configuration */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    flexWrap: 'wrap',
+                    padding: '0.5rem 0.75rem',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                      Custom Duration:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      className="podoload-input"
+                      value={policyDurationInput}
+                      onChange={(e) => setPolicyDurationInput(Math.max(1, parseInt(e.target.value) || 1))}
+                      style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.75rem', fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                      Unit:
+                    </label>
+                    <select
+                      className="podoload-input"
+                      value={policyUnitInput}
+                      onChange={(e) => setPolicyUnitInput(e.target.value as VoucherExpiryUnit)}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
+                    >
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                      <option value="minutes">Minutes</option>
+                    </select>
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: '#334155', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={policyAutoRotate}
+                      onChange={(e) => setPolicyAutoRotate(e.target.checked)}
+                    />
+                    <span>Auto-rotate voucher on expiration</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', color: '#334155', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={applyToExisting}
+                      onChange={(e) => setApplyToExisting(e.target.checked)}
+                    />
+                    <span>Apply to all existing technicians</span>
+                  </label>
+
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      onClick={() => handleSaveExpiryPolicy()}
+                      style={{ fontSize: '0.72rem', padding: '0.3rem 0.75rem', fontWeight: 700 }}
+                    >
+                      Save &amp; Apply Policy
+                    </button>
+                  </div>
+                </div>
+
+                {policyFeedbackMsg && (
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#15803d',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      padding: '0.35rem 0.6rem',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {policyFeedbackMsg}
+                  </div>
+                )}
               </div>
 
               {/* System Diagnostics & Clinical Error Logs Audit Table */}

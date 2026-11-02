@@ -1,7 +1,7 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice, DeviceAuthorizationToken } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice, DeviceAuthorizationToken, VoucherExpiryPolicy, VoucherExpiryUnit } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
 import { cloudSyncService } from './cloudSyncService';
@@ -18,6 +18,87 @@ export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   autoUppercase: true,
   nextSequentialNumber: 1001,
 };
+
+export const DEFAULT_VOUCHER_EXPIRY_POLICY: VoucherExpiryPolicy = {
+  duration: 24,
+  unit: 'hours',
+  autoRotateOnExpiry: true,
+};
+
+/**
+ * Calculates duration of voucher expiry policy in milliseconds.
+ */
+export function getVoucherExpiryMs(policy: VoucherExpiryPolicy): number {
+  const duration = Math.max(1, Number(policy.duration) || 1);
+  switch (policy.unit) {
+    case 'minutes':
+      return duration * 60 * 1000;
+    case 'hours':
+      return duration * 60 * 60 * 1000;
+    case 'days':
+      return duration * 24 * 60 * 60 * 1000;
+    default:
+      return duration * 60 * 60 * 1000;
+  }
+}
+
+/**
+ * Returns human-friendly label for voucher expiry policy (e.g. "24 Hours (1 Day)", "7 Days", "2 Hours").
+ */
+export function formatVoucherPolicyLabel(policy: VoucherExpiryPolicy): string {
+  const d = Math.max(1, Number(policy.duration) || 1);
+  if (policy.unit === 'days') {
+    return d === 1 ? '1 Day (24 Hours)' : `${d} Days`;
+  }
+  if (policy.unit === 'hours') {
+    if (d === 24) return '24 Hours (1 Day)';
+    return d === 1 ? '1 Hour' : `${d} Hours`;
+  }
+  if (policy.unit === 'minutes') {
+    if (d === 60) return '60 Mins (1 Hour)';
+    return d === 1 ? '1 Minute' : `${d} Minutes`;
+  }
+  return `${d} ${policy.unit}`;
+}
+
+/**
+ * Formats time remaining until an ISO expiry timestamp into clean badge text.
+ */
+export function formatRemainingTime(expiresAtIso: string): {
+  text: string;
+  isExpired: boolean;
+  minutesRemaining: number;
+  hoursRemaining: number;
+  daysRemaining: number;
+} {
+  const diffMs = new Date(expiresAtIso).getTime() - Date.now();
+  if (diffMs <= 0 || isNaN(diffMs)) {
+    return { text: 'Expired', isExpired: true, minutesRemaining: 0, hoursRemaining: 0, daysRemaining: 0 };
+  }
+
+  const daysRemaining = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  const hoursRemaining = Math.floor(diffMs / (60 * 60 * 1000));
+  const minutesRemaining = Math.max(1, Math.round(diffMs / (60 * 1000)));
+
+  let text = '';
+  if (daysRemaining >= 1) {
+    const remHours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    text = remHours > 0 ? `${daysRemaining}d ${remHours}h Left` : `${daysRemaining}d Left`;
+  } else if (hoursRemaining >= 1) {
+    const remMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+    text = remMins > 0 ? `${hoursRemaining}h ${remMins}m Left` : `${hoursRemaining}h Left`;
+  } else {
+    text = `${minutesRemaining}m Left`;
+  }
+
+  return {
+    text,
+    isExpired: false,
+    minutesRemaining,
+    hoursRemaining,
+    daysRemaining,
+  };
+}
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   appName: 'PodoPress',
@@ -152,6 +233,7 @@ const LS_KEYS = {
   ADMIN_ACCOUNT: 'podopress_admin_account_v1',
   ADMIN_ACCOUNTS_LIST: 'podopress_admin_accounts_list_v1',
   DEVICE_AUTH_TOKEN: 'podopress_device_auth_token_v1',
+  VOUCHER_EXPIRY_POLICY: 'podopress_voucher_expiry_policy_v1',
 };
 
 export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
@@ -1201,23 +1283,153 @@ class PodoPressDatabase {
   }
 
   /**
-   * Generates a 1-hour auto-rotating activation voucher code with timestamp and expiry.
+   * Synchronously retrieves the current technician activation voucher expiration & rotation policy.
    */
-  public generateTimedActivationCode(hospitalPrefix: string = 'TMH'): {
+  public getVoucherExpiryPolicySync(): VoucherExpiryPolicy {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.VOUCHER_EXPIRY_POLICY);
+      if (saved) {
+        return { ...DEFAULT_VOUCHER_EXPIRY_POLICY, ...JSON.parse(saved) };
+      }
+    } catch {
+      // storage fallback
+    }
+    return { ...DEFAULT_VOUCHER_EXPIRY_POLICY };
+  }
+
+  /**
+   * Asynchronously retrieves the current technician activation voucher expiration & rotation policy.
+   */
+  public async getVoucherExpiryPolicy(): Promise<VoucherExpiryPolicy> {
+    const cached = this.getVoucherExpiryPolicySync();
+    const db = await this.initDatabase();
+    if (!db || !db.objectStoreNames.contains('settings')) return cached;
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction('settings', 'readonly');
+        const store = tx.objectStore('settings');
+        const req = store.get('voucher_expiry_policy');
+        req.onsuccess = () => {
+          if (req.result) {
+            resolve({ ...DEFAULT_VOUCHER_EXPIRY_POLICY, ...req.result });
+          } else {
+            resolve(cached);
+          }
+        };
+        req.onerror = () => resolve(cached);
+      } catch {
+        resolve(cached);
+      }
+    });
+  }
+
+  /**
+   * Saves updated voucher expiration policy (hours / days / minutes / custom)
+   * and persists across IndexedDB and localStorage mirror.
+   */
+  public async saveVoucherExpiryPolicy(policy: Partial<VoucherExpiryPolicy>): Promise<VoucherExpiryPolicy> {
+    const current = this.getVoucherExpiryPolicySync();
+    const updated: VoucherExpiryPolicy = {
+      ...current,
+      ...policy,
+      duration: Math.max(1, Number(policy.duration ?? current.duration)),
+      unit: policy.unit || current.unit,
+      autoRotateOnExpiry: policy.autoRotateOnExpiry !== undefined ? policy.autoRotateOnExpiry : current.autoRotateOnExpiry,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem(LS_KEYS.VOUCHER_EXPIRY_POLICY, JSON.stringify(updated));
+    } catch (err) {
+      console.warn('PodoPress: Failed to save voucher expiry policy to localStorage:', err);
+    }
+
+    const db = await this.initDatabase();
+    if (db && db.objectStoreNames.contains('settings')) {
+      try {
+        const tx = db.transaction('settings', 'readwrite');
+        tx.objectStore('settings').put(updated, 'voucher_expiry_policy');
+      } catch (err) {
+        console.warn('PodoPress: Failed to save voucher expiry policy to IndexedDB:', err);
+      }
+    }
+
+    const policyDesc = formatVoucherPolicyLabel(updated);
+    logAuditEvent(
+      'VOUCHER_EXPIRY_POLICY_UPDATED',
+      `Activation voucher expiration policy configured to ${policyDesc} (Auto-rotate: ${updated.autoRotateOnExpiry ? 'enabled' : 'disabled'}).`,
+      'admin',
+      undefined,
+      'security'
+    );
+
+    return updated;
+  }
+
+  /**
+   * Applies configured expiry policy across all existing registered technician activation vouchers.
+   */
+  public applyExpiryPolicyToAllTechnicians(policy?: VoucherExpiryPolicy): TechnicianUser[] {
+    const pol = policy || this.getVoucherExpiryPolicySync();
+    const durationMs = getVoucherExpiryMs(pol);
+    const technicians = this.getTechniciansSync();
+    const now = new Date();
+
+    const updated = technicians.map((t) => {
+      const genTime = t.activationCodeGeneratedAt ? new Date(t.activationCodeGeneratedAt).getTime() : now.getTime();
+      const newExpiresAt = new Date(genTime + durationMs).toISOString();
+      return {
+        ...t,
+        activationCodeGeneratedAt: t.activationCodeGeneratedAt || now.toISOString(),
+        activationCodeExpiresAt: newExpiresAt,
+      };
+    });
+
+    try {
+      localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(updated));
+    } catch {
+      // Ignore
+    }
+    updated.forEach((t) => {
+      this.saveTechnician(t).catch(() => {});
+    });
+    logAuditEvent(
+      'VOUCHER_EXPIRY_BATCH_APPLIED',
+      `Applied ${formatVoucherPolicyLabel(pol)} expiration policy across all registered technician activation vouchers.`,
+      'admin',
+      undefined,
+      'info'
+    );
+    return updated;
+  }
+
+  /**
+   * Generates an auto-rotating activation voucher code with timestamp and expiry
+   * adhering to the configured Administrator policy (hours / days / custom).
+   */
+  public generateTimedActivationCode(
+    hospitalPrefix: string = 'TMH',
+    policy?: VoucherExpiryPolicy
+  ): {
     code: string;
     generatedAt: string;
     expiresAt: string;
+    policyLabel: string;
   } {
+    const pol = policy || this.getVoucherExpiryPolicySync();
     const raw = hospitalPrefix.includes('-') ? hospitalPrefix.split('-')[0] : hospitalPrefix;
     const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
     const randNum = Math.floor(1000 + Math.random() * 9000);
     const code = `${cleanPrefix}-TECH-${randNum}`;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString(); // 1 hour validity
+    const durationMs = getVoucherExpiryMs(pol);
+    const expiresAt = new Date(now.getTime() + durationMs).toISOString();
     return {
       code,
       generatedAt: now.toISOString(),
       expiresAt,
+      policyLabel: formatVoucherPolicyLabel(pol),
     };
   }
 
@@ -1230,21 +1442,38 @@ class PodoPressDatabase {
   }
 
   /**
-   * Checks if an activation code has expired (1 hour rotation policy) and auto-rotates if needed.
+   * Checks if an activation code has expired according to the configured policy
+   * (configurable hours / days / custom) and auto-rotates if needed.
    */
   public getOrRotateTechnicianActivationCode(techId: string): {
     code: string;
     expiresAt: string;
     isRotated: boolean;
     minutesRemaining: number;
+    hoursRemaining: number;
+    daysRemaining: number;
+    remainingText: string;
+    policyLabel: string;
   } {
     const list = this.getTechniciansSync();
     const tech = list.find((t) => t.id === techId);
     const now = Date.now();
+    const policy = this.getVoucherExpiryPolicySync();
+    const policyLabel = formatVoucherPolicyLabel(policy);
 
     if (!tech) {
-      const fresh = this.generateTimedActivationCode('TMH');
-      return { code: fresh.code, expiresAt: fresh.expiresAt, isRotated: false, minutesRemaining: 60 };
+      const fresh = this.generateTimedActivationCode('TMH', policy);
+      const rem = formatRemainingTime(fresh.expiresAt);
+      return {
+        code: fresh.code,
+        expiresAt: fresh.expiresAt,
+        isRotated: false,
+        minutesRemaining: rem.minutesRemaining,
+        hoursRemaining: rem.hoursRemaining,
+        daysRemaining: rem.daysRemaining,
+        remainingText: rem.text,
+        policyLabel,
+      };
     }
 
     const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
@@ -1253,8 +1482,8 @@ class PodoPressDatabase {
     const expiresAtTime = tech.activationCodeExpiresAt ? new Date(tech.activationCodeExpiresAt).getTime() : 0;
     const isExpired = !tech.activationCode || !tech.activationCodeExpiresAt || now >= expiresAtTime;
 
-    if (isExpired) {
-      const timed = this.generateTimedActivationCode(hospPrefix);
+    if (isExpired && policy.autoRotateOnExpiry) {
+      const timed = this.generateTimedActivationCode(hospPrefix, policy);
       tech.activationCode = timed.code;
       tech.activationCodeGeneratedAt = timed.generatedAt;
       tech.activationCodeExpiresAt = timed.expiresAt;
@@ -1262,29 +1491,38 @@ class PodoPressDatabase {
 
       logAuditEvent(
         'ACTIVATION_CODE_AUTO_ROTATED',
-        `Activation voucher auto-rotated for technician ${tech.name} (${tech.username}): New voucher ${timed.code} (Expires in 1 hour).`,
+        `Activation voucher auto-rotated for technician ${tech.name} (${tech.username}): New voucher ${timed.code} (Expires in ${policyLabel}).`,
         'system'
       );
 
+      const rem = formatRemainingTime(timed.expiresAt);
       return {
         code: timed.code,
         expiresAt: timed.expiresAt,
         isRotated: true,
-        minutesRemaining: 60,
+        minutesRemaining: rem.minutesRemaining,
+        hoursRemaining: rem.hoursRemaining,
+        daysRemaining: rem.daysRemaining,
+        remainingText: rem.text,
+        policyLabel,
       };
     }
 
-    const minutesRemaining = Math.max(1, Math.round((expiresAtTime - now) / 60000));
+    const rem = formatRemainingTime(tech.activationCodeExpiresAt || new Date(now + getVoucherExpiryMs(policy)).toISOString());
     return {
       code: tech.activationCode || '',
       expiresAt: tech.activationCodeExpiresAt || '',
       isRotated: false,
-      minutesRemaining,
+      minutesRemaining: rem.minutesRemaining,
+      hoursRemaining: rem.hoursRemaining,
+      daysRemaining: rem.daysRemaining,
+      remainingText: rem.text,
+      policyLabel,
     };
   }
 
   /**
-   * Manually rotate technician activation code on demand (starts fresh 1 hour clock).
+   * Manually rotate technician activation code on demand (starts fresh clock based on configured policy).
    */
   public rotateTechnicianActivationCode(techId: string): TechnicianUser | null {
     const list = this.getTechniciansSync();
@@ -1292,7 +1530,9 @@ class PodoPressDatabase {
     if (!tech) return null;
 
     const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
-    const timed = this.generateTimedActivationCode(hosp?.code || 'TMH');
+    const policy = this.getVoucherExpiryPolicySync();
+    const policyLabel = formatVoucherPolicyLabel(policy);
+    const timed = this.generateTimedActivationCode(hosp?.code || 'TMH', policy);
 
     tech.activationCode = timed.code;
     tech.activationCodeGeneratedAt = timed.generatedAt;
@@ -1301,7 +1541,7 @@ class PodoPressDatabase {
 
     logAuditEvent(
       'ACTIVATION_CODE_MANUAL_ROTATE',
-      `Administrator rotated activation voucher for ${tech.name} (${tech.username}) to ${timed.code} (Valid for 1 hour).`,
+      `Administrator rotated activation voucher for ${tech.name} (${tech.username}) to ${timed.code} (Valid for ${policyLabel}).`,
       'admin'
     );
 
@@ -1509,14 +1749,18 @@ class PodoPressDatabase {
       };
     }
 
-    // Check 1-Hour Expiration on Activation Voucher
+    // Check Configured Expiration on Activation Voucher (Hours / Days / Minutes)
     if (tech.activationCodeExpiresAt) {
       const expiresAtMs = new Date(tech.activationCodeExpiresAt).getTime();
-      // 15-minute grace period after 1 hour (75 mins total)
-      if (Date.now() > expiresAtMs + 15 * 60 * 1000) {
+      const pol = this.getVoucherExpiryPolicySync();
+      const policyLabel = formatVoucherPolicyLabel(pol);
+      const durationMs = getVoucherExpiryMs(pol);
+      const gracePeriodMs = Math.min(60 * 60 * 1000, Math.max(15 * 60 * 1000, Math.floor(durationMs * 0.1)));
+
+      if (Date.now() > expiresAtMs + gracePeriodMs) {
         logAuditEvent(
           'DEVICE_ACTIVATION_REJECTED_EXPIRED',
-          `Activation Code ${normActCode} expired (1-hour security policy). Station registration rejected.`,
+          `Activation Code ${normActCode} expired (${policyLabel} policy). Station registration rejected.`,
           tech.username,
           undefined,
           'security',
@@ -1524,7 +1768,7 @@ class PodoPressDatabase {
         );
         return {
           success: false,
-          error: `Activation Code "${params.activationCode}" has expired (1-hour security rotation policy). Please request a fresh voucher from your Hospital Administrator.`,
+          error: `Activation Code "${params.activationCode}" has expired (configured ${policyLabel} security policy). Please request a fresh voucher from your Hospital Administrator.`,
         };
       }
     }
