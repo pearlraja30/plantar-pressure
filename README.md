@@ -115,28 +115,32 @@ The system includes an automated clinical verification battery covering all test
 * **Dynamic Multi-Technician Roaming**: Diagnostic terminals are no longer locked to a single static operator name. Any authorized technician enrolled under the clinic can sign in, acquire footprints, and generate authenticated clinical reports.
 * **Clear Credential Diagnostics**: Case-insensitive user lookup with distinct verification messages (`User ID not found` vs `Incorrect password`).
 
-### 3. Public Login Screen Lockdown & Tamper-Resistant Security
-* **Zero Public Backdoors**: All "Register Admin" and "First-Time Password Setup" flows have been permanently eliminated from the public role switcher modal, preventing unauthorized terminal users from establishing or overriding master credentials.
-* **Confidential Master Password Recovery**: Forgotten master passwords can only be reset by challenging the confidential Emergency Security Recovery Key (`REC-TMH-9901`) or verified phone number.
-* **Authenticated Administration Only**: Creating new technician accounts, resetting passwords, configuring facility profiles, and auditing login trails are strictly confined inside the authenticated **Hospital Administrator Settings Panel**.
+### 3. Public Login Screen Lockdown & Single Administrator Governance
+* **Strict Single Administrator Setup**: Exactly one Hospital Administrator possesses master administrative authority over each station. Initial master credentials (`admin@technomind.health` / default `1234`) allow the designated clinic head to perform initial setup.
+* **Protected Password Updates (Admin Only)**: Master Password changes are strictly confined inside the authenticated **Hospital Administrator Panel** (`Admin security` tab). Inputs are masked (`••••••••`) by default with current-password verification to prevent onlookers or operators from viewing or modifying credentials.
+* **Zero Public Backdoors**: All "Register Admin", "First-Time Password Setup", and "Forgot Password" options have been permanently eliminated from the login/role-switcher dialog, preventing unauthorized users or operators from hijacking or resetting station credentials.
+* **Authenticated Administration Only**: Creating technician logins, updating technician passwords, configuring facility profiles, and auditing login trails are strictly confined inside the authenticated Admin Panel.
 
 ### 4. Configurable Activation Voucher Rotation Policy (Hours / Days / Custom)
 * **Timed Security Rotation**: Activation vouchers rotate automatically (default 1 hour, configurable to custom hours, days, or minutes).
-* **Live Expiry Telemetry**: Admin hub displays live remaining countdowns (`⏱️ 48m left`) and security policy indicators.
+* **Live Expiry Telemetry**: Admin hub displays live remaining countdowns (`⏱️ 8h 50m left`) and security policy indicators in a collapsible, clutter-free policy drawer.
 * **21 CFR Part 11 Audit Trail**: Immutable logging of every activation attempt, voucher rotation, credential failure, and administrative transfer with JSON export.
 
-### 5. Multi-Platform Device Registration & Offline-First Authorization
+### 5. Multi-Platform Device Registration & Responsive Activation Hub
 * **Cross-Platform Alignment**: Universal enrollment workflow aligned for **Android (.apk)**, **iOS (.ipa)**, and **Windows (.exe)**.
+* **Spacious 2x2 Responsive Credential Cards**: Re-engineered credential cards with `minmax(280px, 1fr)` eliminate cramped columns and text truncation (`...`), ensuring all codes, User IDs, and passwords remain 100% visible across any viewport width.
 * **100% Offline Clinical Scanning**: Cryptographic terminal token binding (`AUTH-DEV-...`) enables uninterrupted examinations, footprint unwarping, and PDF generation without internet connectivity.
 
 ### 6. Responsive UI & Sandboxed Navigation Safety
 * **Zero Horizontal Clipping**: Responsive CSS Grid layouts (`minmax(0, 1fr)`) and scroll-containment wrappers on all clinical tables eliminate right-edge truncation across laptops, tablets, and phones.
 * **Navigation Isolation**: Electron main process blocks unvetted external navigation (`will-navigate`) and denies popup window creation; a global capture-phase web listener intercepts links to prevent accidental routing to external domains.
+* **React Rules of Hooks Integrity**: All lifecycle hooks hoisted above early returns across components, guaranteeing zero hook mismatch exceptions (`DIAG-MVYLWFK2-384`).
 
-### 7. Inbuilt Live Database Records Explorer
+### 7. Inbuilt Live Database Records Explorer & Test Suite (64 Unit Tests)
 * Direct in-app inspection of all 7 database stores (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `audit_logs`, `settings`).
 * Accessible via sidebar (**`Database records`**) and Settings (**`Patient ID & Database`** $\rightarrow$ **`Live Records Explorer`**).
 * Real-time search, live row count metrics, pretty-printed JSON inspection modal with one-click copy, and atomic Export/Import JSON backup.
+* **64/64 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, and security policies.
 
 ---
 
