@@ -40,7 +40,7 @@ import {
   Printer,
   Cloud,
 } from 'lucide-react';
-import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense } from '../../types';
+import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense, AdminAccount, AuditEvent } from '../../types';
 import { dbService } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
 import { diagnosticsLogger, DiagnosticErrorLog } from '../../services/diagnosticsLogger';
@@ -108,6 +108,12 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   // Diagnostics & Error Logs State (IEC 62304 / ISO 13485)
   const [diagnosticLogs, setDiagnosticLogs] = useState<DiagnosticErrorLog[]>(() => diagnosticsLogger.getErrorLogs());
   const [selectedDetailLog, setSelectedDetailLog] = useState<DiagnosticErrorLog | null>(null);
+
+  // Admin Profile & User ID Configuration State
+  const [adminAccount, setAdminAccount] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
+  const [desiredAdminUsername, setDesiredAdminUsername] = useState(adminAccount.username);
+  const [desiredAdminName, setDesiredAdminName] = useState(adminAccount.name);
+  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(() => dbService.getAuditLogsSync());
 
   // Form states for the currently selected hospital
   const [name, setName] = useState(activeHospital.name);
@@ -326,13 +332,13 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
 
   const handleAddTechnician = async () => {
     if (!newTechName.trim() || !newTechUsername.trim()) {
-      alert('Please provide technician full name and username / login ID');
+      alert('Please provide technician full name and desired User ID / username');
       return;
     }
 
     const assignedHosp = hospitals.find((h) => h.id === newTechHospitalId) || activeHospital;
     const generatedPass = 'Tech' + Math.floor(1000 + Math.random() * 9000);
-    const activationCode = dbService.generateActivationCode(assignedHosp.code || 'TMH');
+    const timedVoucher = dbService.generateTimedActivationCode(assignedHosp.code || 'TMH');
 
     const newTech: TechnicianUser = {
       id: `tech-${Date.now()}`,
@@ -348,13 +354,16 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       email: newTechEmail.trim(),
       notes: newTechNotes.trim(),
       recoveryKey: 'REC-TECH-' + Math.floor(1000 + Math.random() * 9000),
-      activationCode,
+      activationCode: timedVoucher.code,
+      activationCodeGeneratedAt: timedVoucher.generatedAt,
+      activationCodeExpiresAt: timedVoucher.expiresAt,
       isRegisteredOnDevice: false,
     };
 
     await dbService.saveTechnician(newTech);
     const updatedList = dbService.getTechniciansSync();
     setTechniciansList(updatedList);
+    setAuditLogs(dbService.getAuditLogsSync());
     setHubSelectedTechId(newTech.id);
     setShowAddTech(false);
     setNewTechName('');
@@ -365,7 +374,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setNewTechEmail('');
     setNewTechNotes('');
 
-    setSaveSuccess(`✓ Technician login created for "${newTech.name}". Clinic Code: ${assignedHosp.code} | Voucher: ${activationCode} | Password: ${newTech.pin}`);
+    setSaveSuccess(`✓ Technician login created for "${newTech.name}". User ID: ${newTech.username} | Voucher: ${timedVoucher.code} (Valid for 1 hour)`);
     setTimeout(() => setSaveSuccess(null), 5000);
   };
 
@@ -417,16 +426,25 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   };
 
   const handleRegenerateActivationCode = async (tech: TechnicianUser) => {
-    const hosp = hospitals.find((h) => h.id === tech.hospitalId) || activeHospital;
-    const newCode = dbService.generateActivationCode(hosp.code || 'TMH');
-    const updated: TechnicianUser = {
-      ...tech,
-      activationCode: newCode,
-    };
-    await dbService.saveTechnician(updated);
-    setTechniciansList(dbService.getTechniciansSync());
-    setSaveSuccess(`✓ New activation code generated for "${tech.name}": ${newCode}`);
-    setTimeout(() => setSaveSuccess(null), 3500);
+    const updated = dbService.rotateTechnicianActivationCode(tech.id);
+    if (updated) {
+      setTechniciansList(dbService.getTechniciansSync());
+      setAuditLogs(dbService.getAuditLogsSync());
+      setSaveSuccess(`✓ Activation code rotated for "${tech.name}": ${updated.activationCode}. Valid for 1 hour.`);
+      setTimeout(() => setSaveSuccess(null), 3500);
+    }
+  };
+
+  const handleSaveAdminProfile = () => {
+    if (!desiredAdminUsername.trim()) {
+      alert('Admin User ID cannot be empty');
+      return;
+    }
+    const updated = dbService.updateAdminUsername(desiredAdminUsername.trim(), desiredAdminName.trim());
+    setAdminAccount(updated);
+    setAuditLogs(dbService.getAuditLogsSync());
+    setSaveSuccess(`✓ Admin User ID updated to "${updated.username}". Future logins require this User ID.`);
+    setTimeout(() => setSaveSuccess(null), 4000);
   };
 
   const getShareableVoucherText = (tech: TechnicianUser) => {
@@ -1241,55 +1259,62 @@ STEP 2: RETURNING STATION SESSIONS
                         </div>
                       </div>
 
-                      {/* Box 2: Activation Voucher Code */}
-                      <div
-                        style={{
-                          backgroundColor: '#ffffff',
-                          border: '1.5px solid #99f6e4',
-                          borderRadius: '8px',
-                          padding: '0.65rem 0.75rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.35rem',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
-                            2. Activation Voucher Code
-                          </span>
-                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>Voucher</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '1rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-                            {currentHubTech.activationCode || 'TMH-TECH-1001'}
-                          </code>
-                          <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            <button
-                              type="button"
-                              className="podoload-btn-secondary podoload-btn-sm"
-                              style={{ fontSize: '0.64rem', padding: '0.2rem 0.35rem' }}
-                              onClick={() => handleRegenerateActivationCode(currentHubTech)}
-                              title="Generate fresh activation voucher code"
-                            >
-                              <RotateCw className="w-3 h-3 text-teal-600" />
-                            </button>
-                            <button
-                              type="button"
-                              className="podoload-btn-primary podoload-btn-sm"
-                              style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                              onClick={() => handleCopyText(currentHubTech.activationCode || 'TMH-TECH-1001', 'actCode')}
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>{copiedLabel === 'actCode' ? '✓ Copied' : 'Copy'}</span>
-                            </button>
+                      {/* Box 2: Activation Voucher Code (1-Hour Timed Policy) */}
+                      {(() => {
+                        const timed = dbService.getOrRotateTechnicianActivationCode(currentHubTech.id);
+                        return (
+                          <div
+                            style={{
+                              backgroundColor: '#ffffff',
+                              border: '1.5px solid #99f6e4',
+                              borderRadius: '8px',
+                              padding: '0.65rem 0.75rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
+                                2. Activation Voucher Code
+                              </span>
+                              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>
+                                ⏱️ {timed.minutesRemaining}m Left (1-Hr Policy)
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+                              <code style={{ fontSize: '1rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                                {timed.code}
+                              </code>
+                              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                <button
+                                  type="button"
+                                  className="podoload-btn-secondary podoload-btn-sm"
+                                  style={{ fontSize: '0.64rem', padding: '0.2rem 0.35rem' }}
+                                  onClick={() => handleRegenerateActivationCode(currentHubTech)}
+                                  title="Rotate activation voucher code now (starts fresh 1-hour expiry)"
+                                >
+                                  <RotateCw className="w-3 h-3 text-teal-600" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="podoload-btn-primary podoload-btn-sm"
+                                  style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                  onClick={() => handleCopyText(timed.code, 'actCode')}
+                                >
+                                  <Copy className="w-3 h-3" />
+                                  <span>{copiedLabel === 'actCode' ? '✓ Copied' : 'Copy'}</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                              Enter in "Activation Voucher Code" on app · Auto-rotates every 1 hour
+                            </div>
                           </div>
-                        </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
-                          Enter in "Activation Voucher Code" on app
-                        </div>
-                      </div>
+                        );
+                      })()}
 
-                      {/* Box 3: Login Username */}
+                      {/* Box 3: Desired User ID / Username */}
                       <div
                         style={{
                           backgroundColor: '#ffffff',
@@ -1305,7 +1330,7 @@ STEP 2: RETURNING STATION SESSIONS
                           <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
                             3. Login ID / Username
                           </span>
-                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Station Login</span>
+                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Desired User ID</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
                           <code style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace' }}>
@@ -1322,7 +1347,7 @@ STEP 2: RETURNING STATION SESSIONS
                           </button>
                         </div>
                         <div style={{ fontSize: '0.62rem', color: '#64748b' }}>
-                          Operator: {currentHubTech.name}
+                          Technician: {currentHubTech.name}
                         </div>
                       </div>
 
@@ -1492,11 +1517,11 @@ STEP 2: RETURNING STATION SESSIONS
                       />
                     </div>
                     <div className="podoload-form-group">
-                      <label className="podoload-label">Username / Login ID *</label>
+                      <label className="podoload-label">Desired User ID / Username *</label>
                       <input
                         type="text"
                         className="podoload-input"
-                        placeholder="e.g. sarah.tech"
+                        placeholder="e.g. sarah.tech or sarah@hospital.com"
                         value={newTechUsername}
                         onChange={(e) => setNewTechUsername(e.target.value)}
                       />
@@ -1685,16 +1710,17 @@ STEP 2: RETURNING STATION SESSIONS
                           </button>
                           <button
                             type="button"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0d9488' }}
                             onClick={() => handleRegenerateActivationCode(tech)}
-                            title="Regenerate activation code"
+                            title="Rotate activation code now (starts fresh 1-hour validity)"
                           >
-                            <RotateCw className="w-3 h-3" />
+                            <RotateCw className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div style={{ fontSize: '0.64rem', color: tech.isRegisteredOnDevice ? '#16a34a' : '#94a3b8', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px', fontSize: '0.62rem', color: '#64748b' }}>
+                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.56rem' }}>⏱️ 1-Hr Auto-Rotate</span>
                           {tech.isRegisteredOnDevice ? (
-                            <span>📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'}</span>
+                            <span style={{ color: '#16a34a' }}>📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'}</span>
                           ) : (
                             <span>📱 Ready for Device Activation</span>
                           )}
@@ -2633,9 +2659,9 @@ STEP 2: RETURNING STATION SESSIONS
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
                   <div style={{ fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>Active Session</div>
-                  <div>Account: <strong>admin@{activeHospital.code.toLowerCase()}.health</strong></div>
-                  <div>Role: <strong>Hospital Administrator</strong></div>
-                  <div>Authentication: <strong>PIN Verified (Session Active)</strong></div>
+                  <div>User ID: <strong>{adminAccount.username}</strong></div>
+                  <div>Administrator: <strong>{adminAccount.name}</strong></div>
+                  <div>Authentication: <strong>PIN &amp; Device Bound (Session Active)</strong></div>
                 </div>
 
                 <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
@@ -2644,6 +2670,64 @@ STEP 2: RETURNING STATION SESSIONS
                     Multi-hospital tenancy, technician logins, and patient records are structured for immediate sync with centralized cloud databases.
                   </div>
                   <span className="podo-badge podo-badge-green">ISO 13485 / IEC 62304 Compliant</span>
+                </div>
+              </div>
+
+              {/* Administrator Identity & Desired User ID Setting */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #ccfbf1',
+                  borderRadius: '8px',
+                  padding: '0.75rem 0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <ShieldCheck className="w-4 h-4 text-teal-600" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
+                      Administrator Identity &amp; Desired User ID Configuration
+                    </span>
+                  </div>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                    Login Credentials Bound
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                  Configure your desired Administrator User ID. This User ID is required alongside your Master Password at login time.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr auto', gap: '0.5rem', alignItems: 'flex-end' }}>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Desired Admin User ID / Username *</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. dr.specialist or admin@hospital.com"
+                      value={desiredAdminUsername}
+                      onChange={(e) => setDesiredAdminUsername(e.target.value)}
+                    />
+                  </div>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Administrator Full Name</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. Dr. Specialist / Hospital Admin"
+                      value={desiredAdminName}
+                      onChange={(e) => setDesiredAdminName(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="podoload-btn-primary podoload-btn-sm"
+                    onClick={handleSaveAdminProfile}
+                    style={{ whiteSpace: 'nowrap', height: '32px' }}
+                  >
+                    Save User ID
+                  </button>
                 </div>
               </div>
 
@@ -2770,6 +2854,78 @@ STEP 2: RETURNING STATION SESSIONS
                         </td>
                       </tr>
                     )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Security & System Audit Trail Table */}
+              <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <h5 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#0c2328' }}>
+                      SECURITY &amp; SYSTEM AUDIT LOG (USAGE &amp; ACCESS TRAIL — 21 CFR PART 11)
+                    </h5>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.68rem', color: '#64748b' }}>
+                      Audit log capturing user logins, 1-hour code rotations, device activations, and administrative actions.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={() => {
+                      const json = JSON.stringify(auditLogs, null, 2);
+                      const blob = new Blob([json], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `PodoPress-Audit-Trail-${new Date().toISOString().slice(0, 10)}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Audit Trail (.json)</span>
+                  </button>
+                </div>
+
+                <table className="podoload-device-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>TIMESTAMP</th>
+                      <th style={{ textAlign: 'left' }}>ACTOR / USER ID</th>
+                      <th style={{ textAlign: 'left' }}>EVENT / ACTION</th>
+                      <th style={{ textAlign: 'left' }}>AUDIT DETAILS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.slice(0, 25).map((log) => (
+                      <tr key={log.id}>
+                        <td style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {log.timestamp.slice(0, 19).replace('T', ' ')}
+                        </td>
+                        <td>
+                          <code style={{ fontSize: '0.7rem', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', fontWeight: 700, color: '#0f766e' }}>
+                            {log.userId}
+                          </code>
+                        </td>
+                        <td>
+                          <span
+                            className="podo-badge"
+                            style={{
+                              fontSize: '0.6rem',
+                              backgroundColor: log.action.includes('FAILED') ? '#fee2e2' : log.action.includes('ROTATE') ? '#fef3c7' : '#ecfdf5',
+                              color: log.action.includes('FAILED') ? '#b91c1c' : log.action.includes('ROTATE') ? '#b45309' : '#047857',
+                            }}
+                          >
+                            {log.action}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.7rem', color: '#334155' }}>
+                          {log.details}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

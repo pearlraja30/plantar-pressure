@@ -18,7 +18,9 @@ export function logAuditEvent(
   action: string,
   details: string,
   userId: string = 'practitioner',
-  caseId?: string
+  caseId?: string,
+  severity?: 'info' | 'warning' | 'security',
+  role?: 'admin' | 'technician' | 'system'
 ): AuditEvent {
   const events = getAuditEvents();
   const newEvent: AuditEvent = {
@@ -29,6 +31,8 @@ export function logAuditEvent(
     action,
     details,
     algorithmVersion: CURRENT_ALGORITHM_VERSION,
+    severity: severity || (action.includes('FAILED') || action.includes('LOCKOUT') ? 'security' : 'info'),
+    role: role || (userId.includes('admin') ? 'admin' : userId.includes('tech') ? 'technician' : 'system'),
   };
 
   events.unshift(newEvent);

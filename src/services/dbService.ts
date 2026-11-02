@@ -5,6 +5,7 @@ import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, Hos
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
 import { cloudSyncService } from './cloudSyncService';
+import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
@@ -1113,9 +1114,12 @@ class PodoPressDatabase {
   }
 
   public async saveTechnician(tech: TechnicianUser): Promise<void> {
-    if (!tech.activationCode) {
+    if (!tech.activationCode || !tech.activationCodeExpiresAt) {
       const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
-      tech.activationCode = this.generateActivationCode(hosp?.code || 'TMH');
+      const timed = this.generateTimedActivationCode(hosp?.code || 'TMH');
+      if (!tech.activationCode) tech.activationCode = timed.code;
+      if (!tech.activationCodeGeneratedAt) tech.activationCodeGeneratedAt = timed.generatedAt;
+      if (!tech.activationCodeExpiresAt) tech.activationCodeExpiresAt = timed.expiresAt;
     }
 
     const list = this.getTechniciansSync();
@@ -1173,7 +1177,48 @@ class PodoPressDatabase {
         (!t.pin || t.pin === cleanPin)
     );
 
+    if (tech) {
+      logAuditEvent(
+        'TECHNICIAN_LOGIN_SUCCESS',
+        `Technician ${tech.name} (User ID: ${tech.username}) successfully authenticated at ${tech.hospitalName || 'Clinic'}.`,
+        tech.username,
+        undefined,
+        'info',
+        'technician'
+      );
+    } else {
+      logAuditEvent(
+        'TECHNICIAN_LOGIN_FAILED',
+        `Failed technician login attempt for User ID "${username}". Incorrect credentials or inactive status.`,
+        username,
+        undefined,
+        'security',
+        'technician'
+      );
+    }
+
     return tech || null;
+  }
+
+  /**
+   * Generates a 1-hour auto-rotating activation voucher code with timestamp and expiry.
+   */
+  public generateTimedActivationCode(hospitalPrefix: string = 'TMH'): {
+    code: string;
+    generatedAt: string;
+    expiresAt: string;
+  } {
+    const raw = hospitalPrefix.includes('-') ? hospitalPrefix.split('-')[0] : hospitalPrefix;
+    const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const code = `${cleanPrefix}-TECH-${randNum}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString(); // 1 hour validity
+    return {
+      code,
+      generatedAt: now.toISOString(),
+      expiresAt,
+    };
   }
 
   /**
@@ -1181,10 +1226,86 @@ class PodoPressDatabase {
    * e.g. "TMH-TECH-4821"
    */
   public generateActivationCode(hospitalPrefix: string = 'TMH'): string {
-    const raw = hospitalPrefix.includes('-') ? hospitalPrefix.split('-')[0] : hospitalPrefix;
-    const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
-    const randNum = Math.floor(1000 + Math.random() * 9000);
-    return `${cleanPrefix}-TECH-${randNum}`;
+    return this.generateTimedActivationCode(hospitalPrefix).code;
+  }
+
+  /**
+   * Checks if an activation code has expired (1 hour rotation policy) and auto-rotates if needed.
+   */
+  public getOrRotateTechnicianActivationCode(techId: string): {
+    code: string;
+    expiresAt: string;
+    isRotated: boolean;
+    minutesRemaining: number;
+  } {
+    const list = this.getTechniciansSync();
+    const tech = list.find((t) => t.id === techId);
+    const now = Date.now();
+
+    if (!tech) {
+      const fresh = this.generateTimedActivationCode('TMH');
+      return { code: fresh.code, expiresAt: fresh.expiresAt, isRotated: false, minutesRemaining: 60 };
+    }
+
+    const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
+    const hospPrefix = hosp?.code || 'TMH';
+
+    const expiresAtTime = tech.activationCodeExpiresAt ? new Date(tech.activationCodeExpiresAt).getTime() : 0;
+    const isExpired = !tech.activationCode || !tech.activationCodeExpiresAt || now >= expiresAtTime;
+
+    if (isExpired) {
+      const timed = this.generateTimedActivationCode(hospPrefix);
+      tech.activationCode = timed.code;
+      tech.activationCodeGeneratedAt = timed.generatedAt;
+      tech.activationCodeExpiresAt = timed.expiresAt;
+      this.saveTechnician(tech);
+
+      logAuditEvent(
+        'ACTIVATION_CODE_AUTO_ROTATED',
+        `Activation voucher auto-rotated for technician ${tech.name} (${tech.username}): New voucher ${timed.code} (Expires in 1 hour).`,
+        'system'
+      );
+
+      return {
+        code: timed.code,
+        expiresAt: timed.expiresAt,
+        isRotated: true,
+        minutesRemaining: 60,
+      };
+    }
+
+    const minutesRemaining = Math.max(1, Math.round((expiresAtTime - now) / 60000));
+    return {
+      code: tech.activationCode || '',
+      expiresAt: tech.activationCodeExpiresAt || '',
+      isRotated: false,
+      minutesRemaining,
+    };
+  }
+
+  /**
+   * Manually rotate technician activation code on demand (starts fresh 1 hour clock).
+   */
+  public rotateTechnicianActivationCode(techId: string): TechnicianUser | null {
+    const list = this.getTechniciansSync();
+    const tech = list.find((t) => t.id === techId);
+    if (!tech) return null;
+
+    const hosp = this.getHospitalProfilesSync().find((h) => h.id === tech.hospitalId);
+    const timed = this.generateTimedActivationCode(hosp?.code || 'TMH');
+
+    tech.activationCode = timed.code;
+    tech.activationCodeGeneratedAt = timed.generatedAt;
+    tech.activationCodeExpiresAt = timed.expiresAt;
+    this.saveTechnician(tech);
+
+    logAuditEvent(
+      'ACTIVATION_CODE_MANUAL_ROTATE',
+      `Administrator rotated activation voucher for ${tech.name} (${tech.username}) to ${timed.code} (Valid for 1 hour).`,
+      'admin'
+    );
+
+    return tech;
   }
 
   /**
@@ -1303,6 +1424,13 @@ class PodoPressDatabase {
     );
 
     if (!hospital) {
+      logAuditEvent(
+        'DEVICE_ACTIVATION_FAILED',
+        `Failed device activation: Clinic code "${params.hospitalCode}" not found.`,
+        'system',
+        undefined,
+        'security'
+      );
       return {
         success: false,
         error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please check with your Administrator.`,
@@ -1368,10 +1496,37 @@ class PodoPressDatabase {
     }
 
     if (!tech) {
+      logAuditEvent(
+        'DEVICE_ACTIVATION_FAILED',
+        `Failed device activation: Invalid voucher code "${params.activationCode}" for hospital ${params.hospitalCode}.`,
+        'system',
+        undefined,
+        'security'
+      );
       return {
         success: false,
         error: `Invalid or unrecognized Activation Code "${params.activationCode}". Please request a fresh voucher from your Hospital Administrator.`,
       };
+    }
+
+    // Check 1-Hour Expiration on Activation Voucher
+    if (tech.activationCodeExpiresAt) {
+      const expiresAtMs = new Date(tech.activationCodeExpiresAt).getTime();
+      // 15-minute grace period after 1 hour (75 mins total)
+      if (Date.now() > expiresAtMs + 15 * 60 * 1000) {
+        logAuditEvent(
+          'DEVICE_ACTIVATION_REJECTED_EXPIRED',
+          `Activation Code ${normActCode} expired (1-hour security policy). Station registration rejected.`,
+          tech.username,
+          undefined,
+          'security',
+          'technician'
+        );
+        return {
+          success: false,
+          error: `Activation Code "${params.activationCode}" has expired (1-hour security rotation policy). Please request a fresh voucher from your Hospital Administrator.`,
+        };
+      }
     }
 
     if (tech.status !== 'active') {
@@ -1425,6 +1580,15 @@ class PodoPressDatabase {
     // 6. Set Active User & Hospital Session
     this.setActiveHospitalIdSync(hospital.id);
     this.setActiveUser('technician', tech.name, tech.id, hospital.id, hospital.name);
+
+    logAuditEvent(
+      'DEVICE_ACTIVATION_SUCCESS',
+      `Station ${hardwareDeviceId} successfully authorized for technician ${tech.name} (User ID: ${tech.username}) at ${hospital.name} with voucher ${normActCode}.`,
+      tech.username,
+      undefined,
+      'info',
+      'technician'
+    );
 
     return {
       success: true,
@@ -1820,10 +1984,10 @@ class PodoPressDatabase {
     // If an admin account was created, match against it
     if (registered) {
       const matchUser =
-        !cleanUser ||
         cleanUser === 'admin' ||
         registered.username.toLowerCase() === cleanUser ||
-        (registered.email && registered.email.toLowerCase() === cleanUser);
+        (registered.email && registered.email.toLowerCase() === cleanUser) ||
+        registered.name.toLowerCase() === cleanUser;
       const matchPin = registered.pin && registered.pin.trim() === cleanPin;
 
       if (matchUser && matchPin) {
@@ -1834,18 +1998,84 @@ class PodoPressDatabase {
           // Ignore
         }
         this.authorizeStationForAdmin(registered);
+        logAuditEvent(
+          'ADMIN_LOGIN_SUCCESS',
+          `Administrator ${registered.name} (User ID: ${registered.username}) successfully authenticated.`,
+          registered.username,
+          undefined,
+          'info',
+          'admin'
+        );
         return { success: true, account: registered };
       }
-      return { success: false, error: 'Invalid Administrator username or Master Password.' };
+
+      logAuditEvent(
+        'ADMIN_LOGIN_FAILED',
+        `Failed Administrator login attempt for User ID "${usernameOrEmail}". Incorrect credentials.`,
+        usernameOrEmail,
+        undefined,
+        'security',
+        'admin'
+      );
+      return { success: false, error: 'Invalid Administrator User ID or Master Password.' };
     }
 
     // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
     if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin' || !cleanUser) && (cleanPin === '1234' || cleanPin === 'admin')) {
       this.authorizeStationForAdmin(DEFAULT_ADMIN_ACCOUNT);
+      logAuditEvent(
+        'ADMIN_LOGIN_SUCCESS',
+        `Administrator ${DEFAULT_ADMIN_ACCOUNT.name} (User ID: ${DEFAULT_ADMIN_ACCOUNT.username}) successfully authenticated with initial credentials.`,
+        DEFAULT_ADMIN_ACCOUNT.username,
+        undefined,
+        'info',
+        'admin'
+      );
       return { success: true, account: DEFAULT_ADMIN_ACCOUNT };
     }
 
+    logAuditEvent(
+      'ADMIN_LOGIN_FAILED',
+      `Failed Administrator login attempt for User ID "${usernameOrEmail}". No account registered.`,
+      usernameOrEmail,
+      undefined,
+      'security',
+      'admin'
+    );
     return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
+  }
+
+  public updateAdminUsername(newUsername: string, newName?: string): AdminAccount {
+    const admin = this.getAdminAccountSync();
+    if (newUsername.trim()) {
+      admin.username = newUsername.trim().toLowerCase();
+    }
+    if (newName && newName.trim()) {
+      admin.name = newName.trim();
+    }
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(admin));
+      const list = this.getAdminAccountsListSync();
+      const idx = list.findIndex((a) => a.id === admin.id);
+      if (idx >= 0) list[idx] = admin;
+      else list.push(admin);
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {
+      // Ignore
+    }
+    logAuditEvent(
+      'ADMIN_USERID_UPDATED',
+      `Administrator profile updated: Desired User ID "${admin.username}", Name "${admin.name}".`,
+      admin.username,
+      undefined,
+      'info',
+      'admin'
+    );
+    return admin;
+  }
+
+  public getAuditLogsSync(): AuditEvent[] {
+    return getAuditEvents();
   }
 
   public recoverAdminPassword(

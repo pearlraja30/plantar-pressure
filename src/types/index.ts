@@ -188,6 +188,8 @@ export interface AuditEvent {
   action: string;
   details: string;
   algorithmVersion: string;
+  severity?: 'info' | 'warning' | 'security';
+  role?: 'admin' | 'technician' | 'system';
 }
 
 export type PatientIdMode = 'alphanumeric' | 'numeric' | 'date_alphanumeric';
@@ -269,6 +271,8 @@ export interface TechnicianUser {
   notes?: string;
   recoveryKey?: string;
   activationCode?: string; // Code-based enrollment voucher, e.g. "TMH-TECH-1001"
+  activationCodeGeneratedAt?: string; // ISO date string of generation
+  activationCodeExpiresAt?: string; // ISO date string of hourly rotation (valid for 1 hour)
   registeredDeviceId?: string; // Bound hardware device fingerprint
   isRegisteredOnDevice?: boolean;
   authorizedAt?: string;

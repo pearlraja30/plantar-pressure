@@ -20,6 +20,7 @@ import {
   Smartphone,
   Sparkles,
   Building2,
+  User,
 } from 'lucide-react';
 import { SystemUserSession, dbService, APP_CURRENT_VERSION } from '../../services/dbService';
 import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken } from '../../types';
@@ -112,6 +113,18 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   // Initial Master Password Setup State (for first-time station configuration only)
   const [isSettingInitialPassword, setIsSettingInitialPassword] = useState<boolean>(false);
+  const [adminUsernameInput, setAdminUsernameInput] = useState<string>(() => {
+    const acc = dbService.getAdminAccountSync();
+    return acc?.username || 'admin@technomind.health';
+  });
+  const [regAdminUsername, setRegAdminUsername] = useState<string>(() => {
+    const acc = dbService.getAdminAccountSync();
+    return acc?.username || 'admin@technomind.health';
+  });
+  const [regAdminName, setRegAdminName] = useState<string>(() => {
+    const acc = dbService.getAdminAccountSync();
+    return acc?.name || 'Dr. Specialist';
+  });
   const [regAdminPassword, setRegAdminPassword] = useState('');
   const [regAdminPasswordConfirm, setRegAdminPasswordConfirm] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -140,6 +153,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   // Handle First-Time Administrator Master Password Setup
   const handleSetInitialPassword = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!regAdminUsername.trim()) {
+      setPinError('Please enter your desired Admin User ID / Username.');
+      return;
+    }
     if (!regAdminPassword.trim()) {
       setPinError('Please enter a Master Password.');
       return;
@@ -153,8 +170,10 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       return;
     }
 
-    const updated = dbService.setInitialAdminPassword(regAdminPassword.trim());
+    dbService.setInitialAdminPassword(regAdminPassword.trim());
+    const updated = dbService.updateAdminUsername(regAdminUsername.trim(), regAdminName.trim());
     setRegisteredAdmin(updated);
+    setAdminUsernameInput(updated.username);
     setIsSettingInitialPassword(false);
     setPinError(null);
     dbService.authorizeStationForAdmin(updated);
@@ -170,15 +189,19 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     setDeviceLockout(null);
 
     if (selectedRole === 'admin') {
+      if (!adminUsernameInput.trim()) {
+        setPinError('Please enter your Administrator User ID / Username.');
+        return;
+      }
       if (!adminPassword.trim()) {
         setPinError('Please enter your Administrator Master Password.');
         return;
       }
 
-      // 2. Validate Credentials strictly
-      const auth = dbService.authenticateAdmin(registeredAdmin?.username || 'admin', adminPassword);
+      // 2. Validate Credentials strictly (both username and master password)
+      const auth = dbService.authenticateAdmin(adminUsernameInput.trim(), adminPassword);
       if (!auth.success) {
-        setPinError(auth.error || 'Incorrect Master Password. Please try again or use "Forgot Master Password" to recover your account.');
+        setPinError(auth.error || 'Incorrect Admin User ID or Master Password. Please try again or use "Forgot Master Password" to recover your account.');
         return;
       }
 
@@ -212,8 +235,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         if (boundTech) techToAuth = boundTech;
       }
       if (techToAuth) {
-        if (techToAuth.pin && techPassword.trim() !== techToAuth.pin) {
-          setPinError(`Incorrect password for technician ${techToAuth.name}. Please try again or use "Forgot Password".`);
+        const authTech = dbService.authenticateTechnician(techToAuth.username, techPassword);
+        if (!authTech) {
+          setPinError(`Incorrect password for technician User ID "${techToAuth.username}". Please try again or use "Forgot Password".`);
           return;
         }
         setPinError(null);
@@ -937,29 +961,48 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Admin Account
+                      Desired Admin User ID / Username *
                     </label>
                     <input
                       type="text"
                       className="podoload-input"
-                      value={registeredAdmin ? `${registeredAdmin.name} (${registeredAdmin.username})` : 'Administrator (admin@technomind.health)'}
-                      disabled
-                      style={{ fontSize: '0.78rem', backgroundColor: '#f1f5f9', color: '#475569' }}
+                      value={regAdminUsername}
+                      onChange={(e) => setRegAdminUsername(e.target.value)}
+                      placeholder="e.g. dr.specialist or admin@hospital.com"
+                      style={{ fontSize: '0.78rem' }}
+                      autoComplete="username"
+                      required
+                      autoFocus
                     />
                   </div>
 
                   <div>
                     <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
-                      Hospital / Clinic Facility
+                      Administrator Full Name / Title *
                     </label>
                     <input
                       type="text"
                       className="podoload-input"
-                      value={registeredAdmin?.hospitalName || 'Technomind Healthcare Systems'}
-                      disabled
-                      style={{ fontSize: '0.78rem', backgroundColor: '#f1f5f9', color: '#475569' }}
+                      value={regAdminName}
+                      onChange={(e) => setRegAdminName(e.target.value)}
+                      placeholder="e.g. Dr. Specialist / Hospital Administrator"
+                      style={{ fontSize: '0.78rem' }}
+                      required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '2px' }}>
+                    Hospital / Clinic Facility
+                  </label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={registeredAdmin?.hospitalName || 'Technomind Healthcare Systems'}
+                    disabled
+                    style={{ fontSize: '0.78rem', backgroundColor: '#f1f5f9', color: '#475569' }}
+                  />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
@@ -1156,63 +1199,90 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     {selectedRole === 'admin' && (
                       <div
                         style={{
-                          marginTop: '0.35rem',
+                          marginTop: '0.45rem',
                           paddingLeft: '2.5rem',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
+                          flexDirection: 'column',
                           gap: '0.5rem',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Lock className="w-3.5 h-3.5 text-slate-500" />
-                          <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>Master Password:</span>
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1.2fr 1fr',
+                            gap: '0.65rem',
+                            backgroundColor: '#ffffff',
+                            padding: '0.6rem 0.75rem',
+                            borderRadius: '6px',
+                            border: '1px solid #ccfbf1',
+                          }}
+                        >
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                              <User className="w-3 h-3 text-teal-600" />
+                              <span>Admin User ID / Username *</span>
+                            </label>
                             <input
-                              type={showAdminPassword ? 'text' : 'password'}
-                              placeholder="••••••••"
-                              value={adminPassword}
-                              autoComplete="current-password"
+                              type="text"
+                              className="podoload-input"
+                              placeholder="Enter Admin User ID"
+                              value={adminUsernameInput}
+                              autoComplete="username"
                               onChange={(e) => {
-                                setAdminPassword(e.target.value);
+                                setAdminUsernameInput(e.target.value);
                                 setPinError(null);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSwitchAccount();
-                                }
-                              }}
                               onClick={(e) => e.stopPropagation()}
-                              style={{
-                                width: '130px',
-                                padding: '0.2rem 1.6rem 0.2rem 0.4rem',
-                                fontSize: '0.74rem',
-                                border: '1px solid #94a3b8',
-                                borderRadius: '4px',
-                              }}
+                              style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}
                             />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowAdminPassword(!showAdminPassword);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                right: '4px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#64748b',
-                                padding: '1px',
-                              }}
-                            >
-                              {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                            </button>
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                              <Lock className="w-3 h-3 text-teal-600" />
+                              <span>Master Password *</span>
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type={showAdminPassword ? 'text' : 'password'}
+                                className="podoload-input"
+                                placeholder="••••••••"
+                                value={adminPassword}
+                                autoComplete="current-password"
+                                onChange={(e) => {
+                                  setAdminPassword(e.target.value);
+                                  setPinError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSwitchAccount();
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ fontSize: '0.76rem', padding: '0.25rem 1.8rem 0.25rem 0.5rem' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowAdminPassword(!showAdminPassword);
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  right: '4px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: '#64748b',
+                                  padding: '1px',
+                                }}
+                              >
+                                {showAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -1565,8 +1635,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   ● Authorized Station
                                 </span>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#1e293b', fontWeight: 700 }}>
-                                👨‍⚕️ Registered Operator: {deviceAuth.technicianName}
+                              <div style={{ fontSize: '0.74rem', color: '#1e293b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span>👨‍⚕️ Operator: {deviceAuth.technicianName}</span>
+                                <code style={{ fontSize: '0.68rem', backgroundColor: '#e2e8f0', color: '#0f766e', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                                  User ID: {technicians.find(t => t.id === deviceAuth.technicianId)?.username || currentActiveTech?.username || 'tech'}
+                                </code>
                               </div>
                               <div style={{ fontSize: '0.64rem', color: '#64748b' }}>
                                 Station ID: {deviceAuth.deviceFingerprint} · 100% Offline Clinical Scanning Ready

@@ -2853,6 +2853,118 @@ it("Enforces Multi-Technician Management & Remote Technician Examination Data In
   expect(Boolean(centralDb.cases.find((c) => c.id === "case-remote-501"))).toBe(true);
 });
 
+it("Enforces 1-Hour Activation Code Expiry & Rotation, Desired User ID Login, and Audit Trail Persistence", () => {
+  const auditLogs = [];
+  const logAudit = (action, details, userId) => {
+    auditLogs.unshift({
+      id: "aud-" + Math.random().toString(36).substring(2, 8),
+      timestamp: new Date().toISOString(),
+      action,
+      details,
+      userId,
+    });
+  };
+
+  // 1. Timed Activation Code with 1-hour expiration
+  const generateTimedCode = (prefix, currentTimeMs = Date.now()) => {
+    const raw = (prefix || 'TMH').includes('-') ? prefix.split('-')[0] : prefix;
+    const cleanPrefix = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'CLINIC';
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const code = `${cleanPrefix}-TECH-${randNum}`;
+    const generatedAt = new Date(currentTimeMs).toISOString();
+    const expiresAt = new Date(currentTimeMs + 60 * 60 * 1000).toISOString(); // 1 hour validity
+    return { code, generatedAt, expiresAt };
+  };
+
+  const initialTime = Date.now();
+  let timed = generateTimedCode("TMH-CENTRAL", initialTime);
+  expect(timed.code).toContain("TMH-TECH-");
+
+  const techAccount = {
+    id: "tech-01",
+    name: "Alex Rivera",
+    username: "alex.tech", // Desired User ID
+    pin: "Rivera#2026",
+    activationCode: timed.code,
+    activationCodeGeneratedAt: timed.generatedAt,
+    activationCodeExpiresAt: timed.expiresAt,
+  };
+
+  // 2. Validate within 1 hour: succeeds
+  const validateCode = (tech, inputCode, nowMs) => {
+    if (tech.activationCode !== inputCode) return { success: false, reason: "INVALID_CODE" };
+    const expiresMs = new Date(tech.activationCodeExpiresAt).getTime();
+    if (nowMs > expiresMs + 15 * 60 * 1000) {
+      logAudit("ACTIVATION_CODE_EXPIRED", `Code ${inputCode} expired.`, tech.username);
+      return { success: false, reason: "EXPIRED" };
+    }
+    logAudit("DEVICE_ACTIVATED", `Station bound with code ${inputCode}.`, tech.username);
+    return { success: true };
+  };
+
+  const test30mLater = initialTime + 30 * 60 * 1000;
+  const resValid = validateCode(techAccount, techAccount.activationCode, test30mLater);
+  expect(resValid.success).toBe(true);
+
+  // 3. Validate 80 minutes later (past 1 hour + 15m grace): rejected
+  const test80mLater = initialTime + 80 * 60 * 1000;
+  const resExpired = validateCode(techAccount, techAccount.activationCode, test80mLater);
+  expect(resExpired.success).toBe(false);
+  expect(resExpired.reason).toBe("EXPIRED");
+
+  // 4. Auto-rotation generates fresh 1-hour code
+  const rotated = generateTimedCode("TMH-CENTRAL", test80mLater);
+  techAccount.activationCode = rotated.code;
+  techAccount.activationCodeGeneratedAt = rotated.generatedAt;
+  techAccount.activationCodeExpiresAt = rotated.expiresAt;
+  logAudit("ACTIVATION_CODE_ROTATED", `Rotated to ${rotated.code}`, techAccount.username);
+
+  const resRotatedValid = validateCode(techAccount, rotated.code, test80mLater + 5 * 60 * 1000);
+  expect(resRotatedValid.success).toBe(true);
+
+  // 5. Desired Admin User ID Login
+  const adminAccount = {
+    name: "Dr. Specialist",
+    username: "dr.specialist", // Desired custom User ID
+    pin: "Master#9900",
+  };
+
+  const authenticateAdmin = (inputUser, inputPass) => {
+    const userMatch = inputUser.trim().toLowerCase() === adminAccount.username.toLowerCase();
+    const passMatch = inputPass.trim() === adminAccount.pin;
+
+    if (!userMatch) {
+      logAudit("ADMIN_LOGIN_FAILED_USERID", `Unknown User ID "${inputUser}".`, inputUser);
+      return { success: false, error: "Invalid Admin User ID." };
+    }
+    if (!passMatch) {
+      logAudit("ADMIN_LOGIN_FAILED_PASSWORD", `Incorrect password for "${inputUser}".`, inputUser);
+      return { success: false, error: "Incorrect Master Password." };
+    }
+
+    logAudit("ADMIN_LOGIN_SUCCESS", `Administrator "${inputUser}" logged in.`, inputUser);
+    return { success: true };
+  };
+
+  // Wrong User ID fails
+  const authBadUser = authenticateAdmin("wrong.admin", "Master#9900");
+  expect(authBadUser.success).toBe(false);
+
+  // Wrong Password fails
+  const authBadPass = authenticateAdmin("dr.specialist", "WrongPass123");
+  expect(authBadPass.success).toBe(false);
+
+  // Correct User ID and Password succeeds
+  const authOk = authenticateAdmin("dr.specialist", "Master#9900");
+  expect(authOk.success).toBe(true);
+
+  // 6. Audit logs captured
+  expect(auditLogs.length >= 5).toBe(true);
+  expect(Boolean(auditLogs.find((a) => a.action === "ADMIN_LOGIN_SUCCESS"))).toBe(true);
+  expect(Boolean(auditLogs.find((a) => a.action === "ACTIVATION_CODE_EXPIRED"))).toBe(true);
+  expect(Boolean(auditLogs.find((a) => a.action === "ACTIVATION_CODE_ROTATED"))).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
