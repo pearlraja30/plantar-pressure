@@ -1186,7 +1186,7 @@ STEP 2: RETURNING STATION SESSIONS
                   style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Create Technician Login</span>
+                  <span>Create Technician Login</span>
                 </button>
               </div>
 
@@ -1255,22 +1255,22 @@ STEP 2: RETURNING STATION SESSIONS
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         flexWrap: 'wrap',
-                        gap: '0.6rem',
-                        padding: '0.6rem 0.85rem',
+                        gap: '0.75rem',
+                        padding: '0.65rem 0.9rem',
                         backgroundColor: '#ffffff',
                         border: '1px solid #ccfbf1',
                         borderRadius: '8px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
                           Select Technician:
                         </label>
                         <select
                           className="podoload-input"
                           value={currentHubTech.id}
                           onChange={(e) => setHubSelectedTechId(e.target.value)}
-                          style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.35rem 0.6rem', flex: 1, minWidth: '160px', maxWidth: '100%' }}
+                          style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.35rem 0.6rem', minWidth: '200px', maxWidth: '380px', flex: 1 }}
                         >
                           {techniciansList.map((t) => (
                             <option key={t.id} value={t.id}>
@@ -1294,20 +1294,20 @@ STEP 2: RETURNING STATION SESSIONS
                           title="Create another technician login for Android, iOS, or Windows"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>+ Add Technician</span>
+                          <span>Add Technician</span>
                         </button>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span
                           className={`podo-badge ${currentHubTech.isRegisteredOnDevice ? 'podo-badge-green' : 'podo-badge-gray'}`}
-                          style={{ fontSize: '0.64rem' }}
+                          style={{ fontSize: '0.66rem' }}
                         >
                           {currentHubTech.isRegisteredOnDevice
                             ? `📱 Bound: ${currentHubTech.registeredDeviceId || 'Station'}`
                             : '⚡ Ready for Enrollment'}
                         </span>
-                        <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                        <span className="podo-badge podo-badge-green" style={{ fontSize: '0.66rem' }}>
                           ✓ 100% Offline Ready
                         </span>
                       </div>
@@ -1317,7 +1317,7 @@ STEP 2: RETURNING STATION SESSIONS
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
                         gap: '0.65rem',
                         width: '100%',
                         boxSizing: 'border-box',
@@ -1329,37 +1329,37 @@ STEP 2: RETURNING STATION SESSIONS
                           backgroundColor: '#ffffff',
                           border: '1.5px solid #bbf7d0',
                           borderRadius: '8px',
-                          padding: '0.65rem 0.75rem',
+                          padding: '0.8rem 0.95rem',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.35rem',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
                           minWidth: 0,
-                          overflow: 'hidden',
                           boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                             1. Hospital / Clinic Code
                           </span>
-                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>Required</span>
+                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>Required</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
-                          <code style={{ fontSize: '0.92rem', fontWeight: 900, color: '#166534', fontFamily: 'monospace', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={techHosp.code}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <code style={{ fontSize: '1.05rem', fontWeight: 900, color: '#166534', fontFamily: 'monospace', letterSpacing: '0.04em', whiteSpace: 'nowrap' }} title={techHosp.code}>
                             {techHosp.code}
                           </code>
                           <button
                             type="button"
                             className="podoload-btn-secondary podoload-btn-sm"
-                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}
+                            style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}
                             onClick={() => handleCopyText(techHosp.code, 'hospCode')}
                           >
-                            <Copy className="w-3 h-3 text-emerald-600" />
+                            <Copy className="w-3.5 h-3.5 text-emerald-600" />
                             <span>{copiedLabel === 'hospCode' ? '✓ Copied' : 'Copy'}</span>
                           </button>
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={techHosp.name}>
-                          Facility: {techHosp.name}
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }} title={techHosp.name}>
+                          Facility: <strong>{techHosp.name}</strong>
                         </div>
                       </div>
 
@@ -1372,61 +1372,66 @@ STEP 2: RETURNING STATION SESSIONS
                               backgroundColor: '#ffffff',
                               border: '1.5px solid #99f6e4',
                               borderRadius: '8px',
-                              padding: '0.65rem 0.75rem',
+                              padding: '0.8rem 0.95rem',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '0.35rem',
+                              justifyContent: 'space-between',
+                              gap: '0.5rem',
                               minWidth: 0,
-                              overflow: 'hidden',
                               boxSizing: 'border-box',
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
-                              <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f766e', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                                 2. Activation Voucher Code
                               </span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem' }}>
-                                  ⏱️ {timed.remainingText} ({timed.policyLabel})
-                                </span>
-                                <button
-                                  type="button"
-                                  className="podoload-btn-secondary podoload-btn-sm"
-                                  style={{ fontSize: '0.58rem', padding: '1px 5px', color: '#0f766e' }}
-                                  onClick={() => setShowPolicyConfig(!showPolicyConfig)}
-                                  title="Configure activation voucher expiration & rotation duration (hours / days / custom)"
-                                >
-                                  ⚙️ Configure
-                                </button>
-                              </div>
+                              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
+                                ⏱️ {timed.remainingText}
+                              </span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
-                              <code style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={timed.code}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                              <code style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f766e', fontFamily: 'monospace', letterSpacing: '0.04em', whiteSpace: 'nowrap' }} title={timed.code}>
                                 {timed.code}
                               </code>
-                              <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                                 <button
                                   type="button"
                                   className="podoload-btn-secondary podoload-btn-sm"
-                                  style={{ fontSize: '0.64rem', padding: '0.2rem 0.35rem' }}
+                                  style={{ padding: '0.25rem 0.4rem' }}
                                   onClick={() => handleRegenerateActivationCode(currentHubTech)}
                                   title={`Rotate activation voucher code now (starts fresh ${timed.policyLabel} expiry)`}
                                 >
-                                  <RotateCw className="w-3 h-3 text-teal-600" />
+                                  <RotateCw className="w-3.5 h-3.5 text-teal-600" />
                                 </button>
                                 <button
                                   type="button"
                                   className="podoload-btn-primary podoload-btn-sm"
-                                  style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                  style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                                   onClick={() => handleCopyText(timed.code, 'actCode')}
                                 >
-                                  <Copy className="w-3 h-3" />
+                                  <Copy className="w-3.5 h-3.5" />
                                   <span>{copiedLabel === 'actCode' ? '✓ Copied' : 'Copy'}</span>
                                 </button>
                               </div>
                             </div>
-                            <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              Enter in "Activation Voucher Code" on app · Policy: <strong>{timed.policyLabel}</strong>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', fontSize: '0.68rem', color: '#64748b' }}>
+                              <span>Expires in <strong>{timed.policyLabel}</strong></span>
+                              <button
+                                type="button"
+                                onClick={() => setShowPolicyConfig(!showPolicyConfig)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  fontSize: '0.68rem',
+                                  color: '#0f766e',
+                                  fontWeight: 700,
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {showPolicyConfig ? 'Hide Policy ▲' : 'Configure Policy ⚙️'}
+                              </button>
                             </div>
                           </div>
                         );
@@ -1438,37 +1443,37 @@ STEP 2: RETURNING STATION SESSIONS
                           backgroundColor: '#ffffff',
                           border: '1.5px solid #e2e8f0',
                           borderRadius: '8px',
-                          padding: '0.65rem 0.75rem',
+                          padding: '0.8rem 0.95rem',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.35rem',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
                           minWidth: 0,
-                          overflow: 'hidden',
                           boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                             3. Login ID / Username
                           </span>
-                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Desired User ID</span>
+                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>Desired User ID</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
-                          <code style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentHubTech.username}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <code style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f766e', fontFamily: 'monospace', whiteSpace: 'nowrap' }} title={currentHubTech.username}>
                             {currentHubTech.username}
                           </code>
                           <button
                             type="button"
                             className="podoload-btn-secondary podoload-btn-sm"
-                            style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}
+                            style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}
                             onClick={() => handleCopyText(currentHubTech.username, 'username')}
                           >
-                            <Copy className="w-3 h-3 text-slate-600" />
+                            <Copy className="w-3.5 h-3.5 text-slate-600" />
                             <span>{copiedLabel === 'username' ? '✓ Copied' : 'Copy'}</span>
                           </button>
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentHubTech.name}>
-                          Technician: {currentHubTech.name}
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }} title={currentHubTech.name}>
+                          Technician: <strong>{currentHubTech.name}</strong>
                         </div>
                       </div>
 
@@ -1478,48 +1483,48 @@ STEP 2: RETURNING STATION SESSIONS
                           backgroundColor: '#ffffff',
                           border: '1.5px solid #e2e8f0',
                           borderRadius: '8px',
-                          padding: '0.65rem 0.75rem',
+                          padding: '0.8rem 0.95rem',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.35rem',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
                           minWidth: 0,
-                          overflow: 'hidden',
                           boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                             4. Password / PIN
                           </span>
-                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>Admin Managed</span>
+                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>Admin Managed</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', minWidth: 0 }}>
-                          <code style={{ fontSize: '0.82rem', fontWeight: 800, color: visibleTechPasswords[currentHubTech.id] ? '#0f766e' : '#64748b', fontFamily: 'monospace', letterSpacing: visibleTechPasswords[currentHubTech.id] ? 'normal' : '0.12em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <code style={{ fontSize: '0.98rem', fontWeight: 800, color: visibleTechPasswords[currentHubTech.id] ? '#0f766e' : '#64748b', fontFamily: 'monospace', letterSpacing: visibleTechPasswords[currentHubTech.id] ? 'normal' : '0.12em', whiteSpace: 'nowrap' }}>
                             {visibleTechPasswords[currentHubTech.id] ? (currentHubTech.pin || '1234') : '••••••••'}
                           </code>
-                          <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                             <button
                               type="button"
                               className="podoload-btn-secondary podoload-btn-sm"
-                              style={{ padding: '0.2rem 0.35rem' }}
+                              style={{ padding: '0.25rem 0.4rem' }}
                               onClick={() => setVisibleTechPasswords((prev) => ({ ...prev, [currentHubTech.id]: !prev[currentHubTech.id] }))}
                               title="Toggle password view"
                             >
-                              {visibleTechPasswords[currentHubTech.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              {visibleTechPasswords[currentHubTech.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
                             <button
                               type="button"
                               className="podoload-btn-secondary podoload-btn-sm"
-                              style={{ fontSize: '0.64rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                               onClick={() => handleCopyText(currentHubTech.pin || '1234', 'password')}
                             >
-                              <Copy className="w-3 h-3 text-slate-600" />
+                              <Copy className="w-3.5 h-3.5 text-slate-600" />
                               <span>{copiedLabel === 'password' ? '✓ Copied' : 'Copy'}</span>
                             </button>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Used for station sign-in</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+                          <span style={{ color: '#64748b' }}>Used for station sign-in</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -1528,7 +1533,7 @@ STEP 2: RETURNING STATION SESSIONS
                               setShowTechEditPasswordVal(false);
                               setTechPasswordModalError(null);
                             }}
-                            style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.62rem', color: '#0d9488', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                            style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.68rem', color: '#0d9488', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                           >
                             Reset Password
                           </button>
@@ -1537,70 +1542,68 @@ STEP 2: RETURNING STATION SESSIONS
                     </div>
 
                     {/* Direct Sharing Actions */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid #ccfbf1' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          className="podoload-btn-primary podoload-btn-sm"
-                          onClick={() => handleCopyText(getShareableVoucherText(currentHubTech), 'all')}
-                          title="Copy full instructions card with all credentials"
-                          style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                          <span>{copiedLabel === 'all' ? '✓ All Credentials Copied!' : '📋 Copy All Login Credentials'}</span>
-                        </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', gap: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid #ccfbf1' }}>
+                      <button
+                        type="button"
+                        className="podoload-btn-primary podoload-btn-sm"
+                        onClick={() => handleCopyText(getShareableVoucherText(currentHubTech), 'all')}
+                        title="Copy full instructions card with all credentials"
+                        style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>{copiedLabel === 'all' ? '✓ All Credentials Copied!' : '📋 Copy All Login Credentials'}</span>
+                      </button>
 
-                        <button
-                          type="button"
-                          className="podoload-btn-secondary podoload-btn-sm"
-                          onClick={() => handleShareVoucherWhatsApp(currentHubTech)}
-                          title="Share activation instructions directly via WhatsApp"
-                          style={{
-                            fontSize: '0.7rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            color: '#15803d',
-                            borderColor: '#86efac',
-                            backgroundColor: '#f0fdf4',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Share WhatsApp</span>
-                        </button>
+                      <button
+                        type="button"
+                        className="podoload-btn-secondary podoload-btn-sm"
+                        onClick={() => handleShareVoucherWhatsApp(currentHubTech)}
+                        title="Share activation instructions directly via WhatsApp"
+                        style={{
+                          fontSize: '0.7rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          color: '#15803d',
+                          borderColor: '#86efac',
+                          backgroundColor: '#f0fdf4',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Share WhatsApp</span>
+                      </button>
 
-                        <button
-                          type="button"
-                          className="podoload-btn-secondary podoload-btn-sm"
-                          onClick={() => handleShareVoucherEmail(currentHubTech)}
-                          title="Send activation voucher via Email"
-                          style={{
-                            fontSize: '0.7rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            color: '#0369a1',
-                            borderColor: '#7dd3fc',
-                            backgroundColor: '#f0f9ff',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <Mail className="w-3.5 h-3.5 text-sky-600" />
-                          <span>Share Email</span>
-                        </button>
+                      <button
+                        type="button"
+                        className="podoload-btn-secondary podoload-btn-sm"
+                        onClick={() => handleShareVoucherEmail(currentHubTech)}
+                        title="Send activation voucher via Email"
+                        style={{
+                          fontSize: '0.7rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          color: '#0369a1',
+                          borderColor: '#7dd3fc',
+                          backgroundColor: '#f0f9ff',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <Mail className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Share Email</span>
+                      </button>
 
-                        <button
-                          type="button"
-                          className="podoload-btn-secondary podoload-btn-sm"
-                          onClick={() => handleShareNative(currentHubTech)}
-                          title="Share via native device sharing sheet"
-                          style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                        >
-                          <Share2 className="w-3.5 h-3.5 text-teal-600" />
-                          <span>Native Share</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="podoload-btn-secondary podoload-btn-sm"
+                        onClick={() => handleShareNative(currentHubTech)}
+                        title="Share via native device sharing sheet"
+                        style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Native Share</span>
+                      </button>
 
                       <button
                         type="button"
@@ -1614,19 +1617,21 @@ STEP 2: RETURNING STATION SESSIONS
                       </button>
                     </div>
 
-                    {/* EXPIRY & ROTATION POLICY CONFIGURATION CARD */}
-                    <div
-                      style={{
-                        backgroundColor: '#ffffff',
-                        border: '1.5px solid #99f6e4',
-                        borderRadius: '8px',
-                        padding: '0.75rem 0.9rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.55rem',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {/* EXPIRY & ROTATION POLICY CONFIGURATION DRAWER */}
+                    {showPolicyConfig && (
+                      <div
+                        style={{
+                          backgroundColor: '#ffffff',
+                          border: '1.5px solid #99f6e4',
+                          borderRadius: '8px',
+                          padding: '0.85rem 1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.65rem',
+                          animation: 'fadeIn 0.2s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <Clock className="w-4 h-4 text-teal-600" />
                           <h6 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
@@ -1769,8 +1774,9 @@ STEP 2: RETURNING STATION SESSIONS
                         </div>
                       )}
                     </div>
-                  </div>
-                );
+                  )}
+                </div>
+              );
               })()}
 
               {/* Create Technician Sub-Form */}
@@ -1936,7 +1942,7 @@ STEP 2: RETURNING STATION SESSIONS
                     style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem' }}
                   >
                     <Plus className="w-3 h-3" />
-                    <span>+ Add New Technician</span>
+                    <span>Add New Technician</span>
                   </button>
                 )}
               </div>
@@ -2460,7 +2466,7 @@ STEP 2: RETURNING STATION SESSIONS
                     style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>+ Expand Device Seats (Payment)</span>
+                    <span>Expand Device Seats (Payment)</span>
                   </button>
                 </div>
               </div>
