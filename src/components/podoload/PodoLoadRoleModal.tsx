@@ -183,7 +183,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       // 2. Validate Credentials strictly (both username and master password)
       const auth = dbService.authenticateAdmin(adminUsernameInput.trim(), adminPassword);
       if (!auth.success) {
-        setPinError(auth.error || 'Incorrect Admin User ID or Master Password. Please try again or use "Forgot Master Password" to recover your account.');
+        setPinError(auth.error || 'Incorrect Admin User ID or Master Password. Please check your credentials and try again.');
         return;
       }
 
@@ -1087,27 +1087,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                             </div>
                           </div>
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRecoveryMode('admin');
-                              setPinError(null);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              fontSize: '0.68rem',
-                              color: '#0f766e',
-                              textDecoration: 'underline',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Forgot Master Password?
-                          </button>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -1505,51 +1484,25 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRecoveryMode('technician');
-                                  const match = technicians.find(
-                                    (t) =>
-                                      t.username.toLowerCase() === techUsernameInput.trim().toLowerCase() ||
-                                      t.email?.toLowerCase() === techUsernameInput.trim().toLowerCase()
-                                  );
-                                  setTechRecoveryId(match?.id || deviceAuth?.technicianId || selectedTechId);
-                                  setPinError(null);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  fontSize: '0.68rem',
-                                  color: '#0284c7',
-                                  textDecoration: 'underline',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Forgot Password?
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMobileAuthTab('activate');
-                                  setPinError(null);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  fontSize: '0.68rem',
-                                  color: '#0f766e',
-                                  textDecoration: 'underline',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Switch / Re-pair Station
-                              </button>
-                            </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMobileAuthTab('activate');
+                                setPinError(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '0.68rem',
+                                color: '#0f766e',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Switch / Re-pair Station
+                            </button>
                           </div>
                         </div>
                       )}
