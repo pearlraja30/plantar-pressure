@@ -145,11 +145,27 @@ The system includes an automated clinical verification battery covering all test
 * **Navigation Isolation**: Electron main process blocks unvetted external navigation (`will-navigate`) and denies popup window creation; a global capture-phase web listener intercepts links to prevent accidental routing to external domains.
 * **React Rules of Hooks Integrity**: All lifecycle hooks hoisted above early returns across components, guaranteeing zero hook mismatch exceptions (`DIAG-MVYLWFK2-384`).
 
-### 7. Inbuilt Live Database Records Explorer & Test Suite (65 Unit Tests)
+### 7. Inbuilt Live Database Records Explorer & Test Suite (66 Unit Tests)
 * Direct in-app inspection of all 7 database stores (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `audit_logs`, `settings`).
 * Accessible via sidebar (**`Database records`**) and Settings (**`Patient ID & Database`** $\rightarrow$ **`Live Records Explorer`**).
 * Real-time search, live row count metrics, pretty-printed JSON inspection modal with one-click copy, and atomic Export/Import JSON backup.
-* **65/65 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, and separated `/admin` routing.
+* **66/66 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, separated `/admin` routing, and shift logout data purging.
+
+### 8. Explicit Station Logout & Zero Stale Data Guarantee Between Users
+* **Immediate Accessible Logout Controls**:
+  * **Top Header**: Accessible via the dedicated `Sign Out` button alongside the active user badge.
+  * **Sidebar Profile Card**: Dedicated red-accented `Log Out` button directly inside the user footer card.
+  * **Account Switcher Modal**: Prominent session banner displaying active user with an immediate `Sign Out` button.
+* **Zero Stale Data Guarantee**:
+  * Logging out or switching users triggers an automated in-memory clinical purge:
+    * Clears selected patient and selected case identifiers (`ppa-selected-patient-id`, `ppa-selected-case-id`, `ppa-active-session`).
+    * Resets raw foot scans (`leftFoot`, `rightFoot`), pressure heatmaps, orthotic morphometry metrics, and regional analyses to pristine `null` states.
+    * Resets clinical step counter to `Step 1: Patient Registration` and wipes search buffers.
+  * Guarantees zero cross-patient and cross-technician data leakage between different operators sharing the same physical workstation.
+* **Locked Terminal State (`isSessionLocked`)**:
+  * Signing out locks the application in a modal authentication gate.
+  * Dismissal (`X` and `Cancel` buttons) is strictly disabled while locked until valid credentials are authenticated.
+  * Logs an immutable 21 CFR Part 11 audit trail event (`USER_LOGOUT`) recording timestamp and user details.
 
 ---
 

@@ -2066,6 +2066,26 @@ class PodoPressDatabase {
     return session;
   }
 
+  public logoutUser(): void {
+    try {
+      const activeUser = this.getActiveUserSync();
+      localStorage.removeItem(LS_KEYS.ACTIVE_USER);
+      safeStorage.removeItem('ppa-selected-patient-id');
+      safeStorage.removeItem('ppa-selected-case-id');
+      safeStorage.removeItem('ppa-active-session');
+      logAuditEvent(
+        'USER_LOGOUT',
+        `User ${activeUser.name} (${activeUser.username}, role: ${activeUser.role}) logged out of session. Active session purged.`,
+        activeUser.username,
+        undefined,
+        'info',
+        activeUser.role
+      );
+    } catch (e) {
+      console.warn('Failed to clean user session during logout', e);
+    }
+  }
+
   // =========================================================================
   // ADMINISTRATOR ACCOUNT CREATION & AUTHENTICATION
   // =========================================================================

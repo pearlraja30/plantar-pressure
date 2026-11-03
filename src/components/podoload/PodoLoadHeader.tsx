@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck } from 'lucide-react';
+import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
@@ -21,6 +21,7 @@ interface PodoLoadHeaderProps {
   clinicName?: string;
   currentUser?: SystemUserSession;
   onOpenUserSwitcher?: () => void;
+  onLogout?: () => void;
   onOpenAdmin?: () => void;
   onOpenMobileMenu?: () => void;
 }
@@ -41,6 +42,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   clinicName = 'Technomind Healthcare Systems',
   currentUser = SYSTEM_ACCOUNTS.admin,
   onOpenUserSwitcher,
+  onLogout,
   onOpenAdmin,
   onOpenMobileMenu,
 }) => {
@@ -209,6 +211,32 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
               </>
             )}
           </button>
+
+          {/* Quick Logout Button */}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Sign out of station and end current clinical session"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                padding: '0.3rem 0.65rem',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#ffffff',
+                color: '#64748b',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              <span>Sign Out</span>
+            </button>
+          )}
         </div>
       </div>
 

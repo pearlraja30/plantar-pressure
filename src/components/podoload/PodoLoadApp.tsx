@@ -264,6 +264,50 @@ export function PodoLoadApp() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(() => !deviceAuthStatus.isAuthorized || checkIsAdminUrl());
   const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
 
+  // Foot capture data (Screens 2 - 5) - FRESH DATA ONLY (No auto-injection of sample footprints)
+  const [leftFoot, setLeftFoot] = useState<FootCaptureData | null>(null);
+  const [rightFoot, setRightFoot] = useState<FootCaptureData | null>(null);
+
+  // Heatmaps and analysis data (Screens 3 - 5)
+  const [leftHeatmapUrl, setLeftHeatmapUrl] = useState<string | null>(null);
+  const [rightHeatmapUrl, setRightHeatmapUrl] = useState<string | null>(null);
+  const [leftAnalysis, setLeftAnalysis] = useState<any>(null);
+  const [rightAnalysis, setRightAnalysis] = useState<any>(null);
+  const [isSessionLocked, setIsSessionLocked] = useState<boolean>(false);
+
+  const handlePurgeSessionData = () => {
+    // Zero Stale Data Guarantee:
+    // Reset all in-memory clinical examination, scan, heatmap, and patient states
+    setSelectedPatientId('');
+    setSelectedCaseId('');
+    setActiveLoadedCase(null);
+    setLeftFoot(null);
+    setRightFoot(null);
+    setLeftHeatmapUrl(null);
+    setRightHeatmapUrl(null);
+    setLeftAnalysis(null);
+    setRightAnalysis(null);
+    setGlobalSearch('');
+    setCurrentStep(1);
+    setCurrentSection('registration');
+    setIsScannerWizardOpen(false);
+
+    try {
+      safeStorage.removeItem('ppa-selected-patient-id');
+      safeStorage.removeItem('ppa-selected-case-id');
+      safeStorage.removeItem('ppa-active-session');
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleLogout = () => {
+    dbService.logoutUser();
+    handlePurgeSessionData();
+    setIsSessionLocked(true);
+    setIsRoleModalOpen(true);
+  };
+
   const handleSelectRole = (
     role: 'admin' | 'technician',
     customName?: string,
@@ -271,6 +315,10 @@ export function PodoLoadApp() {
     hospitalId?: string,
     hospitalName?: string
   ) => {
+    // Zero Stale Data: Always ensure clean clinical slate when switching accounts
+    handlePurgeSessionData();
+    setIsSessionLocked(false);
+
     const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
     if (role === 'admin') {
@@ -430,16 +478,6 @@ export function PodoLoadApp() {
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, []);
-
-  // Foot capture data (Screens 2 - 5) - FRESH DATA ONLY (No auto-injection of sample footprints)
-  const [leftFoot, setLeftFoot] = useState<FootCaptureData | null>(null);
-  const [rightFoot, setRightFoot] = useState<FootCaptureData | null>(null);
-
-  // Heatmaps and analysis data (Screens 3 - 5)
-  const [leftHeatmapUrl, setLeftHeatmapUrl] = useState<string | null>(null);
-  const [rightHeatmapUrl, setRightHeatmapUrl] = useState<string | null>(null);
-  const [leftAnalysis, setLeftAnalysis] = useState<any>(null);
-  const [rightAnalysis, setRightAnalysis] = useState<any>(null);
 
   // Restore scans and heatmaps when selecting an existing case from records or cloud
   useEffect(() => {
@@ -1082,6 +1120,7 @@ export function PodoLoadApp() {
         onNavigate={handleNavClick}
         onStartNewExam={handleStartNewExam}
         currentUser={currentUser}
+        onLogout={handleLogout}
         onOpenUserSwitcher={(mode) => {
           if (mode === 'admin') {
             setRoleModalAdminMode(true);
@@ -1113,6 +1152,7 @@ export function PodoLoadApp() {
           clinicName={activeHospital.name}
           currentUser={currentUser}
           onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
+          onLogout={handleLogout}
           onOpenAdmin={handleOpenAdminSection}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
@@ -1379,8 +1419,9 @@ export function PodoLoadApp() {
 
       {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin')}
+        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin') || isSessionLocked}
         onClose={() => {
+          if (isSessionLocked) return;
           const status = dbService.checkDeviceAuthorizationStatus();
           setDeviceAuthStatus(status);
           if (status.isAuthorized || currentUser.role === 'admin') {
@@ -1390,7 +1431,9 @@ export function PodoLoadApp() {
         }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
+        onLogout={handleLogout}
         isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin'}
+        isSessionLocked={isSessionLocked}
         activationReason={deviceAuthStatus.reason}
         initialAdminMode={roleModalAdminMode}
       />

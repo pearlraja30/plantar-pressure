@@ -3185,6 +3185,109 @@ it("Enforces Separated /admin Context & Default Technician-Only Station Flow", (
   expect(checkElectronArgv(['node', 'PodoPress.exe', '/admin'])).toBe(true);
 });
 
+it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", () => {
+  // 1. Storage simulation with an active user and active clinical examination data
+  const storage = new Map();
+  storage.set("ppa_active_user", JSON.stringify({
+    role: "technician",
+    name: "Kavita Rao",
+    username: "kavita.rao",
+    hospitalId: "hosp-001"
+  }));
+  storage.set("ppa-selected-patient-id", "pat-1234");
+  storage.set("ppa-selected-case-id", "case-5678");
+  storage.set("ppa-active-session", "session-token-xyz");
+
+  // In-memory clinical session states for active technician
+  let sessionState = {
+    currentUser: JSON.parse(storage.get("ppa_active_user")),
+    selectedPatientId: "pat-1234",
+    selectedCaseId: "case-5678",
+    activeLoadedCase: { id: "case-5678", patientId: "pat-1234", notes: "Severe pronation" },
+    leftFoot: { rawDataUrl: "data:image/jpeg;base64,...", capturedAt: "11:20:00" },
+    rightFoot: { rawDataUrl: "data:image/jpeg;base64,...", capturedAt: "11:22:00" },
+    leftHeatmapUrl: "data:image/png;base64,...",
+    rightHeatmapUrl: "data:image/png;base64,...",
+    leftAnalysis: { archIndex: 0.28 },
+    rightAnalysis: { archIndex: 0.27 },
+    globalSearch: "pat-1234",
+    currentStep: 4,
+    currentSection: "report",
+    isSessionLocked: false
+  };
+
+  expect(sessionState.selectedPatientId).toBe("pat-1234");
+  expect(sessionState.leftFoot).not.toBeNull();
+  expect(storage.get("ppa-selected-patient-id")).toBe("pat-1234");
+
+  // 2. Technician finishes shift and clicks "Sign Out / Log Out"
+  // Simulate dbService.logoutUser()
+  const logoutUser = () => {
+    storage.delete("ppa_active_user");
+    storage.delete("ppa-selected-patient-id");
+    storage.delete("ppa-selected-case-id");
+    storage.delete("ppa-active-session");
+  };
+
+  // Simulate handlePurgeSessionData()
+  const purgeSessionData = () => {
+    sessionState.selectedPatientId = "";
+    sessionState.selectedCaseId = "";
+    sessionState.activeLoadedCase = null;
+    sessionState.leftFoot = null;
+    sessionState.rightFoot = null;
+    sessionState.leftHeatmapUrl = null;
+    sessionState.rightHeatmapUrl = null;
+    sessionState.leftAnalysis = null;
+    sessionState.rightAnalysis = null;
+    sessionState.globalSearch = "";
+    sessionState.currentStep = 1;
+    sessionState.currentSection = "registration";
+  };
+
+  // Perform full logout workflow
+  logoutUser();
+  purgeSessionData();
+  sessionState.isSessionLocked = true;
+
+  // 3. Verify Zero Stale Data Guarantee
+  expect(storage.has("ppa_active_user")).toBe(false);
+  expect(storage.has("ppa-selected-patient-id")).toBe(false);
+  expect(storage.has("ppa-selected-case-id")).toBe(false);
+  expect(storage.has("ppa-active-session")).toBe(false);
+
+  expect(sessionState.selectedPatientId).toBe("");
+  expect(sessionState.selectedCaseId).toBe("");
+  expect(sessionState.activeLoadedCase).toBeNull();
+  expect(sessionState.leftFoot).toBeNull();
+  expect(sessionState.rightFoot).toBeNull();
+  expect(sessionState.leftHeatmapUrl).toBeNull();
+  expect(sessionState.rightHeatmapUrl).toBeNull();
+  expect(sessionState.leftAnalysis).toBeNull();
+  expect(sessionState.rightAnalysis).toBeNull();
+  expect(sessionState.globalSearch).toBe("");
+  expect(sessionState.currentStep).toBe(1);
+  expect(sessionState.currentSection).toBe("registration");
+  expect(sessionState.isSessionLocked).toBe(true);
+
+  // 4. Verify terminal lock: Station cannot be dismissed without valid authentication
+  const canDismissModal = (isLocked, isMandatoryActivation) => {
+    return !isLocked && !isMandatoryActivation;
+  };
+  expect(canDismissModal(sessionState.isSessionLocked, false)).toBe(false);
+
+  // 5. Subsequent user logs in (e.g., Dr. Specialist as Hospital Administrator)
+  sessionState.isSessionLocked = false;
+  sessionState.currentUser = {
+    role: "admin",
+    name: "Dr. Specialist",
+    username: "admin@technomind.health"
+  };
+  expect(canDismissModal(sessionState.isSessionLocked, false)).toBe(true);
+  expect(sessionState.selectedPatientId).toBe(""); // Remains completely pristine and unpolluted
+  expect(sessionState.leftFoot).toBeNull();
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

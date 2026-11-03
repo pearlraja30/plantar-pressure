@@ -21,6 +21,7 @@ import {
   Sparkles,
   Building2,
   User,
+  LogOut,
 } from 'lucide-react';
 import { SystemUserSession, dbService, APP_CURRENT_VERSION } from '../../services/dbService';
 import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken } from '../../types';
@@ -37,7 +38,9 @@ interface PodoLoadRoleModalProps {
     hospitalId?: string,
     hospitalName?: string
   ) => void;
+  onLogout?: () => void;
   isMandatoryActivation?: boolean;
+  isSessionLocked?: boolean;
   activationReason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician';
   initialAdminMode?: boolean;
 }
@@ -47,7 +50,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   onClose,
   currentUser,
   onSelectRole,
+  onLogout,
   isMandatoryActivation = false,
+  isSessionLocked = false,
   activationReason,
   initialAdminMode = false,
 }) => {
@@ -494,6 +499,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       : activationReason === 'new_device'
                       ? 'New Hardware Device Detected — Registration Required'
                       : 'Station Activation & Enrollment Required'
+                    : isSessionLocked
+                    ? 'Station Locked — Authentication Required'
                     : isAdminContext
                     ? 'Hospital Administrator Portal'
                     : 'Clinical Technician Station Sign-In'}
@@ -507,13 +514,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     ? 'Single-device license policy active. Upgraded multi-device license required.'
                     : isMandatoryActivation
                     ? 'Security Policy: Enter your Clinic Code and Activation Voucher to authorize this station before proceeding with clinical examinations.'
+                    : isSessionLocked
+                    ? 'Station session signed out. Enter your User ID and Password/PIN to unlock and begin a completely fresh session.'
                     : isAdminContext
                     ? 'Authenticate with your Master Password for clinic administration, technician management, and system setup.'
                     : 'Sign in with your Technician User ID & Password assigned by your Hospital Administrator.'}
                 </p>
               </div>
             </div>
-            {!isMandatoryActivation && (
+            {!isMandatoryActivation && !isSessionLocked && (
               <button
                 type="button"
                 className="podoload-modal-close-btn"
@@ -527,6 +536,50 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
           {/* Modal Body */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem 0' }}>
+            {/* Active Session Info Banner with Sign Out */}
+            {!isSessionLocked && !isMandatoryActivation && onLogout && recoveryMode === 'none' && !deviceLockout && (
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: '#334155' }}>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                  <span>
+                    Currently active: <strong>{currentUser.name}</strong> ({currentUser.role === 'admin' ? 'Administrator' : 'Technician'})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.2rem 0.55rem',
+                    backgroundColor: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '4px',
+                    color: '#b91c1c',
+                    fontSize: '0.66rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Sign out of station session and purge in-memory patient data"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+
             {/* MANDATORY ACTIVATION NOTICE */}
             {isMandatoryActivation && (
               <div
@@ -1639,7 +1692,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {!isMandatoryActivation && (
+                    {!isMandatoryActivation && !isSessionLocked && (
                       <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
                         Cancel
                       </button>
@@ -1658,7 +1711,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               ) : (
                 /* Normal Technician Flow: 100% Clean Kiosk (Zero Visible Admin Clutter) */
                 <>
-                  {!isMandatoryActivation && (
+                  {!isMandatoryActivation && !isSessionLocked && (
                     <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
                       Cancel
                     </button>

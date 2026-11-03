@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   UserCheck,
   Database,
+  LogOut,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
@@ -36,6 +37,7 @@ interface PodoLoadSidebarProps {
   onStartNewExam: () => void;
   currentUser?: SystemUserSession;
   onOpenUserSwitcher?: (mode?: 'admin' | 'technician') => void;
+  onLogout?: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -46,6 +48,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
   onStartNewExam,
   currentUser = SYSTEM_ACCOUNTS.admin,
   onOpenUserSwitcher,
+  onLogout,
   isOpenMobile = false,
   onCloseMobile,
 }) => {
@@ -242,19 +245,49 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
           if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'admin' ? 'admin' : 'technician');
           if (onCloseMobile) onCloseMobile();
         }}
-        title="Click to switch between Hospital Administrator and Clinical Technician"
+        title="Click to switch active user account"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          {currentUser?.role === 'admin' ? (
-            <ShieldCheck className="w-4 h-4 text-teal-400" />
-          ) : (
-            <UserCheck className="w-4 h-4 text-cyan-400" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            {currentUser?.role === 'admin' ? (
+              <ShieldCheck className="w-4 h-4 text-teal-400" />
+            ) : (
+              <UserCheck className="w-4 h-4 text-cyan-400" />
+            )}
+            <span className="podoload-sidebar-user-role">
+              {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
+            </span>
+          </div>
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onLogout();
+                if (onCloseMobile) onCloseMobile();
+              }}
+              title="Sign out and lock station"
+              style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#f87171',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Log Out</span>
+            </button>
           )}
-          <span className="podoload-sidebar-user-role">
-            {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
-          </span>
         </div>
-        <div className="podoload-sidebar-user-name">{currentUser?.name}</div>
+        <div className="podoload-sidebar-user-name" style={{ marginTop: '2px' }}>{currentUser?.name}</div>
         <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
       </div>
 
