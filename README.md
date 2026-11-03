@@ -188,6 +188,7 @@ The system includes an automated clinical verification battery covering all test
 ## 📚 Enterprise Documentation & Architectural Roadmaps
 
 For detailed clinical, architectural, and developer references, consult the following comprehensive manuals:
+* 📄 [**`CROSS_PLATFORM_OPERATIONS_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CROSS_PLATFORM_OPERATIONS_MANUAL.md) — Complete cross-platform operations guide covering Microsoft Windows Desktop (`.exe`), Google Android (`.apk`), and Apple iOS iPhone/iPad (`.ipa`), hardware scanners, mobile camera gyros, discreet admin routing, and packaging.
 * 📄 [**`POSTGRESQL_3TIER_MIGRATION_PLAN.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/POSTGRESQL_3TIER_MIGRATION_PLAN.md) — 3-Tier Distributed Architecture (Multi-platform Clients, Microservices, PostgreSQL 16+ & Cloud S3 Object Storage) with complete DDL schemas, migration scripts, and sync protocols.
 * 📄 [**`ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md) — Clean Hexagonal Architecture, HAL, 10-Zone AI segmentation model, storage engines, and regulatory compliance.
 * 📄 [**`DEVELOPER_REFERENCE_GUIDE.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/DEVELOPER_REFERENCE_GUIDE.md) — Comprehensive developer cookbook, computer vision pipeline, biomechanical indices, schema migration, and testing recipes.
