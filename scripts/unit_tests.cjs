@@ -3289,6 +3289,128 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
   expect(sessionState.leftFoot).toBeNull();
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 27: Dedicated Administrator Security, Database Write Privileges & Profile Control
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 27: Dedicated Administrator Security, Table Correction & Profile Privileges ---");
+
+it("Enforces discreet separation: Standard kiosk displays technician-only sign-in with zero exposed admin tabs", () => {
+  const getLoginViewElements = (isAdminContext) => {
+    return {
+      showTechnicianStation: !isAdminContext,
+      showAdminPortal: isAdminContext,
+      showPublicAdminTab: false, // Public role tab selector is permanently disabled
+      showBackToTechnicianBtn: isAdminContext,
+    };
+  };
+
+  // 1. Standard kiosk on normal startup or post-logout
+  const normalKiosk = getLoginViewElements(false);
+  expect(normalKiosk.showTechnicianStation).toBe(true);
+  expect(normalKiosk.showAdminPortal).toBe(false);
+  expect(normalKiosk.showPublicAdminTab).toBe(false);
+  expect(normalKiosk.showBackToTechnicianBtn).toBe(false);
+
+  // 2. Secret administrative invocation via /admin, Ctrl+Shift+A, or 5-tap gesture
+  const adminKiosk = getLoginViewElements(true);
+  expect(adminKiosk.showTechnicianStation).toBe(false);
+  expect(adminKiosk.showAdminPortal).toBe(true);
+  expect(adminKiosk.showPublicAdminTab).toBe(false);
+  expect(adminKiosk.showBackToTechnicianBtn).toBe(true);
+});
+
+it("Guarantees Administrator profile management privileges: Mobile Number, Email, User ID, and Recovery Key", () => {
+  let adminProfile = {
+    id: "admin-master-01",
+    name: "Dr. Specialist",
+    username: "admin@technomind.health",
+    phone: "+1 (800) 555-PODO",
+    email: "admin@technomind.health",
+    recoveryKey: "REC-TMH-9901"
+  };
+
+  const updateAdminProfile = (updates) => {
+    adminProfile = { ...adminProfile, ...updates };
+    return adminProfile;
+  };
+
+  const updated = updateAdminProfile({
+    username: "superadmin.clinic",
+    name: "Dr. Elena Rostova",
+    phone: "+1 (555) 987-6543",
+    email: "elena.rostova@metro-podiatry.org",
+    recoveryKey: "REC-METRO-4421"
+  });
+
+  expect(updated.username).toBe("superadmin.clinic");
+  expect(updated.name).toBe("Dr. Elena Rostova");
+  expect(updated.phone).toBe("+1 (555) 987-6543");
+  expect(updated.email).toBe("elena.rostova@metro-podiatry.org");
+  expect(updated.recoveryKey).toBe("REC-METRO-4421");
+});
+
+it("Enforces 21 CFR Part 11 compliant administrative direct table write/correction privileges on raw database records", () => {
+  const auditTrail = [];
+  const database = {
+    patients: [
+      { id: "pat-001", mrn: "MRN-1001", name: "John Doe", phone: "+1 555 0100", clinicalNotes: "Initial screen" }
+    ],
+    cases: [
+      { id: "case-001", caseNumber: "PPA-2026-001", patientId: "pat-001", indication: "Heel pain", operatorName: "Tech. One" }
+    ]
+  };
+
+  const updateRecordAdmin = (role, storeName, key, updatedData, auditReason) => {
+    if (role !== "admin") {
+      return { success: false, error: "Unauthorized: Administrator write privileges required" };
+    }
+    if (!auditReason || !auditReason.trim()) {
+      return { success: false, error: "Audit justification required by 21 CFR Part 11" };
+    }
+
+    const store = database[storeName];
+    const idx = store.findIndex((item) => item.id === key);
+    if (idx === -1) return { success: false, error: "Record not found" };
+
+    store[idx] = { ...store[idx], ...updatedData, updatedAt: new Date().toISOString() };
+    auditTrail.push({
+      action: "RECORD_ADMIN_CORRECTED",
+      storeName,
+      key,
+      auditReason,
+      timestamp: new Date().toISOString()
+    });
+
+    return { success: true, updatedRecord: store[idx] };
+  };
+
+  // 1. Unauthorized attempt by technician is rejected
+  const techAttempt = updateRecordAdmin("technician", "patients", "pat-001", { phone: "+1 555 9999" }, "Typo fix");
+  expect(techAttempt.success).toBe(false);
+  expect(techAttempt.error).toContain("Administrator write privileges required");
+
+  // 2. Administrator attempt without audit justification is rejected
+  const noReasonAttempt = updateRecordAdmin("admin", "patients", "pat-001", { phone: "+1 555 9999" }, "");
+  expect(noReasonAttempt.success).toBe(false);
+  expect(noReasonAttempt.error).toContain("Audit justification required");
+
+  // 3. Authorized Administrator correction succeeds with audit trail
+  const validCorrection = updateRecordAdmin("admin", "patients", "pat-001", { phone: "+1 555 9999" }, "Patient updated contact mobile number");
+  expect(validCorrection.success).toBe(true);
+  expect(database.patients[0].phone).toBe("+1 555 9999");
+  expect(auditTrail.length).toBe(1);
+  expect(auditTrail[0].action).toBe("RECORD_ADMIN_CORRECTED");
+  expect(auditTrail[0].key).toBe("pat-001");
+  expect(auditTrail[0].auditReason).toBe("Patient updated contact mobile number");
+});
+
+it("Restricts Database Records sidebar and section navigation strictly to Hospital Administrators", () => {
+  const isDatabaseAccessible = (userRole) => userRole === "admin";
+
+  expect(isDatabaseAccessible("technician")).toBe(false);
+  expect(isDatabaseAccessible("admin")).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

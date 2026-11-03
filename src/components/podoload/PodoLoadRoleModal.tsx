@@ -1106,73 +1106,57 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             ) : (
               /* VIEW 3: SEPARATED CONTEXT (Admin Portal vs Clinical Technician Login) */
               <>
-                {/* Role Selector Tabs (Clinical Technician vs Hospital Administrator) */}
-                {!isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
+                {/* Dedicated Administrator Portal Header (Shown ONLY when Admin mode is unlocked via /admin, Ctrl+Shift+A, or 5-tap gesture) */}
+                {isAdminContext && !isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
                   <div
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '0.45rem',
-                      backgroundColor: '#f1f5f9',
-                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#f0fdfa',
+                      border: '1px solid #99f6e4',
+                      padding: '0.55rem 0.75rem',
                       borderRadius: '8px',
-                      marginBottom: '0.25rem',
+                      marginBottom: '0.35rem',
                     }}
                   >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <ShieldCheck className="w-4 h-4 text-teal-600" />
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f766e' }}>
+                        Hospital Administrator Portal (Master Session)
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => {
                         setIsAdminContext(false);
                         setSelectedRole('technician');
                         setPinError(null);
+                        if (typeof window !== 'undefined' && (window.location.hash.includes('admin') || window.location.search.includes('admin'))) {
+                          try {
+                            window.history.replaceState(null, '', window.location.pathname);
+                          } catch {
+                            // ignore
+                          }
+                        }
                       }}
                       style={{
+                        background: '#ffffff',
+                        border: '1px solid #99f6e4',
+                        color: '#0f766e',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.45rem',
-                        padding: '0.55rem 0.75rem',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: !isAdminContext ? '#ffffff' : 'transparent',
-                        color: !isAdminContext ? '#0f766e' : '#64748b',
-                        fontWeight: !isAdminContext ? 800 : 600,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        boxShadow: !isAdminContext ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        transition: 'all 0.15s ease',
+                        gap: '0.3rem',
                       }}
                     >
-                      <UserCheck className="w-4 h-4" />
-                      <span>Clinical Technician</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAdminContext(true);
-                        setSelectedRole('admin');
-                        setPinError(null);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.45rem',
-                        padding: '0.55rem 0.75rem',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: isAdminContext ? '#ffffff' : 'transparent',
-                        color: isAdminContext ? '#0f766e' : '#64748b',
-                        fontWeight: isAdminContext ? 800 : 600,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        boxShadow: isAdminContext ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Hospital Administrator</span>
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to Technician Login</span>
                     </button>
                   </div>
                 )}
@@ -1212,7 +1196,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                           {registeredAdmin
-                            ? `${registeredAdmin.username} · ${registeredAdmin.name}`
+                            ? `${registeredAdmin.username} · ${registeredAdmin.name}${registeredAdmin.phone ? ` · 📞 ${registeredAdmin.phone}` : ''}`
                             : 'admin@technomind.health · Hospital Administrator'}
                         </div>
                       </div>
@@ -1347,20 +1331,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {currentUser.role === 'technician' && (
-                        <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
-                          Active
-                        </span>
-                      )}
-                      <div
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '50%',
-                          border: selectedRole === 'technician' ? '5px solid #0d9488' : '2px solid #cbd5e1',
-                          backgroundColor: '#fff',
-                        }}
-                      />
+                      <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
+                        ● Authorized Diagnostic Station
+                      </span>
                     </div>
                   </div>
 

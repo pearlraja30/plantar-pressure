@@ -115,6 +115,9 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [adminAccount, setAdminAccount] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
   const [desiredAdminUsername, setDesiredAdminUsername] = useState(adminAccount.username);
   const [desiredAdminName, setDesiredAdminName] = useState(adminAccount.name);
+  const [adminPhoneInput, setAdminPhoneInput] = useState(adminAccount.phone || '+1 (800) 555-PODO');
+  const [adminEmailInput, setAdminEmailInput] = useState(adminAccount.email || adminAccount.username);
+  const [adminRecoveryKeyInput, setAdminRecoveryKeyInput] = useState(adminAccount.recoveryKey || 'REC-TMH-9901');
   const [auditLogs, setAuditLogs] = useState<AuditEvent[]>(() => dbService.getAuditLogsSync());
 
   // Admin Master Password Change State (Masked & Security Protected)
@@ -491,10 +494,16 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       alert('Admin User ID cannot be empty');
       return;
     }
-    const updated = dbService.updateAdminUsername(desiredAdminUsername.trim(), desiredAdminName.trim());
+    const updated = dbService.updateAdminProfile({
+      username: desiredAdminUsername.trim(),
+      name: desiredAdminName.trim(),
+      phone: adminPhoneInput.trim(),
+      email: adminEmailInput.trim(),
+      recoveryKey: adminRecoveryKeyInput.trim(),
+    });
     setAdminAccount(updated);
     setAuditLogs(dbService.getAuditLogsSync());
-    setSaveSuccess(`✓ Admin User ID updated to "${updated.username}". Future logins require this User ID.`);
+    setSaveSuccess(`✓ Administrator profile & contact credentials updated! User ID: "${updated.username}", Mobile: "${updated.phone || '—'}".`);
     setTimeout(() => setSaveSuccess(null), 4000);
   };
 
@@ -2958,10 +2967,12 @@ STEP 2: RETURNING STATION SESSIONS
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
                 <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
-                  <div style={{ fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>Active Session</div>
+                  <div style={{ fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>Active Administrator Profile</div>
                   <div>User ID: <strong>{adminAccount.username}</strong></div>
                   <div>Administrator: <strong>{adminAccount.name}</strong></div>
-                  <div>Authentication: <strong>PIN &amp; Device Bound (Session Active)</strong></div>
+                  <div>Mobile / Phone: <strong>{adminAccount.phone || '—'}</strong></div>
+                  <div>Official Email: <strong>{adminAccount.email || adminAccount.username}</strong></div>
+                  <div>Recovery Key: <code style={{ color: '#0f766e', fontWeight: 700 }}>{adminAccount.recoveryKey || 'REC-TMH-9901'}</code></div>
                 </div>
 
                 <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
@@ -2973,7 +2984,7 @@ STEP 2: RETURNING STATION SESSIONS
                 </div>
               </div>
 
-              {/* Administrator Identity & Desired User ID Setting */}
+              {/* Administrator Identity & Profile Configuration */}
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -2989,19 +3000,19 @@ STEP 2: RETURNING STATION SESSIONS
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <ShieldCheck className="w-4 h-4 text-teal-600" />
                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
-                      Administrator Identity &amp; Desired User ID Configuration
+                      Administrator Identity, Mobile Number &amp; Contact Profile
                     </span>
                   </div>
                   <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
-                    Login Credentials Bound
+                    Master Privileges Active
                   </span>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                  Configure your desired Administrator User ID. This User ID is required alongside your Master Password at login time.
+                  Administrators have full privileges to update their User ID, mobile phone number, official email, and emergency recovery key. These are used for password resets and two-factor station authorization.
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr auto', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem', alignItems: 'flex-end' }}>
                   <div className="podoload-form-group">
-                    <label className="podoload-label">Desired Admin User ID / Username *</label>
+                    <label className="podoload-label">Admin User ID / Username *</label>
                     <input
                       type="text"
                       className="podoload-input"
@@ -3020,13 +3031,46 @@ STEP 2: RETURNING STATION SESSIONS
                       onChange={(e) => setDesiredAdminName(e.target.value)}
                     />
                   </div>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Admin Mobile / Phone Number *</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. +1 (800) 555-PODO"
+                      value={adminPhoneInput}
+                      onChange={(e) => setAdminPhoneInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Admin Official Email Address</label>
+                    <input
+                      type="email"
+                      className="podoload-input"
+                      placeholder="e.g. admin@technomind.health"
+                      value={adminEmailInput}
+                      onChange={(e) => setAdminEmailInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="podoload-form-group">
+                    <label className="podoload-label">Security Recovery Key</label>
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. REC-TMH-9901"
+                      value={adminRecoveryKeyInput}
+                      onChange={(e) => setAdminRecoveryKeyInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
                   <button
                     type="button"
                     className="podoload-btn-primary podoload-btn-sm"
                     onClick={handleSaveAdminProfile}
-                    style={{ whiteSpace: 'nowrap', height: '32px' }}
+                    style={{ whiteSpace: 'nowrap', height: '34px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    Save User ID
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Administrator Profile &amp; Contact Details</span>
                   </button>
                 </div>
               </div>

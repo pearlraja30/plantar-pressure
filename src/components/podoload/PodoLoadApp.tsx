@@ -1290,18 +1290,38 @@ export function PodoLoadApp() {
             />
           )}
 
-          {/* RECORDS: Inbuilt Database Explorer */}
+          {/* RECORDS: Inbuilt Database Explorer (Hospital Administrator ONLY) */}
           {currentSection === 'database' && (
-            <PodoLoadDatabaseViewer
-              onSelectPatient={(p) => {
-                setSelectedPatientId(p.id);
-                setCurrentStep(1);
-                setCurrentSection('registration');
-              }}
-              onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
-              onOpenSettings={() => setCurrentSection('settings')}
-              onOpenAdmin={handleOpenAdminSection}
-            />
+            currentUser.role === 'admin' ? (
+              <PodoLoadDatabaseViewer
+                onSelectPatient={(p) => {
+                  setSelectedPatientId(p.id);
+                  setCurrentStep(1);
+                  setCurrentSection('registration');
+                }}
+                onSelectReport={(cid, step = 5) => handleSelectReport(cid, step)}
+                onOpenSettings={() => setCurrentSection('settings')}
+                onOpenAdmin={handleOpenAdminSection}
+              />
+            ) : (
+              <div className="podoload-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', margin: '2rem auto', maxWidth: '520px' }}>
+                <ShieldAlert className="w-12 h-12 text-amber-500" style={{ margin: '0 auto 0.75rem auto' }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0c2328', margin: '0 0 0.5rem 0' }}>
+                  Hospital Administrator Access Required
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+                  The raw database records and table editor are strictly restricted to Hospital Administrators. Clinical technicians cannot view, access, or modify raw database tables.
+                </p>
+                <button
+                  type="button"
+                  className="podoload-btn-secondary"
+                  onClick={() => setCurrentSection('patient_search')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', margin: '0 auto' }}
+                >
+                  Return to Patient Records
+                </button>
+              </div>
+            )
           )}
 
           {/* ADMINISTRATION: Hospital & Admin */}

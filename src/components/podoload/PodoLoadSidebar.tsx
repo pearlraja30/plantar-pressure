@@ -177,7 +177,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
               <span>Reports and cloud</span>
             </button>
 
-            {!isMobileDevice && (
+            {!isMobileDevice && currentUser?.role === 'admin' && (
               <button
                 type="button"
                 className={`podoload-nav-item ${currentSection === 'database' ? 'active' : ''}`}
@@ -185,6 +185,9 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
               >
                 <Database className="podoload-nav-item-icon" />
                 <span>Database records</span>
+                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem', marginLeft: 'auto', padding: '1px 5px' }}>
+                  Admin
+                </span>
               </button>
             )}
           </nav>

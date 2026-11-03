@@ -2323,13 +2323,28 @@ class PodoPressDatabase {
     return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
   }
 
-  public updateAdminUsername(newUsername: string, newName?: string): AdminAccount {
+  public updateAdminProfile(params: {
+    username?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+    recoveryKey?: string;
+  }): AdminAccount {
     const admin = this.getAdminAccountSync();
-    if (newUsername.trim()) {
-      admin.username = newUsername.trim().toLowerCase();
+    if (params.username && params.username.trim()) {
+      admin.username = params.username.trim().toLowerCase();
     }
-    if (newName && newName.trim()) {
-      admin.name = newName.trim();
+    if (params.name && params.name.trim()) {
+      admin.name = params.name.trim();
+    }
+    if (params.phone !== undefined) {
+      admin.phone = params.phone.trim();
+    }
+    if (params.email !== undefined) {
+      admin.email = params.email.trim();
+    }
+    if (params.recoveryKey && params.recoveryKey.trim()) {
+      admin.recoveryKey = params.recoveryKey.trim().toUpperCase();
     }
     try {
       localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(admin));
@@ -2342,14 +2357,136 @@ class PodoPressDatabase {
       // Ignore
     }
     logAuditEvent(
-      'ADMIN_USERID_UPDATED',
-      `Administrator profile updated: Desired User ID "${admin.username}", Name "${admin.name}".`,
+      'ADMIN_PROFILE_UPDATED',
+      `Administrator profile updated: Name "${admin.name}", User ID "${admin.username}", Phone "${admin.phone || '—'}", Email "${admin.email || '—'}".`,
       admin.username,
       undefined,
       'info',
       'admin'
     );
     return admin;
+  }
+
+  public updateAdminUsername(newUsername: string, newName?: string): AdminAccount {
+    return this.updateAdminProfile({ username: newUsername, name: newName });
+  }
+
+  /**
+   * Updates an arbitrary database table record directly (Hospital Administrator ONLY).
+   * Supports: patients, cases, technicians, admin_accounts, bound_devices, settings.
+   * Enforces 21 CFR Part 11 immutable audit trail of administrative corrections.
+   */
+  public async updateRecordAdmin(
+    storeName: 'patients' | 'cases' | 'technicians' | 'admin_accounts' | 'bound_devices' | 'settings',
+    key: string,
+    updatedData: any,
+    auditReason: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const activeUser = this.getActiveUserSync();
+    if (activeUser.role !== 'admin') {
+      return {
+        success: false,
+        error: 'Unauthorized access: Only Hospital Administrators hold write & correction privileges on raw database tables.',
+      };
+    }
+
+    if (!auditReason || !auditReason.trim()) {
+      return {
+        success: false,
+        error: 'Audit compliance requirement: Please provide a clinical reason or justification for this administrative correction.',
+      };
+    }
+
+    try {
+      switch (storeName) {
+        case 'patients': {
+          const patient: Patient = {
+            ...updatedData,
+            id: key,
+            updatedAt: new Date().toISOString(),
+          };
+          await this.savePatient(patient);
+          break;
+        }
+
+        case 'cases': {
+          const examCase: AnalysisCase = {
+            ...updatedData,
+            id: key,
+            updatedAt: new Date().toISOString(),
+          };
+          await this.saveCase(examCase);
+          break;
+        }
+
+        case 'technicians': {
+          const tech: TechnicianUser = {
+            ...updatedData,
+            id: key,
+          };
+          await this.saveTechnician(tech);
+          break;
+        }
+
+        case 'admin_accounts': {
+          const list = this.getAdminAccountsListSync();
+          const idx = list.findIndex((a) => a.username === key || a.id === key);
+          const updatedAdmin: AdminAccount = {
+            ...(idx >= 0 ? list[idx] : {}),
+            ...updatedData,
+          };
+          if (idx >= 0) {
+            list[idx] = updatedAdmin;
+          } else {
+            list.push(updatedAdmin);
+          }
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+          const currentPrimary = this.getAdminAccountSync();
+          if (currentPrimary.id === updatedAdmin.id || currentPrimary.username === updatedAdmin.username) {
+            localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(updatedAdmin));
+          }
+          break;
+        }
+
+        case 'bound_devices': {
+          const boundDev: BoundDevice = {
+            ...updatedData,
+            id: key,
+          };
+          deviceBindingService.updateBoundDevice(boundDev);
+          break;
+        }
+
+        case 'settings': {
+          const db = await this.initDatabase();
+          if (db && db.objectStoreNames.contains('settings')) {
+            const tx = db.transaction('settings', 'readwrite');
+            tx.objectStore('settings').put(updatedData, key);
+          }
+          if (key === 'app_settings') {
+            localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(updatedData));
+          }
+          break;
+        }
+
+        default:
+          return { success: false, error: `Unsupported database store: ${storeName}` };
+      }
+
+      logAuditEvent(
+        'RECORD_ADMIN_CORRECTED',
+        `Admin ${activeUser.name} (${activeUser.username}) executed direct database table correction on "${storeName}" [ID: ${key}]. Reason: "${auditReason.trim()}".`,
+        activeUser.username,
+        key,
+        'security',
+        'admin'
+      );
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Failed to correct database record:', err);
+      return { success: false, error: err?.message || 'Database write error' };
+    }
   }
 
   public updateAdminMasterPassword(

@@ -143,6 +143,24 @@ class DeviceBindingService {
   }
 
   /**
+   * Updates an existing bound device record directly (Administrator privilege).
+   */
+  public updateBoundDevice(updatedDevice: BoundDevice): boolean {
+    try {
+      const devices = this.getBoundDevices();
+      const idx = devices.findIndex((d) => d.id === updatedDevice.id);
+      if (idx >= 0) {
+        devices[idx] = { ...devices[idx], ...updatedDevice };
+        localStorage.setItem(LS_KEYS.BOUND_DEVICES, JSON.stringify(devices));
+        return true;
+      }
+    } catch {
+      // Fallback
+    }
+    return false;
+  }
+
+  /**
    * Retrieves the current multi-device license quota and billing status.
    */
   public getDeviceLicense(): DeviceLicense {
