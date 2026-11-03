@@ -86,6 +86,15 @@ if (fs.existsSync(IOS_PLIST_PATH)) {
   console.log(`✓ Updated ios/App/App/Info.plist -> CFBundleShortVersionString "${newVersion}", CFBundleVersion "${newBuild}"`);
 }
 
+// 5. Update src/services/dbService.ts (APP_CURRENT_VERSION)
+const DB_SERVICE_PATH = path.join(ROOT_DIR, 'src', 'services', 'dbService.ts');
+if (fs.existsSync(DB_SERVICE_PATH)) {
+  let dbContent = fs.readFileSync(DB_SERVICE_PATH, 'utf8');
+  dbContent = dbContent.replace(/export const APP_CURRENT_VERSION = '[\d.]+';/, `export const APP_CURRENT_VERSION = '${newVersion}';`);
+  fs.writeFileSync(DB_SERVICE_PATH, dbContent, 'utf8');
+  console.log(`✓ Updated src/services/dbService.ts -> APP_CURRENT_VERSION "${newVersion}"`);
+}
+
 console.log(`\n🎉 All platforms updated to version ${newVersion}!`);
 console.log(`\nTo trigger the automated multi-platform release on GitHub Actions, run:`);
 console.log(`  git commit -am "chore(release): bump version to ${newVersion}"`);
