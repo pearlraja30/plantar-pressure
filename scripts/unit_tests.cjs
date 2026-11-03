@@ -3270,17 +3270,9 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
   expect(sessionState.currentSection).toBe("registration");
   expect(sessionState.isSessionLocked).toBe(true);
 
-  // 4. Verify window close behavior: User can close window (!isMandatoryActivation) to view safe Station Standby
-  const canDismissModal = (isMandatoryActivation) => {
-    return !isMandatoryActivation;
-  };
-  expect(canDismissModal(false)).toBe(true);
-  expect(canDismissModal(true)).toBe(false); // only mandatory hardware activation blocks closing
-
-  // Closing the modal leaves the station in safe standby with zero stale patient data
-  expect(sessionState.isSessionLocked).toBe(true);
-  expect(sessionState.selectedPatientId).toBe("");
-  expect(sessionState.leftFoot).toBeNull();
+  // 4. Verify menu isolation: When signed out, application renders ONLY the Login Screen (Zero menus visible)
+  const isMenuVisible = (isSessionLocked) => !isSessionLocked;
+  expect(isMenuVisible(sessionState.isSessionLocked)).toBe(false);
 
   // 5. Subsequent user logs in (e.g., Dr. Specialist as Hospital Administrator)
   sessionState.isSessionLocked = false;
@@ -3289,7 +3281,10 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
     name: "Dr. Specialist",
     username: "admin@technomind.health"
   };
-  expect(canDismissModal(false)).toBe(true);
+  storage.set("ppa_active_user", JSON.stringify(sessionState.currentUser));
+
+  // Menus and application shell are restored upon successful authentication
+  expect(isMenuVisible(sessionState.isSessionLocked)).toBe(true);
   expect(sessionState.selectedPatientId).toBe(""); // Remains completely pristine and unpolluted
   expect(sessionState.leftFoot).toBeNull();
 });

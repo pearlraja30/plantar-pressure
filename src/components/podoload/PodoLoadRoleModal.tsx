@@ -461,10 +461,114 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   return (
     <>
-      <div className="podoload-modal-backdrop" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div
+        className={isSessionLocked ? 'podoload-fullscreen-auth' : 'podoload-modal-backdrop'}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={
+          isSessionLocked
+            ? {
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                backgroundColor: '#09131f',
+                backgroundImage:
+                  'radial-gradient(ellipse at 50% 15%, rgba(13, 148, 136, 0.22), transparent 60%), linear-gradient(180deg, #070e18 0%, #0c1827 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem 1rem',
+                boxSizing: 'border-box',
+                overflowY: 'auto',
+              }
+            : undefined
+        }
+      >
+        {/* Brand Banner at Top of Login Screen (Only in Full-Screen Login) */}
+        {isSessionLocked && (
+          <div
+            style={{
+              maxWidth: '560px',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(13, 148, 136, 0.25)',
+                  border: '1.5px solid #14b8a6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#2dd4bf',
+                }}
+              >
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                  PodoPress
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span>Technomind Healthcare Systems</span>
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>● 100% Offline Ready</span>
+                </div>
+              </div>
+            </div>
+
+            {typeof window !== 'undefined' && (window as any).electronAPI && (
+              <button
+                type="button"
+                onClick={() => {
+                  if ((window as any).electronAPI?.quitApp) {
+                    (window as any).electronAPI.quitApp();
+                  } else {
+                    window.close();
+                  }
+                }}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  borderRadius: '6px',
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+                title="Exit and completely quit PodoPress"
+              >
+                <span>⏻ Exit App</span>
+              </button>
+            )}
+          </div>
+        )}
+
         <div
           className="podoload-modal-box"
-          style={{ maxWidth: '640px', width: '92%', maxHeight: '92vh', overflowY: 'auto' }}
+          style={{
+            maxWidth: '560px',
+            width: '100%',
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: isSessionLocked
+              ? '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08)'
+              : undefined,
+            maxHeight: isSessionLocked ? '88vh' : '92vh',
+            overflowY: 'auto',
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
@@ -521,7 +625,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 </p>
               </div>
             </div>
-            {!isMandatoryActivation && (
+            {!isMandatoryActivation && !isSessionLocked && (
               <button
                 type="button"
                 className="podoload-modal-close-btn"
@@ -1704,13 +1808,13 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             <div className="podoload-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               {/* Modal Actions Footer: Close/Exit on Left, Primary Auth on Right */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                {!isMandatoryActivation && (
+                {!isMandatoryActivation && !isSessionLocked && (
                   <button
                     type="button"
                     className="podoload-btn-secondary"
                     onClick={onClose}
                     style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    title="Close this sign-in dialog"
+                    title="Close this modal dialog"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Close Window</span>
@@ -1792,6 +1896,21 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Footer Regulatory & Compliance note on Full-Screen Login */}
+        {isSessionLocked && (
+          <div
+            style={{
+              marginTop: '1.25rem',
+              fontSize: '0.7rem',
+              color: '#64748b',
+              textAlign: 'center',
+              letterSpacing: '0.02em',
+            }}
+          >
+            IEC 62304 Class B SaMD · 21 CFR Part 11 Audit Trail Active · Zero Stale Data Guarantee
+          </div>
+        )}
       </div>
 
       {/* Multi-Device Payment Modal */}

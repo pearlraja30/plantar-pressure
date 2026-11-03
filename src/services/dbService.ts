@@ -2021,6 +2021,19 @@ class PodoPressDatabase {
   // USER LOGIN & ROLE ACCESS CONTROL (ADMIN vs TECHNICIAN)
   // =========================================================================
 
+  public hasActiveSession(): boolean {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.ACTIVE_USER);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Boolean(parsed && (parsed.role === 'admin' || parsed.role === 'technician'));
+      }
+    } catch {
+      // Fallback
+    }
+    return false;
+  }
+
   public getActiveUserSync(): SystemUserSession {
     try {
       const saved = localStorage.getItem(LS_KEYS.ACTIVE_USER);

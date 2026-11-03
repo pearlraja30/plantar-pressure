@@ -273,7 +273,7 @@ export function PodoLoadApp() {
   const [rightHeatmapUrl, setRightHeatmapUrl] = useState<string | null>(null);
   const [leftAnalysis, setLeftAnalysis] = useState<any>(null);
   const [rightAnalysis, setRightAnalysis] = useState<any>(null);
-  const [isSessionLocked, setIsSessionLocked] = useState<boolean>(false);
+  const [isSessionLocked, setIsSessionLocked] = useState<boolean>(() => !dbService.hasActiveSession());
 
   const handlePurgeSessionData = () => {
     // Zero Stale Data Guarantee:
@@ -305,7 +305,7 @@ export function PodoLoadApp() {
     dbService.logoutUser();
     handlePurgeSessionData();
     setIsSessionLocked(true);
-    setIsRoleModalOpen(true);
+    setIsRoleModalOpen(false);
   };
 
   const handleSelectRole = (
@@ -318,6 +318,7 @@ export function PodoLoadApp() {
     // Zero Stale Data: Always ensure clean clinical slate when switching accounts
     handlePurgeSessionData();
     setIsSessionLocked(false);
+    setIsRoleModalOpen(false);
 
     const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
@@ -1112,6 +1113,21 @@ export function PodoLoadApp() {
     setIsScannerWizardOpen(false);
   };
 
+  // Dedicated Full-Screen Login Page when Signed Out (Zero visible menus, zero sidebar, zero headers)
+  if (isSessionLocked) {
+    return (
+      <PodoLoadRoleModal
+        isOpen={true}
+        onClose={() => {}}
+        currentUser={currentUser}
+        onSelectRole={handleSelectRole}
+        onLogout={handleLogout}
+        isSessionLocked={true}
+        initialAdminMode={roleModalAdminMode}
+      />
+    );
+  }
+
   return (
     <div className="podoload-root">
       {/* 1. Left Sidebar Navigation / Mobile Drawer */}
@@ -1161,140 +1177,6 @@ export function PodoLoadApp() {
 
         {/* Scrollable Main Content Area */}
         <main className="podoload-content-viewport">
-          {/* LOGGED-OUT STATION STANDBY SCREEN */}
-          {isSessionLocked ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '68vh',
-                padding: '2rem 1rem',
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: '520px',
-                  width: '100%',
-                  backgroundColor: '#ffffff',
-                  borderRadius: '16px',
-                  padding: '2.5rem 2rem',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '1.25rem',
-                }}
-              >
-                <div
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    backgroundColor: '#f0fdfa',
-                    border: '2px solid #99f6e4',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#0d9488',
-                  }}
-                >
-                  <Lock className="w-8 h-8" />
-                </div>
-
-                <div>
-                  <span
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: '#0d9488',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                    }}
-                  >
-                    {activeHospital.name}
-                  </span>
-                  <h2 style={{ margin: '0.35rem 0 0.5rem 0', fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
-                    Diagnostic Station is in Standby
-                  </h2>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
-                    Workstation session signed out. In-memory patient and examination data has been safely purged. Please authenticate with your assigned credentials to begin clinical examinations.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="podoload-btn-primary"
-                    onClick={() => {
-                      setRoleModalAdminMode(false);
-                      setIsRoleModalOpen(true);
-                    }}
-                    style={{
-                      padding: '0.75rem 1.25rem',
-                      fontSize: '0.86rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    <span>Sign In as Clinical Technician</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="podoload-btn-secondary"
-                    onClick={() => {
-                      setRoleModalAdminMode(true);
-                      setIsRoleModalOpen(true);
-                    }}
-                    style={{
-                      padding: '0.75rem 1.25rem',
-                      fontSize: '0.86rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-teal-600" />
-                    <span>Sign In as Hospital Administrator</span>
-                  </button>
-
-                  {typeof window !== 'undefined' && (window as any).electronAPI && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if ((window as any).electronAPI?.quitApp) {
-                          (window as any).electronAPI.quitApp();
-                        } else {
-                          window.close();
-                        }
-                      }}
-                      style={{
-                        marginTop: '0.5rem',
-                        background: 'none',
-                        border: 'none',
-                        color: '#ef4444',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '0.4rem',
-                      }}
-                    >
-                      ⏻ Exit Application
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
           {/* SCREEN 1: Registration */}
           {currentSection === 'registration' && (
             <PodoLoadRegistration
@@ -1479,8 +1361,6 @@ export function PodoLoadApp() {
               onPurgeAllData={handlePurgeAllStaleData}
               onOpenAdmin={handleOpenAdminSection}
             />
-          )}
-          </>
           )}
         </main>
 
