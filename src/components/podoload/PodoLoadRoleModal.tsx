@@ -21,7 +21,6 @@ import {
   Sparkles,
   Building2,
   User,
-  LogOut,
 } from 'lucide-react';
 import { SystemUserSession, dbService, APP_CURRENT_VERSION } from '../../services/dbService';
 import { TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken } from '../../types';
@@ -490,39 +489,39 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   {recoveryMode === 'admin'
                     ? 'Hospital Administrator — Password Recovery'
                     : recoveryMode === 'technician'
-                    ? 'Clinical Technician — Password Recovery (Admin Authorized)'
-                    : deviceLockout
-                    ? 'Device Binding Security Lockout'
-                    : isMandatoryActivation
-                    ? activationReason === 'new_version'
-                      ? `PodoPress v${APP_CURRENT_VERSION} Update — Activation Required`
-                      : activationReason === 'new_device'
-                      ? 'New Hardware Device Detected — Registration Required'
-                      : 'Station Activation & Enrollment Required'
-                    : isSessionLocked
-                    ? 'Station Locked — Authentication Required'
-                    : isAdminContext
-                    ? 'Hospital Administrator Portal'
-                    : 'Clinical Technician Station Sign-In'}
+                      ? 'Clinical Technician — Password Recovery (Admin Authorized)'
+                      : deviceLockout
+                        ? 'Device Binding Security Lockout'
+                        : isMandatoryActivation
+                          ? activationReason === 'new_version'
+                            ? `PodoPress v${APP_CURRENT_VERSION} Update — Activation Required`
+                            : activationReason === 'new_device'
+                              ? 'New Hardware Device Detected — Registration Required'
+                              : 'Station Activation & Enrollment Required'
+                          : isSessionLocked
+                            ? 'Clinical Diagnostic Station Sign-In'
+                            : isAdminContext
+                            ? 'Hospital Administrator Portal'
+                            : 'Clinical Technician Station Sign-In'}
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
                   {recoveryMode === 'admin'
                     ? 'Verify Security Recovery Key, Clinic Code, or registered phone/email to reset your Master Password'
                     : recoveryMode === 'technician'
-                    ? 'Administrator authorization required to reset clinical technician credentials'
-                    : deviceLockout
-                    ? 'Single-device license policy active. Upgraded multi-device license required.'
-                    : isMandatoryActivation
-                    ? 'Security Policy: Enter your Clinic Code and Activation Voucher to authorize this station before proceeding with clinical examinations.'
-                    : isSessionLocked
-                    ? 'Station session signed out. Enter your User ID and Password/PIN to unlock and begin a completely fresh session.'
-                    : isAdminContext
-                    ? 'Authenticate with your Master Password for clinic administration, technician management, and system setup.'
-                    : 'Sign in with your Technician User ID & Password assigned by your Hospital Administrator.'}
+                      ? 'Administrator authorization required to reset clinical technician credentials'
+                      : deviceLockout
+                        ? 'Single-device license policy active. Upgraded multi-device license required.'
+                        : isMandatoryActivation
+                          ? 'Security Policy: Enter your Clinic Code and Activation Voucher to authorize this station before proceeding with clinical examinations.'
+                          : isSessionLocked
+                            ? 'Select your role and authenticate with your assigned credentials to start a fresh clinical session.'
+                            : isAdminContext
+                            ? 'Authenticate with your Master Password for clinic administration, technician management, and system setup.'
+                            : 'Sign in with your Technician User ID & Password assigned by your Hospital Administrator.'}
                 </p>
               </div>
             </div>
-            {!isMandatoryActivation && !isSessionLocked && (
+            {!isMandatoryActivation && (
               <button
                 type="button"
                 className="podoload-modal-close-btn"
@@ -536,50 +535,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
           {/* Modal Body */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1rem 0' }}>
-            {/* Active Session Info Banner with Sign Out */}
-            {!isSessionLocked && !isMandatoryActivation && onLogout && recoveryMode === 'none' && !deviceLockout && (
-              <div
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.72rem', color: '#334155' }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                  <span>
-                    Currently active: <strong>{currentUser.name}</strong> ({currentUser.role === 'admin' ? 'Administrator' : 'Technician'})
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    padding: '0.2rem 0.55rem',
-                    backgroundColor: '#fee2e2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '4px',
-                    color: '#b91c1c',
-                    fontSize: '0.66rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                  title="Sign out of station session and purge in-memory patient data"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            )}
-
             {/* MANDATORY ACTIVATION NOTICE */}
             {isMandatoryActivation && (
               <div
@@ -601,15 +556,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     {activationReason === 'new_version'
                       ? 'Application Update / New Version Authorization Required'
                       : activationReason === 'new_device'
-                      ? 'New Hardware Device Detected — Authorization Required'
-                      : 'Initial Device Registration Required'}
+                        ? 'New Hardware Device Detected — Authorization Required'
+                        : 'Initial Device Registration Required'}
                   </strong>
                   <div style={{ marginTop: '2px', fontSize: '0.7rem', color: '#78350f', lineHeight: 1.4 }}>
                     {activationReason === 'new_version'
                       ? `PodoPress was updated to build v${APP_CURRENT_VERSION}. Enter your Clinic Code and Activation Voucher to authorize this new release before clinical examinations.`
                       : activationReason === 'new_device'
-                      ? 'This physical device is not yet registered. Enter your Clinic Code and Activation Voucher to bind this terminal for offline clinical scanning.'
-                      : 'Please enter your Clinic Code and Technician Activation Voucher to authorize this device before proceeding with examinations.'}
+                        ? 'This physical device is not yet registered. Enter your Clinic Code and Activation Voucher to bind this terminal for offline clinical scanning.'
+                        : 'Please enter your Clinic Code and Technician Activation Voucher to authorize this device before proceeding with examinations.'}
                   </div>
                 </div>
               </div>
@@ -1046,7 +1001,79 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               </form>
             ) : (
               /* VIEW 3: SEPARATED CONTEXT (Admin Portal vs Clinical Technician Login) */
-              isAdminContext ? (
+              <>
+                {/* Role Selector Tabs (Clinical Technician vs Hospital Administrator) */}
+                {!isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.45rem',
+                      backgroundColor: '#f1f5f9',
+                      padding: '4px',
+                      borderRadius: '8px',
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminContext(false);
+                        setSelectedRole('technician');
+                        setPinError(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: !isAdminContext ? '#ffffff' : 'transparent',
+                        color: !isAdminContext ? '#0f766e' : '#64748b',
+                        fontWeight: !isAdminContext ? 800 : 600,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: !isAdminContext ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>Clinical Technician</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminContext(true);
+                        setSelectedRole('admin');
+                        setPinError(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: isAdminContext ? '#ffffff' : 'transparent',
+                        color: isAdminContext ? '#0f766e' : '#64748b',
+                        fontWeight: isAdminContext ? 800 : 600,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: isAdminContext ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Hospital Administrator</span>
+                    </button>
+                  </div>
+                )}
+
+                {isAdminContext ? (
                 /* Account 1: Hospital Administrator (Dedicated Admin Context) */
                 <div
                   style={{
@@ -1587,7 +1614,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     </div>
                   )}
                 </div>
-              )
+              )}
+            </>
             )}
 
             {pinError && (
@@ -1674,82 +1702,92 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           {/* Modal Actions */}
           {!deviceLockout && recoveryMode === 'none' && (
             <div className="podoload-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              {isAdminContext ? (
-                /* Admin Context Footer: Back to Technician Login on Left, Actions on Right */
-                <>
+              {/* Modal Actions Footer: Close/Exit on Left, Primary Auth on Right */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                {!isMandatoryActivation && (
                   <button
                     type="button"
                     className="podoload-btn-secondary"
-                    onClick={() => {
-                      setIsAdminContext(false);
-                      setSelectedRole('technician');
-                      setPinError(null);
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem' }}
+                    onClick={onClose}
+                    style={{ fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    title="Close this sign-in dialog"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back to Technician Login</span>
+                    <X className="w-3.5 h-3.5" />
+                    <span>Close Window</span>
                   </button>
+                )}
+                {typeof window !== 'undefined' && (window as any).electronAPI && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if ((window as any).electronAPI?.quitApp) {
+                        (window as any).electronAPI.quitApp();
+                      } else {
+                        window.close();
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '0.25rem 0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                    title="Exit and completely quit PodoPress application"
+                  >
+                    <span>⏻ Exit App</span>
+                  </button>
+                )}
+              </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {!isMandatoryActivation && !isSessionLocked && (
-                      <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
-                        Cancel
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="podoload-btn-primary"
-                      onClick={handleSwitchAccount}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Log In as Hospital Administrator</span>
-                    </button>
-                  </div>
-                </>
+              {isAdminContext ? (
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={handleSwitchAccount}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Log In as Hospital Administrator</span>
+                </button>
               ) : (
-                /* Normal Technician Flow: 100% Clean Kiosk (Zero Visible Admin Clutter) */
-                <>
-                  {!isMandatoryActivation && !isSessionLocked && (
-                    <button type="button" className="podoload-btn-secondary" onClick={onClose} style={{ fontSize: '0.76rem' }}>
-                      Cancel
-                    </button>
-                  )}
-
-                  {mobileAuthTab === 'activate' ? (
-                    <button
-                      type="button"
-                      className="podoload-btn-primary"
-                      onClick={handleActivateDevice}
-                      disabled={isActivating || Boolean(actSuccessMsg)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>
-                        {isActivating
-                          ? 'Registering Device...'
-                          : actSuccessMsg
+                mobileAuthTab === 'activate' ? (
+                  <button
+                    type="button"
+                    className="podoload-btn-primary"
+                    onClick={handleActivateDevice}
+                    disabled={isActivating || Boolean(actSuccessMsg)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>
+                      {isActivating
+                        ? 'Registering Device...'
+                        : actSuccessMsg
                           ? '✓ Registered! Logging in...'
                           : '🚀 Authorize & Register Device'}
-                      </span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="podoload-btn-primary"
-                      onClick={handleSwitchAccount}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>
-                        {techUsernameInput.trim()
-                          ? `Log In as ${techUsernameInput.trim()}`
-                          : 'Log In as Clinical Technician'}
-                      </span>
-                    </button>
-                  )}
-                </>
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="podoload-btn-primary"
+                    onClick={handleSwitchAccount}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>
+                      {techUsernameInput.trim()
+                        ? `Log In as ${techUsernameInput.trim()}`
+                        : 'Log In as Clinical Technician'}
+                    </span>
+                  </button>
+                )
               )}
             </div>
           )}

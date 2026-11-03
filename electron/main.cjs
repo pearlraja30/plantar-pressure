@@ -257,6 +257,10 @@ ipcMain.handle('app:get-version', () => {
   };
 });
 
+ipcMain.handle('app:quit', () => {
+  app.quit();
+});
+
 app.whenReady().then(() => {
   createWindow();
 

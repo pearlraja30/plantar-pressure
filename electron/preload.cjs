@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   enumerateScanners: () => ipcRenderer.invoke('scanner:enumerate'),
   openScannerFileDialog: () => ipcRenderer.invoke('scanner:open-file-dialog'),
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  quitApp: () => ipcRenderer.invoke('app:quit'),
 });

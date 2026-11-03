@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ShieldAlert, KeyRound } from 'lucide-react';
+import { ShieldAlert, KeyRound, Lock, ShieldCheck, UserCheck } from 'lucide-react';
 import './podoload.css';
 import { PodoLoadSidebar, PodoLoadNavSection } from './PodoLoadSidebar';
 import { PodoLoadHeader } from './PodoLoadHeader';
@@ -164,8 +164,8 @@ export function PodoLoadApp() {
                 archType.toLowerCase().includes('high') || archType.toLowerCase().includes('cavus')
                   ? 'High Arch (Pes Cavus)'
                   : archType.toLowerCase().includes('flat') || archType.toLowerCase().includes('planus')
-                  ? 'Flat Foot (Pes Planus)'
-                  : 'Normal Arch'
+                    ? 'Flat Foot (Pes Planus)'
+                    : 'Normal Arch'
               ) as RegionalAnalysis['archClassification'],
               chippauxSmirakIndex: 0.42,
               staheliIndex: 0.65,
@@ -432,13 +432,13 @@ export function PodoLoadApp() {
     activeLoadedCase && activeLoadedCase.id === selectedCaseId
       ? activeLoadedCase
       : selectedCaseId
-      ? cases.find((c) => c.id === selectedCaseId)
-      : undefined;
+        ? cases.find((c) => c.id === selectedCaseId)
+        : undefined;
   const selectedPatient = selectedPatientId
     ? patients.find((p) => p.id === selectedPatientId)
     : currentCase?.patientId
-    ? patients.find((p) => p.id === currentCase.patientId)
-    : undefined;
+      ? patients.find((p) => p.id === currentCase.patientId)
+      : undefined;
 
   // Active hospital profile
   const [activeHospital, setActiveHospital] = useState<HospitalProfile>(() => dbService.getActiveHospitalSync());
@@ -746,8 +746,8 @@ export function PodoLoadApp() {
           archType.toLowerCase().includes('high') || archType.toLowerCase().includes('cavus')
             ? 'High Arch (Pes Cavus)'
             : archType.toLowerCase().includes('flat') || archType.toLowerCase().includes('planus')
-            ? 'Flat Foot (Pes Planus)'
-            : 'Normal Arch'
+              ? 'Flat Foot (Pes Planus)'
+              : 'Normal Arch'
         ) as RegionalAnalysis['archClassification'],
         chippauxSmirakIndex: fullCase.regionalAnalysis?.chippauxSmirakIndex || 0.42,
         staheliIndex: fullCase.regionalAnalysis?.staheliIndex || 0.65,
@@ -776,13 +776,13 @@ export function PodoLoadApp() {
         fullCase.categoryDistribution && fullCase.categoryDistribution.length === 6
           ? fullCase.categoryDistribution
           : [
-              { category: 'C1', percentage: 70, areaMm2: 7000 },
-              { category: 'C2', percentage: 10, areaMm2: 1200 },
-              { category: 'C3', percentage: 8.5, areaMm2: 1000 },
-              { category: 'C4', percentage: 5.5, areaMm2: 600 },
-              { category: 'C5', percentage: 4.0, areaMm2: 450 },
-              { category: 'C6', percentage: 2.0, areaMm2: 250 },
-            ];
+            { category: 'C1', percentage: 70, areaMm2: 7000 },
+            { category: 'C2', percentage: 10, areaMm2: 1200 },
+            { category: 'C3', percentage: 8.5, areaMm2: 1000 },
+            { category: 'C4', percentage: 5.5, areaMm2: 600 },
+            { category: 'C5', percentage: 4.0, areaMm2: 450 },
+            { category: 'C6', percentage: 2.0, areaMm2: 250 },
+          ];
 
       const hydratedCase: AnalysisCase = {
         ...fullCase,
@@ -1120,6 +1120,7 @@ export function PodoLoadApp() {
         onNavigate={handleNavClick}
         onStartNewExam={handleStartNewExam}
         currentUser={currentUser}
+        isSessionLocked={isSessionLocked}
         onLogout={handleLogout}
         onOpenUserSwitcher={(mode) => {
           if (mode === 'admin') {
@@ -1151,6 +1152,7 @@ export function PodoLoadApp() {
           doctorName={activeHospital.defaultDoctor || 'Dr. Specialist'}
           clinicName={activeHospital.name}
           currentUser={currentUser}
+          isSessionLocked={isSessionLocked}
           onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
           onLogout={handleLogout}
           onOpenAdmin={handleOpenAdminSection}
@@ -1159,6 +1161,140 @@ export function PodoLoadApp() {
 
         {/* Scrollable Main Content Area */}
         <main className="podoload-content-viewport">
+          {/* LOGGED-OUT STATION STANDBY SCREEN */}
+          {isSessionLocked ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '68vh',
+                padding: '2rem 1rem',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: '520px',
+                  width: '100%',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  padding: '2.5rem 2rem',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1.25rem',
+                }}
+              >
+                <div
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f0fdfa',
+                    border: '2px solid #99f6e4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#0d9488',
+                  }}
+                >
+                  <Lock className="w-8 h-8" />
+                </div>
+
+                <div>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: '#0d9488',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    {activeHospital.name}
+                  </span>
+                  <h2 style={{ margin: '0.35rem 0 0.5rem 0', fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
+                    Diagnostic Station is in Standby
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                    Workstation session signed out. In-memory patient and examination data has been safely purged. Please authenticate with your assigned credentials to begin clinical examinations.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-primary"
+                    onClick={() => {
+                      setRoleModalAdminMode(false);
+                      setIsRoleModalOpen(true);
+                    }}
+                    style={{
+                      padding: '0.75rem 1.25rem',
+                      fontSize: '0.86rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Sign In as Clinical Technician</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => {
+                      setRoleModalAdminMode(true);
+                      setIsRoleModalOpen(true);
+                    }}
+                    style={{
+                      padding: '0.75rem 1.25rem',
+                      fontSize: '0.86rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-teal-600" />
+                    <span>Sign In as Hospital Administrator</span>
+                  </button>
+
+                  {typeof window !== 'undefined' && (window as any).electronAPI && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if ((window as any).electronAPI?.quitApp) {
+                          (window as any).electronAPI.quitApp();
+                        } else {
+                          window.close();
+                        }
+                      }}
+                      style={{
+                        marginTop: '0.5rem',
+                        background: 'none',
+                        border: 'none',
+                        color: '#ef4444',
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '0.4rem',
+                      }}
+                    >
+                      ⏻ Exit Application
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
           {/* SCREEN 1: Registration */}
           {currentSection === 'registration' && (
             <PodoLoadRegistration
@@ -1344,6 +1480,8 @@ export function PodoLoadApp() {
               onOpenAdmin={handleOpenAdminSection}
             />
           )}
+          </>
+          )}
         </main>
 
         {/* Persistent Bottom Status Bar */}
@@ -1402,8 +1540,8 @@ export function PodoLoadApp() {
               {deviceAuthStatus.reason === 'new_version'
                 ? `PodoPress was updated to build v${deviceAuthStatus.currentVersion}. Re-authorization via your Clinic Code and Activation Voucher is required before proceeding.`
                 : deviceAuthStatus.reason === 'new_device'
-                ? `New physical device detected (${deviceAuthStatus.deviceId}). Hardware station pairing with your clinic voucher code is required.`
-                : 'This terminal has not been enrolled. Enter your Clinic Code and Technician Activation Voucher to authorize this station.'}
+                  ? `New physical device detected (${deviceAuthStatus.deviceId}). Hardware station pairing with your clinic voucher code is required.`
+                  : 'This terminal has not been enrolled. Enter your Clinic Code and Technician Activation Voucher to authorize this station.'}
             </p>
             <button
               type="button"
@@ -1419,15 +1557,12 @@ export function PodoLoadApp() {
 
       {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin') || isSessionLocked}
+        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin')}
         onClose={() => {
-          if (isSessionLocked) return;
+          setIsRoleModalOpen(false);
+          setRoleModalAdminMode(false);
           const status = dbService.checkDeviceAuthorizationStatus();
           setDeviceAuthStatus(status);
-          if (status.isAuthorized || currentUser.role === 'admin') {
-            setIsRoleModalOpen(false);
-            setRoleModalAdminMode(false);
-          }
         }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}

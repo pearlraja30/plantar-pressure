@@ -151,20 +151,26 @@ The system includes an automated clinical verification battery covering all test
 * Real-time search, live row count metrics, pretty-printed JSON inspection modal with one-click copy, and atomic Export/Import JSON backup.
 * **66/66 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, separated `/admin` routing, and shift logout data purging.
 
-### 8. Explicit Station Logout & Zero Stale Data Guarantee Between Users
+### 8. Explicit Station Logout, Dual-Role Sign-In & Zero Stale Data Guarantee
 * **Immediate Accessible Logout Controls**:
-  * **Top Header**: Accessible via the dedicated `Sign Out` button alongside the active user badge.
+  * **Top Header**: Dedicated `Sign Out` button alongside the active clinician badge.
   * **Sidebar Profile Card**: Dedicated red-accented `Log Out` button directly inside the user footer card.
   * **Account Switcher Modal**: Prominent session banner displaying active user with an immediate `Sign Out` button.
+* **Dual-Role Sign-In Provision on Logout**:
+  * The Sign-In dialog provides prominent **Role Selector Tabs**:
+    * **`🔬 Clinical Technician`**: User ID & Password/PIN input, with station device pairing tab.
+    * **`🛡️ Hospital Administrator`**: Master Password authentication for full clinical & facility administration.
+  * Eliminates modal lockouts, allowing either operator type to immediately log in after a shift ends.
+* **Window Close & Standby Mode**:
+  * Operators can dismiss the sign-in modal at any time via the top-right **`✕`** button or the footer **`Close Window`** action.
+  * On native Windows desktop (`.exe`), a dedicated **`⏻ Exit App`** button allows closing the entire application.
+  * When closed while signed out, the workstation enters a clean, secure **Station Standby View** displaying facility branding and 1-click **`Sign In as Clinical Technician`** or **`Sign In as Hospital Administrator`** actions.
 * **Zero Stale Data Guarantee**:
   * Logging out or switching users triggers an automated in-memory clinical purge:
     * Clears selected patient and selected case identifiers (`ppa-selected-patient-id`, `ppa-selected-case-id`, `ppa-active-session`).
     * Resets raw foot scans (`leftFoot`, `rightFoot`), pressure heatmaps, orthotic morphometry metrics, and regional analyses to pristine `null` states.
     * Resets clinical step counter to `Step 1: Patient Registration` and wipes search buffers.
   * Guarantees zero cross-patient and cross-technician data leakage between different operators sharing the same physical workstation.
-* **Locked Terminal State (`isSessionLocked`)**:
-  * Signing out locks the application in a modal authentication gate.
-  * Dismissal (`X` and `Cancel` buttons) is strictly disabled while locked until valid credentials are authenticated.
   * Logs an immutable 21 CFR Part 11 audit trail event (`USER_LOGOUT`) recording timestamp and user details.
 
 ---

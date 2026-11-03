@@ -3270,11 +3270,17 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
   expect(sessionState.currentSection).toBe("registration");
   expect(sessionState.isSessionLocked).toBe(true);
 
-  // 4. Verify terminal lock: Station cannot be dismissed without valid authentication
-  const canDismissModal = (isLocked, isMandatoryActivation) => {
-    return !isLocked && !isMandatoryActivation;
+  // 4. Verify window close behavior: User can close window (!isMandatoryActivation) to view safe Station Standby
+  const canDismissModal = (isMandatoryActivation) => {
+    return !isMandatoryActivation;
   };
-  expect(canDismissModal(sessionState.isSessionLocked, false)).toBe(false);
+  expect(canDismissModal(false)).toBe(true);
+  expect(canDismissModal(true)).toBe(false); // only mandatory hardware activation blocks closing
+
+  // Closing the modal leaves the station in safe standby with zero stale patient data
+  expect(sessionState.isSessionLocked).toBe(true);
+  expect(sessionState.selectedPatientId).toBe("");
+  expect(sessionState.leftFoot).toBeNull();
 
   // 5. Subsequent user logs in (e.g., Dr. Specialist as Hospital Administrator)
   sessionState.isSessionLocked = false;
@@ -3283,7 +3289,7 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
     name: "Dr. Specialist",
     username: "admin@technomind.health"
   };
-  expect(canDismissModal(sessionState.isSessionLocked, false)).toBe(true);
+  expect(canDismissModal(false)).toBe(true);
   expect(sessionState.selectedPatientId).toBe(""); // Remains completely pristine and unpolluted
   expect(sessionState.leftFoot).toBeNull();
 });

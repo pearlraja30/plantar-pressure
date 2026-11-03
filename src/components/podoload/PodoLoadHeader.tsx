@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut } from 'lucide-react';
+import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
@@ -20,6 +20,7 @@ interface PodoLoadHeaderProps {
   doctorName?: string;
   clinicName?: string;
   currentUser?: SystemUserSession;
+  isSessionLocked?: boolean;
   onOpenUserSwitcher?: () => void;
   onLogout?: () => void;
   onOpenAdmin?: () => void;
@@ -41,6 +42,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
   doctorName = 'Dr. Specialist',
   clinicName = 'Technomind Healthcare Systems',
   currentUser = SYSTEM_ACCOUNTS.admin,
+  isSessionLocked = false,
   onOpenUserSwitcher,
   onLogout,
   onOpenAdmin,
@@ -192,50 +194,77 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             </button>
           )}
 
-          {/* Role & User Login Switcher Badge */}
-          <button
-            type="button"
-            className={`podoload-role-badge ${currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
-            onClick={onOpenUserSwitcher}
-            title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
-          >
-            {currentUser.role === 'admin' ? (
-              <>
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Admin: {currentUser.name} ▾</span>
-              </>
-            ) : (
-              <>
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Tech: {currentUser.name} ▾</span>
-              </>
-            )}
-          </button>
-
-          {/* Quick Logout Button */}
-          {onLogout && (
+          {/* Role & User Login Switcher Badge / Sign In Button */}
+          {isSessionLocked ? (
             <button
               type="button"
-              onClick={onLogout}
-              title="Sign out of station and end current clinical session"
+              onClick={onOpenUserSwitcher}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.3rem 0.65rem',
+                gap: '0.35rem',
+                padding: '0.35rem 0.85rem',
                 borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#64748b',
-                fontSize: '0.72rem',
-                fontWeight: 600,
+                backgroundColor: '#0d9488',
+                color: '#ffffff',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 3px rgba(13,148,136,0.2)',
               }}
+              title="Workstation session signed out. Click to sign in."
             >
-              <LogOut className="w-3.5 h-3.5 text-slate-500" />
-              <span>Sign Out</span>
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Sign In</span>
             </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`podoload-role-badge ${currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
+                onClick={onOpenUserSwitcher}
+                title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
+              >
+                {currentUser.role === 'admin' ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Admin: {currentUser.name} ▾</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Tech: {currentUser.name} ▾</span>
+                  </>
+                )}
+              </button>
+
+              {/* Quick Logout Button */}
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  title="Sign out of station and end current clinical session"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.3rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#64748b',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <LogOut className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

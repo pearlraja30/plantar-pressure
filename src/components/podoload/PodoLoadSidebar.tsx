@@ -36,6 +36,7 @@ interface PodoLoadSidebarProps {
   onNavigate: (section: PodoLoadNavSection) => void;
   onStartNewExam: () => void;
   currentUser?: SystemUserSession;
+  isSessionLocked?: boolean;
   onOpenUserSwitcher?: (mode?: 'admin' | 'technician') => void;
   onLogout?: () => void;
   isOpenMobile?: boolean;
@@ -47,6 +48,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
   onNavigate,
   onStartNewExam,
   currentUser = SYSTEM_ACCOUNTS.admin,
+  isSessionLocked = false,
   onOpenUserSwitcher,
   onLogout,
   isOpenMobile = false,
@@ -59,6 +61,10 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
 
   const handleItemClick = (section: PodoLoadNavSection) => {
+    if (isSessionLocked) {
+      if (onOpenUserSwitcher) onOpenUserSwitcher(section === 'admin' ? 'admin' : 'technician');
+      return;
+    }
     onNavigate(section);
     if (onCloseMobile) onCloseMobile();
   };
@@ -245,50 +251,69 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
           if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'admin' ? 'admin' : 'technician');
           if (onCloseMobile) onCloseMobile();
         }}
-        title="Click to switch active user account"
+        title={isSessionLocked ? 'Click to sign in to station' : 'Click to switch active user account'}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            {currentUser?.role === 'admin' ? (
-              <ShieldCheck className="w-4 h-4 text-teal-400" />
-            ) : (
-              <UserCheck className="w-4 h-4 text-cyan-400" />
-            )}
-            <span className="podoload-sidebar-user-role">
-              {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
-            </span>
+        {isSessionLocked ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Lock className="w-4 h-4 text-amber-400" />
+              <span className="podoload-sidebar-user-role" style={{ color: '#fcd34d' }}>
+                🔒 Signed Out
+              </span>
+            </div>
+            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px', color: '#94a3b8' }}>
+              Station Standby
+            </div>
+            <div className="podoload-sidebar-user-sub" style={{ color: '#2dd4bf', fontWeight: 700 }}>
+              Click to Sign In ▾
+            </div>
           </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                {currentUser?.role === 'admin' ? (
+                  <ShieldCheck className="w-4 h-4 text-teal-400" />
+                ) : (
+                  <UserCheck className="w-4 h-4 text-cyan-400" />
+                )}
+                <span className="podoload-sidebar-user-role">
+                  {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
+                </span>
+              </div>
 
-          {onLogout && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLogout();
-                if (onCloseMobile) onCloseMobile();
-              }}
-              title="Sign out and lock station"
-              style={{
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                color: '#f87171',
-                borderRadius: '4px',
-                padding: '2px 6px',
-                fontSize: '0.62rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-              }}
-            >
-              <LogOut className="w-3 h-3" />
-              <span>Log Out</span>
-            </button>
-          )}
-        </div>
-        <div className="podoload-sidebar-user-name" style={{ marginTop: '2px' }}>{currentUser?.name}</div>
-        <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLogout();
+                    if (onCloseMobile) onCloseMobile();
+                  }}
+                  title="Sign out and lock station"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    color: '#f87171',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Log Out</span>
+                </button>
+              )}
+            </div>
+            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px' }}>{currentUser?.name}</div>
+            <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
+          </>
+        )}
       </div>
 
       <div style={{ padding: '0.45rem 1.25rem 0.75rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
