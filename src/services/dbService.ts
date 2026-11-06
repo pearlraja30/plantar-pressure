@@ -1,7 +1,7 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, SuperAdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
 import { cloudSyncService } from './cloudSyncService';
@@ -9,7 +9,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.58';
+export const APP_CURRENT_VERSION = '1.0.59';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -232,9 +232,23 @@ const LS_KEYS = {
   TECHNICIANS: 'podopress_technicians_v1',
   ADMIN_ACCOUNT: 'podopress_admin_account_v1',
   ADMIN_ACCOUNTS_LIST: 'podopress_admin_accounts_list_v1',
+  SUPER_ADMIN_ACCOUNT: 'podopress_super_admin_account_v1',
   DEVICE_AUTH_TOKEN: 'podopress_device_auth_token_v1',
   VOUCHER_EXPIRY_POLICY: 'podopress_voucher_expiry_policy_v1',
   BURNED_ACTIVATION_CODES: 'podopress_burned_activation_codes_v1',
+};
+
+export const DEFAULT_SUPER_ADMIN_ACCOUNT: SuperAdminAccount = {
+  id: 'superadmin-master-01',
+  name: 'Global Chief Administrator',
+  username: 'superadmin@technomind.health',
+  pin: 'superadmin@123',
+  role: 'superadmin',
+  email: 'superadmin@technomind.health',
+  phone: '+1 (800) 555-SUPER',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  status: 'active',
+  recoveryKey: 'SUPER-MASTER-KEY-9999',
 };
 
 export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
@@ -251,6 +265,8 @@ export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
   status: 'active',
   recoveryKey: 'REC-TMH-9901',
   isInitialSetupCompleted: true,
+  createdBy: 'superadmin',
+  maxStationsAllowed: 10,
 };
 
 export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
@@ -293,7 +309,7 @@ export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
 export interface SystemUserSession {
   username: string;
   name: string;
-  role: 'admin' | 'technician';
+  role: 'superadmin' | 'admin' | 'technician';
   title: string;
   badge: string;
   hospitalId?: string;
@@ -302,13 +318,21 @@ export interface SystemUserSession {
   loginTime: string;
 }
 
-export const SYSTEM_ACCOUNTS: Record<'admin' | 'technician', SystemUserSession> = {
+export const SYSTEM_ACCOUNTS: Record<'superadmin' | 'admin' | 'technician', SystemUserSession> = {
+  superadmin: {
+    username: 'superadmin@technomind.health',
+    name: 'Global Chief Administrator',
+    role: 'superadmin',
+    title: 'Super Administrator',
+    badge: 'Super Admin (Full Governance)',
+    loginTime: new Date().toISOString(),
+  },
   admin: {
     username: 'admin@technomind.health',
     name: 'Dr. Specialist',
     role: 'admin',
     title: 'Hospital Administrator',
-    badge: 'Administrator (Full Access)',
+    badge: 'Administrator (Hospital Access)',
     hospitalId: 'hosp-technomind-main',
     hospitalName: 'Technomind Healthcare Systems',
     loginTime: new Date().toISOString(),
@@ -318,7 +342,7 @@ export const SYSTEM_ACCOUNTS: Record<'admin' | 'technician', SystemUserSession> 
     name: 'Tech. Specialist',
     role: 'technician',
     title: 'Clinical Technician',
-    badge: 'Clinical Operator (All Reports)',
+    badge: 'Clinical Operator (Reports)',
     hospitalId: 'hosp-technomind-main',
     hospitalName: 'Technomind Healthcare Systems',
     technicianId: 'tech-user-01',
@@ -2214,7 +2238,7 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.ACTIVE_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return Boolean(parsed && (parsed.role === 'admin' || parsed.role === 'technician'));
+        return Boolean(parsed && (parsed.role === 'superadmin' || parsed.role === 'admin' || parsed.role === 'technician'));
       }
     } catch {
       // Fallback
@@ -2227,9 +2251,9 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.ACTIVE_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && (parsed.role === 'admin' || parsed.role === 'technician')) {
+        if (parsed && (parsed.role === 'superadmin' || parsed.role === 'admin' || parsed.role === 'technician')) {
           return {
-            ...SYSTEM_ACCOUNTS[parsed.role as 'admin' | 'technician'],
+            ...SYSTEM_ACCOUNTS[parsed.role as 'superadmin' | 'admin' | 'technician'],
             ...parsed,
           };
         }
@@ -2241,7 +2265,7 @@ class PodoPressDatabase {
   }
 
   public setActiveUser(
-    role: 'admin' | 'technician',
+    role: 'superadmin' | 'admin' | 'technician',
     customName?: string,
     technicianId?: string,
     hospitalId?: string,
@@ -2482,37 +2506,48 @@ class PodoPressDatabase {
       }
     };
 
-    const registered = this.getAdminAccountSync();
+    const adminList = this.getAdminAccountsListSync();
     const cleanUser = usernameOrEmail.trim().toLowerCase();
     const cleanPin = pin.trim();
 
-    // If an admin account was created, match against it
-    if (registered) {
-      const matchUser =
-        cleanUser === 'admin' ||
-        registered.username.toLowerCase() === cleanUser ||
-        (registered.email && registered.email.toLowerCase() === cleanUser) ||
-        registered.name.toLowerCase() === cleanUser;
-      const matchPin = registered.pin && registered.pin.trim() === cleanPin;
+    // Match across all registered admins (created by Super Admin or default)
+    if (adminList.length > 0) {
+      const match = adminList.find((a) => {
+        const matchUser =
+          cleanUser === 'admin' ||
+          a.username.toLowerCase() === cleanUser ||
+          (a.email && a.email.toLowerCase() === cleanUser) ||
+          a.name.toLowerCase() === cleanUser;
+        const matchPin = a.pin && a.pin.trim() === cleanPin;
+        return matchUser && matchPin;
+      });
 
-      if (matchUser && matchPin) {
-        clearLockout();
-        registered.lastLoginAt = new Date().toISOString();
-        try {
-          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
-        } catch {
-          // Ignore
+      if (match) {
+        if (match.status === 'suspended') {
+          return {
+            success: false,
+            error: 'This Hospital Administrator account has been suspended by the Super Administrator.',
+          };
         }
-        this.authorizeStationForAdmin(registered);
+        clearLockout();
+        match.lastLoginAt = new Date().toISOString();
+        const updatedList = adminList.map((x) => (x.id === match.id ? match : x));
+        try {
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(updatedList));
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(match));
+        } catch {}
+
+        this.authorizeStationForAdmin(match);
+        this.setActiveUser('admin', match.name, undefined, match.hospitalId, match.hospitalName);
         logAuditEvent(
           'ADMIN_LOGIN_SUCCESS',
-          `Administrator ${registered.name} (User ID: ${registered.username}) successfully authenticated.`,
-          registered.username,
+          `Administrator ${match.name} (User ID: ${match.username}) successfully authenticated for hospital "${match.hospitalName}".`,
+          match.username,
           undefined,
           'info',
           'admin'
         );
-        return { success: true, account: registered };
+        return { success: true, account: match };
       }
 
       recordFailedAttempt();
@@ -2608,6 +2643,343 @@ class PodoPressDatabase {
     return this.updateAdminProfile({ username: newUsername, name: newName });
   }
 
+  // =========================================================================
+  // TIER-1 SUPER ADMINISTRATOR: MASTER GOVERNANCE & TELEMETRY
+  // =========================================================================
+
+  public getSuperAdminAccountSync(): SuperAdminAccount {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.SUPER_ADMIN_ACCOUNT);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.username) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
+    return DEFAULT_SUPER_ADMIN_ACCOUNT;
+  }
+
+  public saveSuperAdminAccount(account: SuperAdminAccount): void {
+    try {
+      localStorage.setItem(LS_KEYS.SUPER_ADMIN_ACCOUNT, JSON.stringify(account));
+    } catch {
+      // Ignore
+    }
+  }
+
+  public authenticateSuperAdmin(
+    usernameOrEmail: string,
+    pin: string
+  ): { success: boolean; account?: SuperAdminAccount; error?: string } {
+    const superAdmin = this.getSuperAdminAccountSync();
+    const cleanUser = usernameOrEmail.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    const isMatchUser =
+      cleanUser === 'superadmin' ||
+      cleanUser === 'superadmin@technomind.health' ||
+      cleanUser === superAdmin.username.toLowerCase() ||
+      (superAdmin.email && superAdmin.email.toLowerCase() === cleanUser) ||
+      cleanUser === superAdmin.name.toLowerCase();
+
+    const isMatchPin = superAdmin.pin && superAdmin.pin.trim() === cleanPin;
+
+    if (isMatchUser && isMatchPin) {
+      superAdmin.lastLoginAt = new Date().toISOString();
+      this.saveSuperAdminAccount(superAdmin);
+      this.setActiveUser('superadmin', superAdmin.name);
+      logAuditEvent(
+        'SUPERADMIN_LOGIN_SUCCESS',
+        `Super Administrator "${superAdmin.name}" (${superAdmin.username}) authenticated with Tier-1 Master Authority.`,
+        superAdmin.username,
+        undefined,
+        'info',
+        'superadmin'
+      );
+      return { success: true, account: superAdmin };
+    }
+
+    logAuditEvent(
+      'SUPERADMIN_LOGIN_FAILED',
+      `Failed Super Administrator login attempt for "${usernameOrEmail}".`,
+      usernameOrEmail,
+      undefined,
+      'security',
+      'superadmin'
+    );
+    return {
+      success: false,
+      error: 'Invalid Super Administrator credentials. Tier-1 Master Authorization failed.',
+    };
+  }
+
+  /**
+   * Super Administrator creates a Hospital Administrator for a designated hospital/clinic.
+   */
+  public createHospitalAdmin(adminData: {
+    name: string;
+    username: string;
+    pin: string;
+    hospitalName: string;
+    hospitalCode?: string;
+    email?: string;
+    phone?: string;
+    maxStationsAllowed?: number;
+  }): { success: boolean; account?: AdminAccount; error?: string } {
+    const cleanUsername = adminData.username.trim().toLowerCase();
+    if (!cleanUsername) return { success: false, error: 'Administrator Username/Email is required.' };
+    if (!adminData.pin || adminData.pin.trim().length < 4) {
+      return { success: false, error: 'Master Password must be at least 4 characters.' };
+    }
+    if (!adminData.hospitalName?.trim()) {
+      return { success: false, error: 'Hospital/Clinic Name is required.' };
+    }
+
+    const currentList = this.getAdminAccountsListSync();
+    if (currentList.some((a) => a.username.toLowerCase() === cleanUsername)) {
+      return { success: false, error: `An Administrator with User ID "${cleanUsername}" already exists.` };
+    }
+
+    const hospCode = (adminData.hospitalCode || cleanUsername.replace(/[^a-z0-9]/gi, '').slice(0, 4) || 'CLINIC').toUpperCase();
+    const hospitalId = 'hosp-' + hospCode.toLowerCase();
+
+    const newAdmin: AdminAccount = {
+      id: 'admin-' + Math.random().toString(36).slice(2, 9),
+      name: adminData.name.trim(),
+      username: cleanUsername,
+      pin: adminData.pin.trim(),
+      hospitalId,
+      hospitalName: adminData.hospitalName.trim(),
+      role: 'admin',
+      phone: adminData.phone?.trim() || '',
+      email: adminData.email?.trim() || cleanUsername,
+      createdAt: new Date().toISOString(),
+      status: 'active',
+      recoveryKey: `REC-${hospCode}-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdBy: 'superadmin',
+      maxStationsAllowed: Number(adminData.maxStationsAllowed) || 5,
+      isInitialSetupCompleted: true,
+    };
+
+    currentList.push(newAdmin);
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(currentList));
+    } catch {}
+
+    // Ensure matching HospitalProfile exists in hospitals list
+    const hospitals: HospitalProfile[] = this.getHospitalProfilesSync();
+    if (!hospitals.some((h: HospitalProfile) => h.id === hospitalId || h.name.toLowerCase() === newAdmin.hospitalName.toLowerCase())) {
+      const newHospital: HospitalProfile = {
+        id: hospitalId,
+        name: newAdmin.hospitalName,
+        code: hospCode,
+        registrationNo: 'REG-' + hospCode + '-2026',
+        contact: newAdmin.phone || '+1(800) 555-PODO',
+        email: newAdmin.email || newAdmin.username,
+        department: 'Plantar Pressure & Biomechanics',
+        address: 'Clinical Foot Care Center',
+        logoPosition: 'Left',
+        defaultDoctor: newAdmin.name,
+        defaultTechnician: '',
+        footerText: 'Accredited Clinical Foot Care & Pressure Screening',
+        doctors: [{ id: 'doc-' + hospitalId, name: newAdmin.name, specialization: 'Chief Medical Consultant', licenseNo: 'DOC-' + hospCode }],
+        technicians: [],
+      };
+      hospitals.push(newHospital);
+      try {
+        localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(hospitals));
+      } catch {}
+    }
+
+    logAuditEvent(
+      'SUPERADMIN_CREATE_ADMIN',
+      `Super Administrator created Hospital Administrator "${newAdmin.name}" (${newAdmin.username}) for hospital "${newAdmin.hospitalName}".`,
+      'superadmin',
+      undefined,
+      'info',
+      'superadmin'
+    );
+
+    return { success: true, account: newAdmin };
+  }
+
+  public updateHospitalAdmin(
+    adminId: string,
+    updates: Partial<AdminAccount>
+  ): { success: boolean; account?: AdminAccount; error?: string } {
+    const list = this.getAdminAccountsListSync();
+    const idx = list.findIndex((a) => a.id === adminId);
+    if (idx < 0) return { success: false, error: 'Hospital Administrator not found.' };
+
+    const updated: AdminAccount = {
+      ...list[idx],
+      ...updates,
+    };
+    list[idx] = updated;
+
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+      if (localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT)) {
+        const currentPrimary = JSON.parse(localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT) || '{}');
+        if (currentPrimary.id === adminId) {
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(updated));
+        }
+      }
+    } catch {}
+
+    logAuditEvent(
+      'SUPERADMIN_UPDATE_ADMIN',
+      `Super Administrator updated Hospital Administrator "${updated.name}" (${updated.username}). Status: ${updated.status}.`,
+      'superadmin',
+      undefined,
+      'info',
+      'superadmin'
+    );
+
+    return { success: true, account: updated };
+  }
+
+  public deleteHospitalAdmin(adminId: string): { success: boolean; error?: string } {
+    let list = this.getAdminAccountsListSync();
+    const target = list.find((a) => a.id === adminId);
+    if (!target) return { success: false, error: 'Hospital Administrator not found.' };
+
+    list = list.filter((a) => a.id !== adminId);
+    try {
+      localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+    } catch {}
+
+    logAuditEvent(
+      'SUPERADMIN_DELETE_ADMIN',
+      `Super Administrator removed Hospital Administrator "${target.name}" (${target.username}).`,
+      'superadmin',
+      undefined,
+      'warning',
+      'superadmin'
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Super Administrator: Global device activation & hardware binding telemetry
+   */
+  public getAllActivationsTelemetry(): Array<{
+    deviceId: string;
+    macAddress: string;
+    platform: string;
+    technicianName: string;
+    technicianUsername: string;
+    hospitalName: string;
+    activationCodeUsed: string;
+    isBurned: boolean;
+    permitExpiresAt: string;
+    isExpired: boolean;
+    boundAt: string;
+    lastActiveAt: string;
+    status: 'active' | 'expired' | 'revoked';
+  }> {
+    const boundDevices = deviceBindingService.getBoundDevices();
+    const technicians: TechnicianUser[] = this.getTechniciansSync();
+    const burnedCodes = this.getBurnedActivationCodesSync();
+    const results: Array<{
+      deviceId: string;
+      macAddress: string;
+      platform: string;
+      technicianName: string;
+      technicianUsername: string;
+      hospitalName: string;
+      activationCodeUsed: string;
+      isBurned: boolean;
+      permitExpiresAt: string;
+      isExpired: boolean;
+      boundAt: string;
+      lastActiveAt: string;
+      status: 'active' | 'expired' | 'revoked';
+    }> = [];
+
+    for (const dev of boundDevices) {
+      const tech = technicians.find(
+        (t: TechnicianUser) =>
+          t.registeredDeviceId === dev.fingerprint ||
+          t.registeredDeviceId === dev.id ||
+          t.username === dev.boundUsername ||
+          t.macAddress === dev.macAddress
+      );
+
+      const codeUsed = tech?.activationCode || 'UNKNOWN-CODE';
+      const isBurned = Boolean(tech?.isActivationCodeUsed || burnedCodes.includes(codeUsed));
+      const permitExpiry = tech?.permitExpiresAt || '';
+      const isExpired = Boolean(permitExpiry && new Date(permitExpiry).getTime() <= Date.now());
+
+      const status: 'active' | 'expired' | 'revoked' =
+        dev.status === 'revoked' ? 'revoked' : isExpired ? 'expired' : 'active';
+
+      results.push({
+        deviceId: dev.id,
+        macAddress: dev.macAddress || '3A:F2:88:9C:12:04',
+        platform: dev.platform || 'Workstation',
+        technicianName: tech?.name || dev.boundUsername || 'Clinical Technician',
+        technicianUsername: tech?.username || dev.boundUsername || 'tech',
+        hospitalName: tech?.hospitalName || 'Clinical Hospital Center',
+        activationCodeUsed: codeUsed,
+        isBurned,
+        permitExpiresAt: permitExpiry,
+        isExpired,
+        boundAt: dev.boundAt || new Date().toISOString(),
+        lastActiveAt: dev.lastActiveAt || dev.boundAt,
+        status,
+      });
+    }
+
+    for (const tech of technicians) {
+      if (tech.isRegisteredOnDevice && tech.registeredDeviceId && !results.some((r) => r.deviceId === tech.registeredDeviceId)) {
+        const permitExpiry = tech.permitExpiresAt || '';
+        const isExpired = Boolean(permitExpiry && new Date(permitExpiry).getTime() <= Date.now());
+        results.push({
+          deviceId: tech.registeredDeviceId,
+          macAddress: tech.macAddress || '5C:BA:EF:41:88:22',
+          platform: 'Windows Desktop / Mobile',
+          technicianName: tech.name,
+          technicianUsername: tech.username,
+          hospitalName: tech.hospitalName || 'Clinical Hospital Center',
+          activationCodeUsed: tech.activationCode || 'TMH-TECH',
+          isBurned: Boolean(tech.isActivationCodeUsed),
+          permitExpiresAt: permitExpiry,
+          isExpired,
+          boundAt: tech.authorizedAt || tech.createdAt,
+          lastActiveAt: tech.lastLoginAt || tech.authorizedAt || tech.createdAt,
+          status: isExpired ? 'expired' : 'active',
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Super Administrator: Global Platform Metrics & KPI Overview
+   */
+  public getSuperAdminGlobalMetrics() {
+    const admins = this.getAdminAccountsListSync();
+    const technicians = this.getTechniciansSync();
+    const activations = this.getAllActivationsTelemetry();
+    const cases = this.getCasesSync();
+    const burnedCodes = this.getBurnedActivationCodesSync();
+    const hospitals = this.getHospitalProfilesSync();
+
+    return {
+      totalAdmins: admins.length,
+      totalHospitals: Math.max(admins.length, hospitals.length),
+      totalTechnicians: technicians.length,
+      totalActiveStations: activations.filter((a) => a.status === 'active').length,
+      totalBoundDevices: activations.length,
+      totalCases: cases.length,
+      totalBurnedCodes: burnedCodes.length,
+    };
+  }
+
   /**
    * Updates an arbitrary database table record directly (Hospital Administrator ONLY).
    * Supports: patients, cases, technicians, admin_accounts, bound_devices, settings.
@@ -2626,10 +2998,10 @@ class PodoPressDatabase {
       };
     }
     const activeUser = this.getActiveUserSync();
-    if (activeUser.role !== 'admin') {
+    if (activeUser.role !== 'admin' && activeUser.role !== 'superadmin') {
       return {
         success: false,
-        error: 'Unauthorized access: Only Hospital Administrators hold write & correction privileges on raw database tables.',
+        error: 'Unauthorized access: Only Administrators hold write & correction privileges on raw database tables.',
       };
     }
 

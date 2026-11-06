@@ -119,6 +119,10 @@ $output = @{
 }
 
 try {
+  Get-Service stisvc | Where-Object { $_.Status -ne 'Running' } | Start-Service -ErrorAction SilentlyContinue
+} catch {}
+
+try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction SilentlyContinue
   if ($dm -and $dm.DeviceInfos) {
     foreach ($dev in $dm.DeviceInfos) {
@@ -347,53 +351,83 @@ $target = "${targetId.replace(/"/g, '`"')}"
 $scanned = $false
 $errMsg = ""
 
+# Ensure Windows Image Acquisition (WIA) service is active
+try {
+  Get-Service stisvc | Where-Object { $_.Status -ne 'Running' } | Start-Service -ErrorAction SilentlyContinue
+} catch {}
+
 try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction Stop
   $dev = $null
+  $infos = @($dm.DeviceInfos)
+
+  # 1. Match by exact DeviceID
   if ($target -and $target -ne "default" -and -not $target.StartsWith("printer-")) {
-    foreach ($info in $dm.DeviceInfos) {
+    foreach ($info in $infos) {
       if ($info.DeviceID -eq $target) {
         $dev = $info.Connect()
         break
       }
     }
   }
-  if (-not $dev -and $dm.DeviceInfos.Count -gt 0) {
-    foreach ($info in $dm.DeviceInfos) {
+
+  # 2. Match by printer / scanner friendly name substring
+  if (-not $dev -and $target) {
+    $cleanTarget = $target.Replace("printer-", "").Replace("-", " ").ToLower()
+    foreach ($info in $infos) {
+      try {
+        $n = [string]$info.Properties.Item("Name").Value
+        if ($n -and ($cleanTarget.Contains($n.ToLower()) -or $n.ToLower().Contains($cleanTarget))) {
+          $dev = $info.Connect()
+          break
+        }
+      } catch {}
+    }
+  }
+
+  # 3. Match default / first WIA scanner (Type 1 = ScannerDeviceType)
+  if (-not $dev) {
+    foreach ($info in $infos) {
       if ($info.Type -eq 1) {
         $dev = $info.Connect()
         break
       }
     }
   }
+
+  # 4. Fallback to any imaging device in DeviceInfos
+  if (-not $dev -and $infos.Length -gt 0) {
+    $dev = $infos[0].Connect()
+  }
+
   if ($dev) {
     $item = $dev.Items.Item(1)
     try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
     try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
     try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
-    $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+
+    $image = $null
+    # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
+    try {
+      $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
+    } catch {
+      try {
+        $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+      } catch {
+        $image = $item.Transfer()
+      }
+    }
+
     if ($image) {
       if (Test-Path $temp) { Remove-Item $temp -Force }
       $image.SaveFile($temp)
       $scanned = $true
     }
+  } else {
+    $errMsg = "No optical scanner detected by Windows WIA. Ensure your printer cum scanner is powered on and connected via USB or Wi-Fi."
   }
 } catch {
   $errMsg = $_.Exception.Message
-}
-
-if (-not $scanned) {
-  try {
-    $dialog = New-Object -ComObject WIA.CommonDialog -ErrorAction Stop
-    $image = $dialog.ShowAcquireImage(1, ${colorMode}, 131072, "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", $false, $true, $true)
-    if ($image) {
-      if (Test-Path $temp) { Remove-Item $temp -Force }
-      $image.SaveFile($temp)
-      $scanned = $true
-    }
-  } catch {
-    $errMsg = $_.Exception.Message
-  }
 }
 
 if ($scanned -and (Test-Path $temp)) {
@@ -406,19 +440,28 @@ if ($scanned -and (Test-Path $temp)) {
       const { stdout } = await runPowerShell(psScript, 60000);
       if (stdout && stdout.includes('SUCCESS') && fs.existsSync(tempOutputFile)) {
         const buffer = fs.readFileSync(tempOutputFile);
-        const dataUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+        let mime = 'image/jpeg';
+        let ext = 'jpg';
+        if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
+          mime = 'image/bmp';
+          ext = 'bmp';
+        } else if (buffer[0] === 0x89 && buffer[1] === 0x50) {
+          mime = 'image/png';
+          ext = 'png';
+        }
+        const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
         try { fs.unlinkSync(tempOutputFile); } catch {}
         return {
           success: true,
           dataUrl,
-          filename: `scan_${Date.now()}.jpg`,
+          filename: `scan_${Date.now()}.${ext}`,
           deviceName: options.deviceName || 'System Flatbed Scanner',
         };
       } else {
         const errDetail = stdout.replace('FAILED:', '').trim();
         return {
           success: false,
-          error: errDetail || 'Scanner did not return image data. Check connection and paper placement.',
+          error: errDetail || 'Scanner did not return image data. Check power, cable connection, and paper placement.',
         };
       }
     } catch (err) {

@@ -248,11 +248,17 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             <>
               <button
                 type="button"
-                className={`podoload-role-badge ${currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
+                className={`podoload-role-badge ${currentUser.role === 'superadmin' ? 'role-superadmin' : currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
                 onClick={onOpenUserSwitcher}
                 title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
+                style={currentUser.role === 'superadmin' ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' } : undefined}
               >
-                {currentUser.role === 'admin' ? (
+                {currentUser.role === 'superadmin' ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                    <span>👑 Super Admin: {currentUser.name} ▾</span>
+                  </>
+                ) : currentUser.role === 'admin' ? (
                   <>
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>Admin: {currentUser.name} ▾</span>

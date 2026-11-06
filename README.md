@@ -107,7 +107,7 @@ For the complete, in-depth architectural and operational manual, refer to:
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **75 / 75 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, and cloud sync engines.
+* **79 / 79 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -163,7 +163,7 @@ The system includes an automated clinical verification battery covering all test
 * **Direct Table Write & Administrative Correction Privileges**: Hospital Administrators possess master privileges to correct and write database records across `patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, and `settings`.
 * **21 CFR Part 11 Audit Trail Conformance**: Every administrative record correction mandates a documented clinical justification/reason, immediately committing the modification to offline IndexedDB and appending an immutable `RECORD_ADMIN_CORRECTED` audit event with timestamp and administrator identity.
 * **Dual-View Record Editor**: Offers both structured form-based editing (for rapid contact, phone, MRN, notes, and staff updates) and raw JSON editor with syntax validation.
-* **75/75 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, separated `/admin` routing, administrative write privileges, Windows WIA scanning automation, and shift logout data purging.
+* **79/79 Unit Tests & 15/15 Clinical Scenarios (100% Green)**: Comprehensive verification covering biomechanics, hardware binding, multi-technician roaming, security policies, separated `/admin` routing, three-tier role hierarchy (Super Admin -> Admin -> Technician), administrative write privileges, Windows WIA scanning automation, and shift logout data purging.
 
 ### 8. Explicit Station Logout, Discreet Kiosk Authentication & Zero Stale Data Guarantee
 * **Immediate Accessible Logout Controls**:

@@ -459,5 +459,61 @@ gantt
    - Clicking `[Change Printer / Scanner]` allows switching at any time.
 
 ---
+
+## 15. Three-Tier Role Hierarchy & Multi-Tenant Super Admin Governance
+
+### 15.1 Architectural Role Model
+```
+┌────────────────────────────────────────────────────────┐
+│               1. Super Administrator                   │
+│   (Vendor Authority: Technomind Global Master)        │
+│   - Provisions Hospital Administrators                 │
+│   - Global telemetry & workstation MAC bindings        │
+│   - Master 21 CFR Part 11 audit trails                 │
+│   - Global clinical reports across all clinics         │
+│   - Full system JSON export / backup                   │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│             2. Hospital Administrator                  │
+│       (Clinic Authority: Hospital Director)            │
+│   - Hospital profile & report branding (Logo, Header)  │
+│   - Provisions Clinical Technicians                    │
+│   - Issues single-use activation vouchers & permits    │
+│   - Clinic-level patient records & device licenses     │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│               3. Clinical Technician                   │
+│         (Operator Authority: Field Specialist)         │
+│   - Binds physical station terminal (MAC address)      │
+│   - Burns activation voucher (single-use restriction)  │
+│   - Conducts bilateral Harris Mat optical exams        │
+│   - Generates & shares clinical reports (Print, PDF)   │
+└────────────────────────────────────────────────────────┘
+```
+
+### 15.2 Operational Credentials & Security
+- **Super Administrator**:
+  - Default User ID / Email: `superadmin@technomind.health`
+  - Default Master Password: `superadmin@123`
+  - Shortcuts: `Ctrl+Shift+S` / `Cmd+Shift+S` or URL `/superadmin` / `#/superadmin`
+  - Features:
+    - Hospital Administrator Creation Modal (Name, Username, Password, Clinic Quota).
+    - Station Telemetry Table: Device ID, MAC address, Bound Technician, Hospital, Voucher Burn Status, Permit Expiration, and Security Revocation Kill-Switch.
+    - Global Cross-Hospital Reports Hub.
+    - Full System Backup export in JSON format.
+- **Hospital Administrator**:
+  - Created by Super Administrator.
+  - Provisions Technicians with Voucher Codes (e.g. `TMH-TECH-1001`) and sets Permit Expirations (1 hour, 24 hours, 7 days, 30 days, or custom).
+  - Manages Clinic Branding and Patient Directory.
+- **Clinical Technician**:
+  - Activated via Voucher Code.
+  - Terminal binds hardware fingerprint and MAC address on first activation, burning the voucher code.
+  - Voucher cannot be reused across multiple machines.
+
+---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*
 

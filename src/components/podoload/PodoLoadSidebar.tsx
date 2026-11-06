@@ -29,7 +29,8 @@ export type PodoLoadNavSection =
   | 'reports_cloud'
   | 'database'
   | 'settings'
-  | 'admin';
+  | 'admin'
+  | 'superadmin';
 
 interface PodoLoadSidebarProps {
   currentSection: PodoLoadNavSection;
@@ -37,7 +38,7 @@ interface PodoLoadSidebarProps {
   onStartNewExam: () => void;
   currentUser?: SystemUserSession;
   isSessionLocked?: boolean;
-  onOpenUserSwitcher?: (mode?: 'admin' | 'technician') => void;
+  onOpenUserSwitcher?: (mode?: 'superadmin' | 'admin' | 'technician') => void;
   onLogout?: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -224,6 +225,19 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 )}
               </button>
 
+              {currentUser?.role === 'superadmin' && (
+                <button
+                  type="button"
+                  className={`podoload-nav-item ${currentSection === 'superadmin' ? 'active' : ''}`}
+                  onClick={() => handleItemClick('superadmin')}
+                  title="Super Administrator Governance: Clinics, Station Telemetry, Reports, Master Audit"
+                  style={{ color: currentSection === 'superadmin' ? '#ffffff' : '#c084fc' }}
+                >
+                  <ShieldCheck className="podoload-nav-item-icon text-purple-400" />
+                  <span style={{ flex: 1, textAlign: 'left', fontWeight: 700 }}>Super Admin Console</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
@@ -251,7 +265,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
       <div
         className="podoload-sidebar-user-card"
         onClick={() => {
-          if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'admin' ? 'admin' : 'technician');
+          if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'superadmin' ? 'superadmin' : currentUser?.role === 'admin' ? 'admin' : 'technician');
           if (onCloseMobile) onCloseMobile();
         }}
         title={isSessionLocked ? 'Click to sign in to station' : 'Click to switch active user account'}
@@ -275,13 +289,15 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                {currentUser?.role === 'admin' ? (
+                {currentUser?.role === 'superadmin' ? (
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                ) : currentUser?.role === 'admin' ? (
                   <ShieldCheck className="w-4 h-4 text-teal-400" />
                 ) : (
                   <UserCheck className="w-4 h-4 text-cyan-400" />
                 )}
                 <span className="podoload-sidebar-user-role">
-                  {currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
+                  {currentUser?.role === 'superadmin' ? '👑 Super Admin' : currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
                 </span>
               </div>
 

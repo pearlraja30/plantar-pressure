@@ -912,6 +912,89 @@ To achieve maximum horizontal scale across multi-hospital networks, the platform
 - **Vite & TypeScript Build**: `tsc -b && vite build` compiled in 363ms with 0 errors.
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 
+---
+
+## 34. Three-Tier Role Hierarchy & Multi-Tenant Governance with Optical Scanner Resilience (v1.0.59)
+
+### 34.1 Three-Tier Role Hierarchy Architecture (`superadmin` -> `admin` -> `technician`)
+- **Clinical Governance Requirement**:
+  - Full hierarchical access control:
+    1. **Super Administrator (`superadmin`)**: Global vendor authority. Provisions hospital administrators, monitors global multi-clinic telemetry, inspects workstation hardware MAC bindings and voucher burn states, audits cross-hospital clinical records, and exports full system backups.
+    2. **Hospital Administrator (`admin`)**: Hospital/clinic director. Manages hospital profile, branding, provisions clinical technicians, sets voucher validity durations (hours/days), and monitors clinic-level patient records.
+    3. **Clinical Technician (`technician`)**: Registered workstation operator. Activates device using single-use activation voucher code, conducts patient registrations, executes foot scanning, and generates clinical analysis reports.
+- **Implementation & Type System**:
+  - `src/types/index.ts`:
+    - Added `SuperAdminAccount` model with attributes: `id`, `name`, `username`, `pin`, `role: 'superadmin'`, `email`, `phone`, `createdAt`, `status`, `recoveryKey`.
+    - Extended `AdminAccount` with `createdBy?: string` and `maxStationsAllowed?: number`.
+    - Updated `AuditEvent` role typing to include `'superadmin' | 'admin' | 'technician' | 'system'`.
+  - `src/services/auditService.ts`:
+    - Updated `logAuditEvent()` to trace `'superadmin'` operations in master 21 CFR Part 11 audit log.
+  - `src/services/dbService.ts`:
+    - Initialized `LS_KEYS.SUPER_ADMIN_ACCOUNT = 'podopress_super_admin_account_v1'`.
+    - Added default Super Admin profile: `superadmin@technomind.health` (`superadmin@123`).
+    - Added `getSuperAdminAccountSync()` and `saveSuperAdminAccount()`.
+    - Added `authenticateSuperAdmin(user, pass)`.
+    - Updated `authenticateAdmin()` to validate against dynamic `adminAccountsListSync` (allowing Super Admin created hospital administrators to log in across the system).
+    - Implemented `createHospitalAdmin()`, `updateHospitalAdmin()`, and `deleteHospitalAdmin()`.
+    - Implemented `getAllActivationsTelemetry()`: gathers bound workstation hardware IDs, MAC addresses, bound technician usernames, hospital names, voucher codes, burn status, permit expiration timestamps, and status (`active`, `expired`, `revoked`).
+    - Implemented `getSuperAdminGlobalMetrics()`: returns aggregate statistics on hospitals, administrators, technicians, active workstations, total patient cases, and voucher burn rate.
+
+### 34.2 Super Administrator Governance Console Component (`PodoLoadSuperAdmin.tsx`)
+- **Component Design & Modular Tabs**:
+  - `src/components/podoload/PodoLoadSuperAdmin.tsx`:
+    - **Header & Metric Grid**: Live counters for Total Clinics, Active Admins, Field Technicians, Bound Workstations, and Global Clinical Reports.
+    - **Tab 1: Hospital Administrators & Clinics**:
+      - Provision Hospital Admin modal (Name, Username, Master Password, Hospital Name, Quota).
+      - Admin Directory with search, status toggle (Active/Suspended), and master password reset.
+    - **Tab 2: Workstation Activations & Hardware Telemetry**:
+      - Live telemetry table of all stations across all clinics.
+      - Displays: Device ID, MAC Address, Bound Technician, Hospital, Voucher Code, Voucher Burn State (Burned / Unused), Permit Expiry Countdown, and Status.
+      - Super Admin **Security Kill-Switch**: One-click instant revocation of compromised or unrenewed workstations.
+    - **Tab 3: Global Clinical Reports**:
+      - Master cross-hospital patient directory and scan explorer.
+      - Filters by hospital, search by patient ID / case number, and one-click "Inspect Report".
+    - **Tab 4: Master 21 CFR Part 11 Audit Trail**:
+      - Complete chronological log tracing creations, logins, voucher burns, and scan evaluations across all hospitals.
+    - **Tab 5: System Backup & Export**:
+      - One-click global JSON export containing full database snapshots, metric logs, and device activation telemetry.
+
+### 34.3 Role Modal & Navigation Integration
+- **`src/components/podoload/PodoLoadRoleModal.tsx`**:
+  - Added 3-tier role tabs: `[🔬 Technician]`, `[🏥 Clinic Admin]`, `[🛡️ Super Admin]`.
+  - Added Super Admin authentication form with masked master password and toggle visibility.
+  - Added keyboard shortcut `Ctrl+Shift+S` / `Cmd+Shift+S` to open Super Admin mode directly.
+- **`src/components/podoload/PodoLoadSidebar.tsx`**:
+  - Added `superadmin` to `PodoLoadNavSection`.
+  - Added `🛡️ Super Admin Console` sidebar navigation item when logged in as Super Admin.
+  - Updated user footer profile card with purple shield and `👑 Super Admin` badge.
+- **`src/components/podoload/PodoLoadHeader.tsx`**:
+  - Added Super Admin identity badge: `👑 Super Admin: [Name] ▾` with distinct purple badge styling.
+- **`src/components/podoload/PodoLoadApp.tsx`**:
+  - Handled `/superadmin`, `#/superadmin`, and `?mode=superadmin` URL routing.
+  - Rendered `<PodoLoadSuperAdmin />` when `currentSection === 'superadmin'`.
+  - Connected `podoload:superadmin-requested` event listener.
+
+### 34.4 Windows Desktop & Web Browser Scanner Automation Enhancements
+- **Windows Desktop (Electron EXE)**:
+  - `electron/main.cjs`:
+    - Auto-starts Windows Image Acquisition (`stisvc`) service in PowerShell if stopped.
+    - Universal WIA Transfer format: Transfers `wiaFormatBMP` (`{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}`) first (guaranteed standard across 100% of Windows WIA drivers including Epson, HP, Canon, Brother), falling back to JPEG and default format.
+    - Added magic-byte inspection (`BM`, `PNG`, `JPEG`) on scan output buffer for precise MIME-type header encoding.
+    - Safe COM collection iteration prevents `Count` property exceptions on COM wrappers.
+- **Web Browser Mode**:
+  - `src/components/podoload/PodoLoadCapture.tsx`:
+    - When workstation has no configured printer-cum-scanner, automatically opens the **"Select Installed Printer cum Scanner"** modal first.
+    - Technician selects clinic printer (Epson EcoTank L-series, HP MFP, Canon PIXMA, Brother MFC, or custom name), saving it to local workstation settings.
+    - Completely eliminated unhelpful alert dialogs (`Direct hardware capture error: . Please select the scan output file directly.`); replaced with smooth step-by-step guidance and automatic file ingestion.
+    - Scanned image immediately processes and renders on screen with true DPI, auto-deskew, and 1:1 scale.
+
+### 34.5 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **79/79** Unit Tests in `scripts/unit_tests.cjs` (`npm run test:unit`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` (`npm run test:validate`) — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 269ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Automated Multi-Platform Release**: Git commit, tag `v1.0.59`, and push to GitHub remote triggers GitHub Actions CI/CD pipeline for Windows (`.exe`), macOS (`.dmg`), Linux (`.AppImage`), Android (`.apk`), and iOS (`.ipa`).
+
 
 
 

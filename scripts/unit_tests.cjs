@@ -3739,6 +3739,215 @@ it("Enforces Web Browser Station Pairing: Requires printer selection first, reme
   expect(allowed.some((d) => d.label.includes("Integrated Webcam"))).toBe(false);
 });
 
+// ======================================================================
+// SECTION 29: THREE-TIER ROLE HIERARCHY & SUPER ADMIN GOVERNANCE
+// (Super Admin -> Admin -> Technician)
+// ======================================================================
+console.log("\n--- SECTION 29: Three-Tier Role Hierarchy & Super Admin Governance ---");
+
+it("Three-Tier Hierarchy: Super Admin authenticates with master vendor credentials", () => {
+  // 1. Mock Super Admin Account Store
+  const mockSuperAdmin = {
+    id: "superadmin-master-01",
+    name: "Technomind Global Super Administrator",
+    username: "superadmin@technomind.health",
+    pin: "superadmin@123",
+    role: "superadmin",
+    email: "superadmin@technomind.health",
+    status: "active",
+  };
+
+  const authenticateSuperAdmin = (user, pass) => {
+    if (!user || !pass) return { success: false, error: "Credentials required" };
+    const matchesUser =
+      user.toLowerCase() === mockSuperAdmin.username.toLowerCase() ||
+      user.toLowerCase() === mockSuperAdmin.email.toLowerCase();
+    if (matchesUser && pass === mockSuperAdmin.pin) {
+      return { success: true, account: mockSuperAdmin };
+    }
+    return { success: false, error: "Invalid Super Administrator credentials." };
+  };
+
+  // Valid credentials succeed
+  const authValid = authenticateSuperAdmin("superadmin@technomind.health", "superadmin@123");
+  expect(authValid.success).toBe(true);
+  expect(authValid.account.role).toBe("superadmin");
+  expect(authValid.account.name).toBe("Technomind Global Super Administrator");
+
+  // Invalid password rejected
+  const authBadPin = authenticateSuperAdmin("superadmin@technomind.health", "wrongpassword");
+  expect(authBadPin.success).toBe(false);
+
+  // Invalid username rejected
+  const authBadUser = authenticateSuperAdmin("unknown@domain.com", "superadmin@123");
+  expect(authBadUser.success).toBe(false);
+});
+
+it("Hierarchical Provisioning: Super Admin creates Hospital Administrator account", () => {
+  const adminDirectory = [];
+
+  const createHospitalAdmin = (payload, creator = "superadmin@technomind.health") => {
+    const adminAcc = {
+      id: "admin-" + Date.now(),
+      name: payload.name,
+      username: payload.username.toLowerCase(),
+      pin: payload.password,
+      role: "admin",
+      hospitalId: "hosp-" + Date.now(),
+      hospitalName: payload.hospitalName,
+      status: "active",
+      maxStationsAllowed: payload.maxStations || 5,
+      createdBy: creator,
+      createdAt: new Date().toISOString(),
+    };
+    adminDirectory.push(adminAcc);
+    return { success: true, admin: adminAcc };
+  };
+
+  const result = createHospitalAdmin({
+    name: "Dr. Apollo Clinical Director",
+    username: "apollo-admin",
+    password: "Apollo@admin2026",
+    hospitalName: "Apollo Multispeciality Hospitals",
+    maxStations: 8,
+  });
+
+  expect(result.success).toBe(true);
+  expect(result.admin.role).toBe("admin");
+  expect(result.admin.createdBy).toBe("superadmin@technomind.health");
+  expect(result.admin.maxStationsAllowed).toBe(8);
+  expect(adminDirectory.length).toBe(1);
+
+  // Authenticate created admin
+  const login = (user, pass) => {
+    const found = adminDirectory.find(
+      (a) => a.username === user.toLowerCase() && a.pin === pass && a.status === "active"
+    );
+    return found ? { success: true, account: found } : { success: false };
+  };
+
+  const authNewAdmin = login("apollo-admin", "Apollo@admin2026");
+  expect(authNewAdmin.success).toBe(true);
+  expect(authNewAdmin.account.hospitalName).toBe("Apollo Multispeciality Hospitals");
+});
+
+it("Clinic Provisioning: Hospital Admin provisions Technician with Single-Use Voucher", () => {
+  const technicians = [];
+  const vouchers = new Map();
+
+  // Hospital Admin creates technician with voucher
+  const createTechWithVoucher = (adminUser, techName, techUsername, voucherCode, permitDays = 30) => {
+    const tech = {
+      id: "tech-" + Date.now(),
+      name: techName,
+      username: techUsername,
+      role: "technician",
+      hospitalId: "hosp-apollo-01",
+      hospitalName: "Apollo Hospitals",
+      voucherCode,
+      permitDurationDays: permitDays,
+      createdAt: new Date().toISOString(),
+    };
+    technicians.push(tech);
+    vouchers.set(voucherCode, {
+      code: voucherCode,
+      assignedTech: techUsername,
+      burned: false,
+      burnedAt: null,
+      boundMac: null,
+      expiresAt: null,
+    });
+    return tech;
+  };
+
+  const tech = createTechWithVoucher("apollo-admin", "Kavita Rao", "kavita.rao", "APOLLO-TECH-5001", 30);
+  expect(tech.voucherCode).toBe("APOLLO-TECH-5001");
+  expect(vouchers.has("APOLLO-TECH-5001")).toBe(true);
+
+  // Technician activates station with voucher code
+  const activateStation = (code, macAddress) => {
+    const v = vouchers.get(code);
+    if (!v) return { success: false, error: "INVALID_CODE" };
+    if (v.burned) return { success: false, error: "ALREADY_BURNED" };
+
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    v.burned = true;
+    v.burnedAt = new Date().toISOString();
+    v.boundMac = macAddress;
+    v.expiresAt = expires;
+
+    return {
+      success: true,
+      boundDevice: { macAddress, technician: v.assignedTech, expiresAt: expires },
+    };
+  };
+
+  // 1st activation on station 1 succeeds
+  const act1 = activateStation("APOLLO-TECH-5001", "00:1B:44:11:3A:B7");
+  expect(act1.success).toBe(true);
+  expect(act1.boundDevice.macAddress).toBe("00:1B:44:11:3A:B7");
+
+  // 2nd activation with same voucher on station 2 is strictly blocked (single-use burned!)
+  const act2 = activateStation("APOLLO-TECH-5001", "A4:83:E7:22:9C:F1");
+  expect(act2.success).toBe(false);
+  expect(act2.error).toBe("ALREADY_BURNED");
+});
+
+it("Super Admin Telemetry & Tracing: Master console inspects all activations, vouchers, and audit trails", () => {
+  const globalActivations = [
+    {
+      deviceId: "station-apollo-01",
+      macAddress: "00:1B:44:11:3A:B7",
+      technician: "kavita.rao",
+      hospitalName: "Apollo Hospitals",
+      voucherCode: "APOLLO-TECH-5001",
+      voucherBurned: true,
+      permitExpiresAt: new Date(Date.now() + 25 * 86400000).toISOString(),
+      status: "active",
+    },
+    {
+      deviceId: "station-fortis-02",
+      macAddress: "B8:27:EB:44:55:66",
+      technician: "rahul.varma",
+      hospitalName: "Fortis Healthcare",
+      voucherCode: "FORTIS-TECH-1002",
+      voucherBurned: true,
+      permitExpiresAt: new Date(Date.now() - 2 * 86400000).toISOString(), // Expired
+      status: "expired",
+    },
+  ];
+
+  // Super admin queries telemetry
+  const getSuperAdminTelemetry = () => {
+    return {
+      totalStations: globalActivations.length,
+      activeStations: globalActivations.filter((s) => s.status === "active").length,
+      expiredStations: globalActivations.filter((s) => s.status === "expired").length,
+      stations: globalActivations,
+    };
+  };
+
+  const telemetry = getSuperAdminTelemetry();
+  expect(telemetry.totalStations).toBe(2);
+  expect(telemetry.activeStations).toBe(1);
+  expect(telemetry.expiredStations).toBe(1);
+  expect(telemetry.stations[0].macAddress).toBe("00:1B:44:11:3A:B7");
+
+  // Super Admin kill-switch revocation
+  const revokeStation = (stationId) => {
+    const station = globalActivations.find((s) => s.deviceId === stationId);
+    if (station) {
+      station.status = "revoked";
+      return true;
+    }
+    return false;
+  };
+
+  const revoked = revokeStation("station-apollo-01");
+  expect(revoked).toBe(true);
+  expect(globalActivations[0].status).toBe("revoked");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -14,6 +14,7 @@ import { PodoLoadPatientSearch } from './PodoLoadPatientSearch';
 import { PodoLoadCloudRecords } from './PodoLoadCloudRecords';
 import { PodoLoadSettings } from './PodoLoadSettings';
 import { PodoLoadAdmin } from './PodoLoadAdmin';
+import { PodoLoadSuperAdmin } from './PodoLoadSuperAdmin';
 
 import { Patient, AnalysisCase, HospitalProfile, ClinicalCategory, OrthoticMeasurements, RegionalAnalysis } from '../../types';
 import { cloudSyncService, CloudSyncStatus } from '../../services/cloudSyncService';
@@ -241,7 +242,7 @@ export function PodoLoadApp() {
     }
   }, [selectedCaseId]);
 
-  // User Authentication & Role Access Control (Admin vs Technician)
+  // User Authentication & Role Access Control (Super Admin vs Admin vs Technician)
   const checkIsAdminUrl = (): boolean => {
     if (typeof window === 'undefined') return false;
     const path = window.location.pathname.toLowerCase();
@@ -258,10 +259,26 @@ export function PodoLoadApp() {
     );
   };
 
+  const checkIsSuperAdminUrl = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return (
+      path === '/superadmin' ||
+      path.startsWith('/superadmin/') ||
+      hash === '#superadmin' ||
+      hash === '#/superadmin' ||
+      search.includes('superadmin=true') ||
+      search.includes('mode=superadmin')
+    );
+  };
+
   const [currentUser, setCurrentUser] = useState<SystemUserSession>(() => dbService.getActiveUserSync());
   const [deviceAuthStatus, setDeviceAuthStatus] = useState(() => dbService.checkDeviceAuthorizationStatus());
   const [roleModalAdminMode, setRoleModalAdminMode] = useState<boolean>(() => checkIsAdminUrl());
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(() => !deviceAuthStatus.isAuthorized || checkIsAdminUrl());
+  const [roleModalSuperAdminMode, setRoleModalSuperAdminMode] = useState<boolean>(() => checkIsSuperAdminUrl());
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(() => !deviceAuthStatus.isAuthorized || checkIsAdminUrl() || checkIsSuperAdminUrl());
   const [activeLoadedCase, setActiveLoadedCase] = useState<AnalysisCase | null>(null);
 
   // Foot capture data (Screens 2 - 5) - FRESH DATA ONLY (No auto-injection of sample footprints)
@@ -308,11 +325,12 @@ export function PodoLoadApp() {
     setIsSessionLocked(true);
     setIsStandbyModalOpen(true);
     setRoleModalAdminMode(false);
+    setRoleModalSuperAdminMode(false);
     setIsRoleModalOpen(false);
   };
 
   const handleSelectRole = (
-    role: 'admin' | 'technician',
+    role: 'superadmin' | 'admin' | 'technician',
     customName?: string,
     technicianId?: string,
     hospitalId?: string,
@@ -323,24 +341,29 @@ export function PodoLoadApp() {
     setIsSessionLocked(false);
     setIsStandbyModalOpen(false);
     setIsRoleModalOpen(false);
+    setRoleModalAdminMode(false);
+    setRoleModalSuperAdminMode(false);
 
     const session = dbService.setActiveUser(role, customName, technicianId, hospitalId, hospitalName);
     setCurrentUser(session);
-    if (role === 'admin') {
+    if (role === 'superadmin') {
+      setCurrentSection('superadmin');
+    } else if (role === 'admin') {
       dbService.authorizeStationForAdmin();
       if (!isMobileDevice) {
         setCurrentSection('admin');
       }
     } else {
-      if (currentSection === 'admin' || currentSection === 'settings') {
+      if (currentSection === 'admin' || currentSection === 'superadmin' || currentSection === 'settings') {
         setCurrentSection('registration');
       }
     }
     const updatedStatus = dbService.checkDeviceAuthorizationStatus();
     setDeviceAuthStatus(updatedStatus);
-    if (updatedStatus.isAuthorized || role === 'admin') {
+    if (updatedStatus.isAuthorized || role === 'admin' || role === 'superadmin') {
       setIsRoleModalOpen(false);
       setRoleModalAdminMode(false);
+      setRoleModalSuperAdminMode(false);
     }
     if (hospitalId) {
       const allHosps = dbService.getHospitalProfilesSync();
@@ -351,10 +374,17 @@ export function PodoLoadApp() {
     }
   };
 
-  // Synchronize /admin, #/admin, or ?mode=admin URL routing
+  // Synchronize /superadmin, /admin, #/admin, or ?mode=admin URL routing
   useEffect(() => {
     const handleUrlRoute = () => {
-      if (checkIsAdminUrl()) {
+      if (checkIsSuperAdminUrl()) {
+        if (currentUser.role === 'superadmin') {
+          setCurrentSection('superadmin');
+        } else {
+          setRoleModalSuperAdminMode(true);
+          setIsRoleModalOpen(true);
+        }
+      } else if (checkIsAdminUrl()) {
         if (currentUser.role === 'admin') {
           if (!isMobileDevice) {
             setCurrentSection('admin');
@@ -387,10 +417,23 @@ export function PodoLoadApp() {
       }
     };
 
+    const triggerSuperAdmin = () => {
+      if (currentUser.role === 'superadmin') {
+        setCurrentSection('superadmin');
+      } else {
+        setRoleModalSuperAdminMode(true);
+        setIsRoleModalOpen(true);
+      }
+    };
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         triggerAdmin();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        triggerSuperAdmin();
       }
     };
 
@@ -398,11 +441,17 @@ export function PodoLoadApp() {
       triggerAdmin();
     };
 
+    const handleCustomSuperAdminEvent = () => {
+      triggerSuperAdmin();
+    };
+
     window.addEventListener('keydown', handleGlobalKeyDown);
     window.addEventListener('podoload:admin-requested', handleCustomAdminEvent);
+    window.addEventListener('podoload:superadmin-requested', handleCustomSuperAdminEvent);
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
       window.removeEventListener('podoload:admin-requested', handleCustomAdminEvent);
+      window.removeEventListener('podoload:superadmin-requested', handleCustomSuperAdminEvent);
     };
   }, [currentUser.role, isMobileDevice]);
 
@@ -1144,6 +1193,7 @@ export function PodoLoadApp() {
           onLogout={handleLogout}
           isSessionLocked={true}
           initialAdminMode={roleModalAdminMode}
+          initialSuperAdminMode={roleModalSuperAdminMode}
         />
       );
     }
@@ -1531,6 +1581,39 @@ export function PodoLoadApp() {
             )
           )}
 
+          {/* SUPER ADMINISTRATOR: Multi-Tenant Governance Console */}
+          {currentSection === 'superadmin' && (
+            currentUser.role === 'superadmin' ? (
+              <PodoLoadSuperAdmin
+                onLogout={handleLogout}
+                onSwitchRole={handleSelectRole}
+                onOpenCase={(caseOrId) => handleSelectReport(typeof caseOrId === 'string' ? caseOrId : caseOrId.id, 5)}
+              />
+            ) : (
+              <div className="podoload-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', margin: '2rem auto', maxWidth: '520px' }}>
+                <ShieldAlert className="w-12 h-12 text-purple-600" style={{ margin: '0 auto 0.75rem auto' }} />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0c2328', margin: '0 0 0.5rem 0' }}>
+                  Super Administrator Access Required
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+                  The Super Admin Console governs hospital administrators, cross-clinic workstation telemetry (MAC address bindings &amp; voucher burns), and master audit trails. Only authenticated Technomind Super Administrators have access.
+                </p>
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={() => {
+                    setRoleModalSuperAdminMode(true);
+                    setIsRoleModalOpen(true);
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', margin: '0 auto', backgroundColor: '#7e22ce' }}
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>Log In as Super Administrator</span>
+                </button>
+              </div>
+            )
+          )}
+
           {/* SYSTEM: Settings */}
           {currentSection === 'settings' && (
             <PodoLoadSettings
@@ -1614,22 +1697,24 @@ export function PodoLoadApp() {
         </div>
       )}
 
-      {/* Role & Account Switcher Modal (Hospital Administrator vs Clinical Technician) */}
+      {/* Role & Account Switcher Modal (Super Admin vs Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin')}
+        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin')}
         onClose={() => {
           setIsRoleModalOpen(false);
           setRoleModalAdminMode(false);
+          setRoleModalSuperAdminMode(false);
           const status = dbService.checkDeviceAuthorizationStatus();
           setDeviceAuthStatus(status);
         }}
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
         onLogout={handleLogout}
-        isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin'}
+        isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin'}
         isSessionLocked={isSessionLocked}
         activationReason={deviceAuthStatus.reason}
         initialAdminMode={roleModalAdminMode}
+        initialSuperAdminMode={roleModalSuperAdminMode}
       />
     </div>
   );

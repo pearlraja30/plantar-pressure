@@ -20,7 +20,7 @@ export function logAuditEvent(
   userId: string = 'practitioner',
   caseId?: string,
   severity?: 'info' | 'warning' | 'security',
-  role?: 'admin' | 'technician' | 'system'
+  role?: 'superadmin' | 'admin' | 'technician' | 'system'
 ): AuditEvent {
   const events = getAuditEvents();
   const newEvent: AuditEvent = {
@@ -32,7 +32,7 @@ export function logAuditEvent(
     details,
     algorithmVersion: CURRENT_ALGORITHM_VERSION,
     severity: severity || (action.includes('FAILED') || action.includes('LOCKOUT') ? 'security' : 'info'),
-    role: role || (userId.includes('admin') ? 'admin' : userId.includes('tech') ? 'technician' : 'system'),
+    role: role || (userId.includes('superadmin') ? 'superadmin' : userId.includes('admin') ? 'admin' : userId.includes('tech') ? 'technician' : 'system'),
   };
 
   events.unshift(newEvent);

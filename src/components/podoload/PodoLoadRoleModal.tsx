@@ -33,7 +33,7 @@ interface PodoLoadRoleModalProps {
   onClose: () => void;
   currentUser: SystemUserSession;
   onSelectRole: (
-    role: 'admin' | 'technician',
+    role: 'superadmin' | 'admin' | 'technician',
     customName?: string,
     technicianId?: string,
     hospitalId?: string,
@@ -44,6 +44,7 @@ interface PodoLoadRoleModalProps {
   isSessionLocked?: boolean;
   activationReason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician' | 'permit_expired';
   initialAdminMode?: boolean;
+  initialSuperAdminMode?: boolean;
 }
 
 export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
@@ -56,6 +57,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   isSessionLocked = false,
   activationReason,
   initialAdminMode = false,
+  initialSuperAdminMode = false,
 }) => {
   const isMobileDevice =
     Capacitor.isNativePlatform() ||
@@ -66,23 +68,35 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
   const [isAdminContext, setIsAdminContext] = useState<boolean>(() => Boolean(initialAdminMode));
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'technician'>(
-    initialAdminMode ? 'admin' : isMobileDevice ? 'technician' : currentUser.role
+  const [selectedRole, setSelectedRole] = useState<'superadmin' | 'admin' | 'technician'>(
+    initialSuperAdminMode
+      ? 'superadmin'
+      : initialAdminMode
+      ? 'admin'
+      : currentUser.role === 'superadmin'
+      ? 'superadmin'
+      : isMobileDevice
+      ? 'technician'
+      : currentUser.role
   );
   const [selectedTechId, setSelectedTechId] = useState<string>(
     currentUser.technicianId || (technicians.length > 0 ? technicians[0].id : 'tech-user-01')
   );
 
-  // Sync admin mode when initialAdminMode prop changes or modal opens
+  // Sync admin or superadmin mode when props change or modal opens
   useEffect(() => {
-    if (initialAdminMode) {
+    if (initialSuperAdminMode) {
+      setSelectedRole('superadmin');
+    } else if (initialAdminMode) {
       setIsAdminContext(true);
       setSelectedRole('admin');
+    } else if (currentUser.role === 'superadmin') {
+      setSelectedRole('superadmin');
     } else {
       setIsAdminContext(false);
       setSelectedRole('technician');
     }
-  }, [initialAdminMode, isOpen]);
+  }, [initialAdminMode, initialSuperAdminMode, currentUser.role, isOpen]);
 
   // Discreet 5-tap header gesture tracking
   const [headerTapCount, setHeaderTapCount] = useState(0);
@@ -167,6 +181,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     return acc?.username || 'admin@technomind.health';
   });
 
+  // Super Admin Login Credentials (Global Vendor Authority)
+  const [superAdminUsernameInput, setSuperAdminUsernameInput] = useState<string>(() => {
+    const s = dbService.getSuperAdminAccountSync();
+    return s?.username || 'superadmin@technomind.health';
+  });
+  const [superAdminPassword, setSuperAdminPassword] = useState<string>('');
+  const [showSuperAdminPassword, setShowSuperAdminPassword] = useState<boolean>(false);
+
   // Technician Login User ID state (allows entering ANY assigned User ID)
   const [techUsernameInput, setTechUsernameInput] = useState<string>(() => {
     if (currentUser?.role === 'technician' && currentUser.name) {
@@ -216,6 +238,12 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
           return toggled;
         });
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedRole('superadmin');
+        setPinError(null);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -229,6 +257,26 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const handleSwitchAccount = () => {
     setPinError(null);
     setDeviceLockout(null);
+
+    // 1. Super Administrator Master Authentication (Global Vendor Governance)
+    if (selectedRole === 'superadmin') {
+      if (!superAdminUsernameInput.trim()) {
+        setPinError('Please enter Super Administrator Username or Email.');
+        return;
+      }
+      if (!superAdminPassword.trim()) {
+        setPinError('Please enter Super Administrator Master Password.');
+        return;
+      }
+      const auth = dbService.authenticateSuperAdmin(superAdminUsernameInput.trim(), superAdminPassword);
+      if (!auth.success || !auth.account) {
+        setPinError(auth.error || 'Invalid Super Administrator credentials. Please verify your credentials and try again.');
+        return;
+      }
+      onSelectRole('superadmin', auth.account.name);
+      onClose();
+      return;
+    }
 
     if (selectedRole === 'admin') {
       if (!adminUsernameInput.trim()) {
@@ -1120,65 +1168,233 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 </div>
               </form>
             ) : (
-              /* VIEW 3: SEPARATED CONTEXT (Admin Portal vs Clinical Technician Login) */
+              /* VIEW 3: THREE-TIER ROLE HIERARCHY (Super Admin -> Admin -> Technician) */
               <>
-                {/* Dedicated Administrator Portal Header (Shown ONLY when Admin mode is unlocked via /admin, Ctrl+Shift+A, or 5-tap gesture) */}
-                {isAdminContext && !isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
+                {/* Role Tabs Switcher: Technician | Hospital Admin | Super Admin */}
+                {!isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
                   <div
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#f0fdfa',
-                      border: '1px solid #99f6e4',
-                      padding: '0.55rem 0.75rem',
+                      gap: '0.35rem',
+                      marginBottom: '0.65rem',
+                      backgroundColor: '#f1f5f9',
+                      padding: '4px',
                       borderRadius: '8px',
-                      marginBottom: '0.35rem',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <ShieldCheck className="w-4 h-4 text-teal-600" />
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f766e' }}>
-                        Hospital Administrator Portal (Master Session)
-                      </span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRole('technician');
+                        setIsAdminContext(false);
+                        setPinError(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '0.45rem 0.35rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: selectedRole === 'technician' ? '#ffffff' : 'transparent',
+                        color: selectedRole === 'technician' ? '#0f766e' : '#64748b',
+                        boxShadow: selectedRole === 'technician' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>🔬 Technician</span>
+                    </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setIsAdminContext(false);
-                        setSelectedRole('technician');
+                        setSelectedRole('admin');
+                        setIsAdminContext(true);
                         setPinError(null);
-                        if (typeof window !== 'undefined' && (window.location.hash.includes('admin') || window.location.search.includes('admin'))) {
-                          try {
-                            window.history.replaceState(null, '', window.location.pathname);
-                          } catch {
-                            // ignore
-                          }
-                        }
                       }}
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid #99f6e4',
-                        color: '#0f766e',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.7rem',
+                        flex: 1,
+                        padding: '0.45rem 0.35rem',
+                        fontSize: '0.72rem',
                         fontWeight: 700,
+                        borderRadius: '6px',
+                        border: 'none',
                         cursor: 'pointer',
+                        backgroundColor: selectedRole === 'admin' ? '#ffffff' : 'transparent',
+                        color: selectedRole === 'admin' ? '#0f766e' : '#64748b',
+                        boxShadow: selectedRole === 'admin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.3rem',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        transition: 'all 0.15s ease',
                       }}
                     >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to Technician Login</span>
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>🏥 Clinic Admin</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRole('superadmin');
+                        setIsAdminContext(false);
+                        setPinError(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '0.45rem 0.35rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: selectedRole === 'superadmin' ? '#ffffff' : 'transparent',
+                        color: selectedRole === 'superadmin' ? '#7e22ce' : '#64748b',
+                        boxShadow: selectedRole === 'superadmin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>🛡️ Super Admin</span>
                     </button>
                   </div>
                 )}
 
-                {isAdminContext ? (
-                  /* Account 1: Hospital Administrator (Dedicated Admin Context) */
+                {selectedRole === 'superadmin' ? (
+                  /* Role 1: Super Administrator Governance (Master Vendor Authority) */
+                  <div
+                    style={{
+                      padding: '0.95rem 1rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid #a855f7',
+                      backgroundColor: '#faf5ff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            backgroundColor: '#f3e8ff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#7e22ce',
+                          }}
+                        >
+                          <ShieldAlert className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#581c87' }}>
+                            Super Administrator Governance
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#6b21a8' }}>
+                            Technomind Global Authority · Multi-Hospital Master Management
+                          </div>
+                        </div>
+                      </div>
+                      <span className="podo-badge" style={{ backgroundColor: '#f3e8ff', color: '#7e22ce', fontWeight: 700, fontSize: '0.64rem' }}>
+                        Master Vendor
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                      <strong>Full Multi-Tenant Governance:</strong> Provision Hospital Admins, inspect all workstation hardware MAC bindings, trace voucher code burns and permit expirations, audit all patient reports, and export global backups.
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.2fr 1fr',
+                        gap: '0.65rem',
+                        backgroundColor: '#ffffff',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid #e9d5ff',
+                      }}
+                    >
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#7e22ce', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                          <User className="w-3 h-3 text-purple-600" />
+                          <span>Super Admin ID / Email *</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="podoload-input"
+                          placeholder="superadmin@technomind.health"
+                          value={superAdminUsernameInput}
+                          autoComplete="username"
+                          onChange={(e) => {
+                            setSuperAdminUsernameInput(e.target.value);
+                            setPinError(null);
+                          }}
+                          style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#7e22ce', display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '2px' }}>
+                          <Lock className="w-3 h-3 text-purple-600" />
+                          <span>Master Password *</span>
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={showSuperAdminPassword ? 'text' : 'password'}
+                            className="podoload-input"
+                            placeholder="••••••••"
+                            value={superAdminPassword}
+                            autoComplete="current-password"
+                            onChange={(e) => {
+                              setSuperAdminPassword(e.target.value);
+                              setPinError(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSwitchAccount();
+                              }
+                            }}
+                            style={{ fontSize: '0.76rem', padding: '0.25rem 1.8rem 0.25rem 0.5rem' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSuperAdminPassword(!showSuperAdminPassword)}
+                            style={{
+                              position: 'absolute',
+                              right: '4px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#64748b',
+                              padding: '1px',
+                            }}
+                          >
+                            {showSuperAdminPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : selectedRole === 'admin' ? (
+                  /* Account 1: Hospital Administrator (Clinic Admin Context) */
                   <div
                     style={{
                       padding: '0.95rem 1rem',
@@ -1953,7 +2169,17 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 )}
               </div>
 
-              {isAdminContext ? (
+              {selectedRole === 'superadmin' ? (
+                <button
+                  type="button"
+                  className="podoload-btn-primary"
+                  onClick={handleSwitchAccount}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#7e22ce' }}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Sign In as Super Administrator</span>
+                </button>
+              ) : selectedRole === 'admin' || isAdminContext ? (
                 <button
                   type="button"
                   className="podoload-btn-primary"

@@ -128,7 +128,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           isMobileDevice ? 'Mobile Camera Sensor' : 'No Scanner Hardware Detected'
         );
         // If on web browser without a configured printer-scanner, prompt user to select installed printer first
-        if (!isMobileDevice && typeof window !== 'undefined' && !(window as any).electronAPI && !hasPromptedBrowserPrinter) {
+        if (!isMobileDevice && typeof window !== 'undefined' && !(window as any).electronAPI && !hardwareScannerService.getDefaultPrinterScanner()) {
           setHasPromptedBrowserPrinter(true);
           setIsPrinterModalOpen(true);
         }
@@ -350,7 +350,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
       } catch (err: any) {
         setScanning(false);
         setPhase('');
-        alert(`Optical sensor acquisition notice: ${err.message}. Please select the scan output file directly.`);
+        console.warn('[DirectScan] Optical sensor acquisition error:', err);
         if (side === 'Left') leftFileInputRef.current?.click();
         else rightFileInputRef.current?.click();
         return;

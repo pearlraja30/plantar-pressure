@@ -219,7 +219,7 @@ export interface AuditEvent {
   details: string;
   algorithmVersion: string;
   severity?: 'info' | 'warning' | 'security';
-  role?: 'admin' | 'technician' | 'system';
+  role?: 'superadmin' | 'admin' | 'technician' | 'system';
 }
 
 export type PatientIdMode = 'alphanumeric' | 'numeric' | 'date_alphanumeric';
@@ -367,6 +367,20 @@ export interface HospitalProfile {
   };
 }
 
+export interface SuperAdminAccount {
+  id: string;
+  name: string;
+  username: string; // e.g. superadmin@technomind.health or superadmin
+  pin: string; // Master Super Admin Password
+  role: 'superadmin';
+  email: string;
+  phone?: string;
+  createdAt: string;
+  lastLoginAt?: string;
+  status: 'active';
+  recoveryKey?: string;
+}
+
 export interface AdminAccount {
   id: string;
   name: string;
@@ -383,6 +397,8 @@ export interface AdminAccount {
   status: 'active' | 'suspended';
   recoveryKey?: string;
   isInitialSetupCompleted?: boolean;
+  createdBy?: string; // Created by Super Admin (e.g. 'superadmin')
+  maxStationsAllowed?: number; // Allocated workstation quota
 }
 
 export interface BoundDevice {
