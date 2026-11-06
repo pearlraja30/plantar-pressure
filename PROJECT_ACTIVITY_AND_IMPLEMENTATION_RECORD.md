@@ -1005,3 +1005,65 @@ To achieve maximum horizontal scale across multi-hospital networks, the platform
 
 
 
+
+
+---
+
+## 35. Release v1.0.60: Single Header Sign-Out, Layout Anti-Overlap Safeguards, and Hardware Scanner Hardening
+
+### 35.1 Clinical Overview & User Problem Statement
+In field evaluation and clinical testing of the Windows `.exe` and Web station kiosk, two key usability requirements and ergonomic issues were raised:
+1. **Duplicate Sign Out Elimination**:
+   - The UI had a duplicate red "Log Out" button at the bottom of the left sidebar user card, alongside the primary "Sign Out" button at the top right corner of the header.
+   - Requirement: Preserve only the top right corner "Sign Out" button and remove the duplicate sidebar logout button.
+2. **Comprehensive Text Overlap Remediation**:
+   - Menu items, badges, header elements, capture device tags, and report sheet sections suffered from text squeeze and overlap on compact or constrained viewports.
+   - Requirement: Ensure zero text overlapping across sidebar navigation, top header, capture device badges, and the full A4 report document (header clinic info, meta grid, measurements table, interpretation, doctor comments, and signatures).
+3. **Scanner Detection & Direct Hardware Flow**:
+   - Windows EXE: Scanner detection and acquisition must reliably detect the default printer-cum-scanner and transfer the scanned image directly to the processing screen.
+   - Web Browser: App must prompt the user to select the printer installed on the system first before scan ingestion, eliminating all confusing error dialogs.
+
+### 35.2 Architectural Modifications
+
+#### 1. Sidebar Duplicate Sign Out Removal & Label Truncation (`src/components/podoload/PodoLoadSidebar.tsx`)
+- Removed `LogOut` icon import and eliminated the bottom red `<button onClick={onLogout}>Log Out</button>` element from `.podoload-sidebar-user-card`.
+- Preserved single-click switch login menu interaction (`Click to switch login ▾`).
+- Updated footer version tag dynamically from static `v1.0.29` to `v${APP_CURRENT_VERSION} · TechFile TF-001`.
+- Added CSS ellipsis styling (`overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`) to `.podoload-nav-item span`, `.podoload-sidebar-user-role`, and `.podoload-sidebar-user-name`.
+- Protected `ADMIN & SYSTEM` label and `Admin` lock badge with `gap: 0.35rem`, `whiteSpace: nowrap`, and `flexShrink: 0`.
+
+#### 2. Top Header Anti-Collision & Single Sign-Out (`src/components/podoload/PodoLoadHeader.tsx`)
+- Top right corner "Sign Out" button styled with `flexShrink: 0`, `whiteSpace: nowrap`, and `padding: 0.3rem 0.65rem`.
+- Title block enclosed in `minWidth: 0, flexShrink: 1, overflow: hidden, textOverflow: ellipsis`.
+- Global search input set to responsive width with `flex-shrink: 2`.
+- Hospital pill and role badges wrapped with `maxWidth: 220px, overflow: hidden, textOverflow: ellipsis, whiteSpace: nowrap`.
+
+#### 3. Footprint Capture Device Header Fix (`src/components/podoload/PodoLoadCapture.tsx`)
+- Left and Right foot capture headers wrapped with `minWidth: 0, flexWrap: 'wrap'`.
+- Device name enclosed in `maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block'`.
+- Status dots, "Change / Select Printer" button, and resolution/dimensions tags set to `flexShrink: 0` and `whiteSpace: 'nowrap'`.
+
+#### 4. Report Document Zero-Overlap Overhaul (`src/components/podoload/PodoLoadReport.tsx`)
+- **Clinic Header**: Logo box styled with flex shrink 0; clinic name and contact given `wordBreak: 'break-word', lineHeight: 1.3` to prevent clipping or text wrapping issues.
+- **Patient Meta Grid**: All 4 quadrants (`Name`, `ID`, `Age/gender`, `Date`) formatted with `minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35`.
+- **Measurements Table**: Enforced `tableLayout: 'fixed', width: '100%'` with explicit column widths (`42%` metric name, `29%` Left, `29%` Right), preventing numeric metric collisions.
+- **Interpretation & Doctor Comments**: Replaced layout-destabilizing `marginBottom: 'auto'` with explicit margins (`0.45rem` and `0.65rem`), `lineHeight: 1.4`, and `wordBreak: 'break-word'`.
+- **Signatures Row**: Added `flexWrap: 'wrap'`, `gap: '0.75rem'`, and `flex: '1 1 120px'` to Doctor and Technician signatory blocks to eliminate overlapping on narrower containers.
+- **Action Buttons Row**: Buttons configured with `whiteSpace: 'nowrap'`, icon flex-shrink 0, and ellipsis truncation on text labels.
+
+#### 5. Windows EXE & Web Browser Hardware Scanner Hardening (`electron/main.cjs` & `PodoLoadCapture.tsx`)
+- **Windows EXE (`electron/main.cjs`)**:
+  - `scanner:enumerate`: Removed overly restrictive `Type -eq 1` filter to allow multifunction all-in-one printer-cum-scanners (Epson EcoTank, HP MFP, Canon PIXMA, Brother DCP) to be detected via WIA `DeviceInfos`.
+  - `scanner:acquire`: Enhanced PowerShell acquisition script:
+    - Connects to selected or default WIA device with fallback to universal COM collection indexing.
+    - Added automatic fallback to native Windows `WIA.CommonDialog` (`ShowAcquireImage`) if silent transfer cannot acquire an image.
+    - Saves acquired frame to temp BMP/JPEG and streams directly to frontend for automated deskew and processing.
+- **Web Browser Mode (`src/components/podoload/PodoLoadCapture.tsx`)**:
+  - Automatically displays the "Select Installed Printer cum Scanner" modal if no printer has been selected for the browser workstation yet.
+  - When clicking "Scan Left Foot" or "Scan Right Foot", enforces printer selection first, displays clear progress phase, and triggers original scan file ingestion without throwing popup alerts.
+
+### 35.3 Quality Verification & Release
+- **Unit Test Suite**: 79/79 unit tests passed (100% OK).
+- **Validation Suite**: 15/15 clinical validation scenarios passed (100% OK).
+- **Build Status**: TypeScript check (`tsc -b`) and Vite production bundle compiled with 0 errors.
+- **Version Bump**: Bumped to `v1.0.60` across `package.json`, `build.gradle`, `Info.plist`, and `dbService.ts`.

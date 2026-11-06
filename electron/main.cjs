@@ -126,20 +126,22 @@ try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction SilentlyContinue
   if ($dm -and $dm.DeviceInfos) {
     foreach ($dev in $dm.DeviceInfos) {
-      if ($dev.Type -eq 1) {
+      try {
         $devId = [string]$dev.DeviceID
         $devName = [string]$dev.Properties.Item("Name").Value
-        $mfg = [string]$dev.Properties.Item("Manufacturer").Value
-        $output.scanners += @{
-          id = $devId
-          name = $devName
-          manufacturer = $mfg
-          interface = "WIA"
-          status = "Ready"
-          maxDpi = 4800
-          isScanner = $true
+        $mfg = try { [string]$dev.Properties.Item("Manufacturer").Value } catch { "Windows Imaging Device" }
+        if ($devName) {
+          $output.scanners += @{
+            id = $devId
+            name = $devName
+            manufacturer = $mfg
+            interface = "WIA"
+            status = "Ready"
+            maxDpi = 4800
+            isScanner = $true
+          }
         }
-      }
+      } catch {}
     }
   }
 } catch {}
@@ -385,46 +387,68 @@ try {
     }
   }
 
-  # 3. Match default / first WIA scanner (Type 1 = ScannerDeviceType)
+  # 3. Match default / first WIA scanner
   if (-not $dev) {
     foreach ($info in $infos) {
-      if ($info.Type -eq 1) {
-        $dev = $info.Connect()
-        break
-      }
+      $dev = try { $info.Connect() } catch { $null }
+      if ($dev) { break }
     }
   }
 
   # 4. Fallback to any imaging device in DeviceInfos
   if (-not $dev -and $infos.Length -gt 0) {
-    $dev = $infos[0].Connect()
+    $dev = try { $infos[0].Connect() } catch { $null }
   }
 
   if ($dev) {
-    $item = $dev.Items.Item(1)
-    try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
-    try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
-    try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
+    $item = try { $dev.Items.Item(1) } catch { try { $dev.Items | Select-Object -First 1 } catch { $null } }
+    if ($item) {
+      try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
+      try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
+      try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
 
-    $image = $null
-    # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
-    try {
-      $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
-    } catch {
+      $image = $null
+      # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
       try {
-        $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+        $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
       } catch {
-        $image = $item.Transfer()
+        try {
+          $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+        } catch {
+          try {
+            $image = $item.Transfer()
+          } catch {}
+        }
+      }
+
+      if ($image) {
+        if (Test-Path $temp) { Remove-Item $temp -Force }
+        $image.SaveFile($temp)
+        $scanned = $true
       }
     }
+  }
 
-    if ($image) {
-      if (Test-Path $temp) { Remove-Item $temp -Force }
-      $image.SaveFile($temp)
-      $scanned = $true
+  # 5. Fallback: If programmatic transfer did not produce a file, use native WIA CommonDialog!
+  if (-not $scanned) {
+    try {
+      $cd = New-Object -ComObject WIA.CommonDialog -ErrorAction SilentlyContinue
+      if ($cd) {
+        # ShowAcquireImage(DeviceType=1 Scanner, Intent=1 Color, Bias=131072 Quality, FormatID=BMP, AlwaysSelect=false, UseDeviceProps=true, CancelError=false)
+        $img = $cd.ShowAcquireImage(1, 1, 131072, "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}", $false, $true, $false)
+        if ($img) {
+          if (Test-Path $temp) { Remove-Item $temp -Force }
+          $img.SaveFile($temp)
+          $scanned = $true
+        }
+      }
+    } catch {
+      if (-not $errMsg) { $errMsg = $_.Exception.Message }
     }
-  } else {
-    $errMsg = "No optical scanner detected by Windows WIA. Ensure your printer cum scanner is powered on and connected via USB or Wi-Fi."
+  }
+
+  if (-not $scanned -and -not $errMsg) {
+    $errMsg = "No optical scanner responded. Ensure your printer cum scanner is powered on and connected via USB or Wi-Fi."
   }
 } catch {
   $errMsg = $_.Exception.Message

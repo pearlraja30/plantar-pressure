@@ -64,8 +64,8 @@
    LEFT SIDEBAR
    ---------------------------------------------------- */
 .podoload-sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 235px;
+  min-width: 235px;
   background-color: var(--podo-sidebar-bg);
   display: flex;
   flex-direction: column;
@@ -146,6 +146,12 @@
   flex-shrink: 0;
 }
 
+.podoload-nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ----------------------------------------------------
    MAIN APP CONTAINER
    ---------------------------------------------------- */
@@ -196,7 +202,10 @@
 
 .podoload-global-search {
   position: relative;
-  width: 320px;
+  width: 240px;
+  max-width: 280px;
+  min-width: 140px;
+  flex-shrink: 2;
 }
 
 .podoload-global-search input {
@@ -1141,6 +1150,7 @@
 .podoload-metrics-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.74rem;
 }
 

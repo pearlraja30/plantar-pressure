@@ -113,6 +113,8 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
     try {
       const list = await hardwareScannerService.enumerateAttachedScanners(force);
       setAvailableScanners(list);
+      const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
+
       if (list.length > 0) {
         const defaultDev = list.find((s) => s.isDefault);
         const chosenId = defaultDev ? defaultDev.id : list[0].id;
@@ -127,11 +129,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
         setScannerModel(
           isMobileDevice ? 'Mobile Camera Sensor' : 'No Scanner Hardware Detected'
         );
-        // If on web browser without a configured printer-scanner, prompt user to select installed printer first
-        if (!isMobileDevice && typeof window !== 'undefined' && !(window as any).electronAPI && !hardwareScannerService.getDefaultPrinterScanner()) {
-          setHasPromptedBrowserPrinter(true);
-          setIsPrinterModalOpen(true);
-        }
+      }
+
+      // Prompt on web browser if no installed printer cum scanner has been paired yet
+      if (!isMobileDevice && !isElectron && !hardwareScannerService.getDefaultPrinterScanner()) {
+        setHasPromptedBrowserPrinter(true);
+        setIsPrinterModalOpen(true);
       }
     } catch (e) {
       console.warn('Error discovering scanners:', e);
@@ -277,7 +280,23 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const handleDirectScan = async (side: 'Left' | 'Right') => {
     let activeDevice = availableScanners.find((s) => s.id === selectedScannerId);
 
-    // If no printer/scanner is selected or available in browser, ask user to select printer first
+    const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
+
+    // If on web browser and no installed printer has been paired yet, prompt user to select first
+    if (!isElectron && !isMobileDevice) {
+      const defaultPrinter = hardwareScannerService.getDefaultPrinterScanner();
+      if (!defaultPrinter || !activeDevice) {
+        setIsPrinterModalOpen(true);
+        return;
+      }
+    }
+
+    // If no printer/scanner is selected or available, ask user to select printer first
+    if (!activeDevice && availableScanners.length > 0) {
+      activeDevice = availableScanners[0];
+      setSelectedScannerId(activeDevice.id);
+    }
+
     if (!activeDevice) {
       setIsPrinterModalOpen(true);
       return;
@@ -781,7 +800,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 gap: '0.35rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0, flexWrap: 'wrap' }}>
                 <span
                   style={{
                     width: '8px',
@@ -789,9 +808,21 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                     borderRadius: '50%',
                     backgroundColor: isScannerAttached ? '#16a34a' : '#f59e0b',
                     display: 'inline-block',
+                    flexShrink: 0,
                   }}
                 />
-                <strong style={{ color: '#0f172a' }}>
+                <strong
+                  style={{
+                    color: '#0f172a',
+                    maxWidth: '220px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                    verticalAlign: 'middle',
+                  }}
+                  title={activeDevice ? activeDevice.name : undefined}
+                >
                   {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Selected'}
                 </strong>
                 <button
@@ -806,11 +837,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                     textDecoration: 'underline',
                     padding: '0 4px',
                     fontWeight: 600,
+                    flexShrink: 0,
                   }}
                 >
                   {activeDevice ? 'Change' : 'Select Printer'}
                 </button>
-                <span style={{ color: '#64748b' }}>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>
                   · {resolutionDpi} ·{' '}
                   {sheetSize === 'Custom'
                     ? `Custom (${customWidthMm}×${customHeightMm} mm)`
@@ -1123,7 +1155,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 gap: '0.35rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0, flexWrap: 'wrap' }}>
                 <span
                   style={{
                     width: '8px',
@@ -1131,9 +1163,21 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                     borderRadius: '50%',
                     backgroundColor: isScannerAttached ? '#16a34a' : '#f59e0b',
                     display: 'inline-block',
+                    flexShrink: 0,
                   }}
                 />
-                <strong style={{ color: '#0f172a' }}>
+                <strong
+                  style={{
+                    color: '#0f172a',
+                    maxWidth: '220px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                    verticalAlign: 'middle',
+                  }}
+                  title={activeDevice ? activeDevice.name : undefined}
+                >
                   {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Selected'}
                 </strong>
                 <button
@@ -1148,11 +1192,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                     textDecoration: 'underline',
                     padding: '0 4px',
                     fontWeight: 600,
+                    flexShrink: 0,
                   }}
                 >
                   {activeDevice ? 'Change' : 'Select Printer'}
                 </button>
-                <span style={{ color: '#64748b' }}>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>
                   · {resolutionDpi} ·{' '}
                   {sheetSize === 'Custom'
                     ? `Custom (${customWidthMm}×${customHeightMm} mm)`

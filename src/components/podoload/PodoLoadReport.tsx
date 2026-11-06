@@ -529,20 +529,23 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
             className="podoload-report-header"
             style={{
               justifyContent: logoPosition === 'Centre' ? 'center' : logoPosition === 'Right' ? 'flex-end' : 'flex-start',
+              gap: '0.75rem',
+              alignItems: 'center',
+              flexWrap: 'wrap',
             }}
           >
             <div className="podoload-report-logo-box">
               {logoUrl ? (
-                <img src={logoUrl} alt="Clinic Logo" style={{ maxHeight: '34px', maxWidth: '65px', objectFit: 'contain' }} />
+                <img src={logoUrl} alt="Clinic Logo" style={{ maxHeight: '38px', maxWidth: '75px', objectFit: 'contain' }} />
               ) : (
                 'Logo'
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0c2328', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                [{clinicName || 'Hospital / clinic name'}]
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0c2328', wordBreak: 'break-word', lineHeight: 1.3 }}>
+                {clinicName || 'Hospital / clinic name'}
               </span>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', wordBreak: 'break-word', lineHeight: 1.3 }}>
                 {clinicContact}
               </span>
             </div>
@@ -551,16 +554,16 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           <div className="podoload-report-divider" />
 
           {/* Report Title */}
-          <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.04em', color: '#0c2328', marginBottom: '0.45rem' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.04em', color: '#0c2328', marginBottom: '0.45rem' }}>
             PLANTAR PRESSURE REPORT
           </div>
 
           {/* Patient Details Meta Grid */}
           <div className="podoload-report-meta-grid" style={{ marginBottom: '0.45rem', paddingBottom: '0.35rem' }}>
-            <div>Name: <strong>{patientName}</strong></div>
-            <div>ID: <strong>[{patientId}]</strong></div>
-            <div>Age / gender: <strong>[{patientAge}] / [{patientGender}]</strong></div>
-            <div>Date: <strong>[{examDate}]</strong></div>
+            <div style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35 }}>Name: <strong>{patientName}</strong></div>
+            <div style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35 }}>ID: <strong>[{patientId}]</strong></div>
+            <div style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35 }}>Age / gender: <strong>[{patientAge}] / [{patientGender}]</strong></div>
+            <div style={{ minWidth: 0, wordBreak: 'break-word', lineHeight: 1.35 }}>Date: <strong>[{examDate}]</strong></div>
           </div>
 
           {/* Presentation Mode Selector */}
@@ -677,12 +680,12 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </div>
 
           {/* Measurements Table (Truthful Measured Values, Zero Hallucination) */}
-          <table className="podoload-metrics-table" style={{ marginBottom: '0.75rem' }}>
+          <table className="podoload-metrics-table" style={{ marginBottom: '0.75rem', tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
-                <th></th>
-                <th>LEFT</th>
-                <th>RIGHT</th>
+                <th style={{ width: '42%' }}></th>
+                <th style={{ width: '29%' }}>LEFT</th>
+                <th style={{ width: '29%' }}>RIGHT</th>
               </tr>
             </thead>
             <tbody>
@@ -745,34 +748,47 @@ ${comments ? `\nDoctor Comments:\n${deduplicateSentences(comments)}` : ''}`;
           </table>
 
           {/* Interpretation (Concise Diagnostic Label, Zero Repetition) */}
-          <div style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>
-            <span style={{ fontWeight: 700 }}>Interpretation (auto): </span>
+          <div style={{ fontSize: '0.72rem', marginBottom: '0.45rem', lineHeight: 1.4, wordBreak: 'break-word' }}>
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>Interpretation (auto): </span>
             <span style={{ color: '#334155' }}>
               {archClassification} plantar pattern · Peak contact at {peakRegion}.
             </span>
           </div>
 
           {/* Doctor Comments (Full Clinical Assessment) */}
-          <div style={{ fontSize: '0.68rem', marginBottom: 'auto' }}>
-            <span style={{ fontWeight: 700 }}>Doctor comments: </span>
+          <div style={{ fontSize: '0.68rem', marginBottom: '0.65rem', lineHeight: 1.4, wordBreak: 'break-word' }}>
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>Doctor comments: </span>
             <span style={{ color: '#334155' }}>
               {deduplicateSentences(comments) || 'Plantar screening completed.'}
             </span>
           </div>
 
           {/* Signatures */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginTop: '0.45rem', paddingTop: '0.35rem', borderTop: '1px solid #e2e8f0' }}>
-            <div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              fontSize: '0.68rem',
+              marginTop: '0.45rem',
+              paddingTop: '0.35rem',
+              borderTop: '1px solid #e2e8f0',
+              minWidth: 0,
+            }}
+          >
+            <div style={{ minWidth: 0, wordBreak: 'break-word', flex: '1 1 120px' }}>
               Doctor: <strong>{doctorName}</strong>
               <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>Signature Verified</div>
             </div>
-            <div>
+            <div style={{ minWidth: 0, wordBreak: 'break-word', textAlign: 'right', flex: '1 1 120px' }}>
               Technician: <strong>{technicianName || 'Clinical Specialist'}</strong>
             </div>
           </div>
 
           {/* Footer Note */}
-          <div style={{ textAlign: 'center', fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+          <div style={{ textAlign: 'center', fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.35rem', wordBreak: 'break-word', lineHeight: 1.3 }}>
             {customFooter ? `${customFooter} · ` : ''}Software supported by Technomind Healthcare
           </div>
         </div>

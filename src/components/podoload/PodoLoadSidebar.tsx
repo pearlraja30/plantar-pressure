@@ -14,10 +14,9 @@ import {
   ShieldCheck,
   UserCheck,
   Database,
-  LogOut,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
+import { SystemUserSession, SYSTEM_ACCOUNTS, APP_CURRENT_VERSION } from '../../services/dbService';
 
 export type PodoLoadNavSection =
   | 'registration'
@@ -197,11 +196,11 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         {/* Section 3: ADMINISTRATION & SYSTEM (Desktop / Web Only) */}
         {!isMobileDevice && (
           <div className="podoload-nav-section">
-            <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>ADMIN & SYSTEM</span>
+            <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>ADMIN & SYSTEM</span>
               {currentUser?.role === 'technician' && (
-                <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Lock className="w-2.5 h-2.5" /> Admin Only
+                <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <Lock className="w-2.5 h-2.5" /> Admin
                 </span>
               )}
             </div>
@@ -287,56 +286,30 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
                 {currentUser?.role === 'superadmin' ? (
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <ShieldCheck className="w-4 h-4 text-purple-400 flex-shrink-0" />
                 ) : currentUser?.role === 'admin' ? (
-                  <ShieldCheck className="w-4 h-4 text-teal-400" />
+                  <ShieldCheck className="w-4 h-4 text-teal-400 flex-shrink-0" />
                 ) : (
-                  <UserCheck className="w-4 h-4 text-cyan-400" />
+                  <UserCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 )}
-                <span className="podoload-sidebar-user-role">
+                <span className="podoload-sidebar-user-role" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {currentUser?.role === 'superadmin' ? '👑 Super Admin' : currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
                 </span>
               </div>
-
-              {onLogout && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLogout();
-                    if (onCloseMobile) onCloseMobile();
-                  }}
-                  title="Sign out and lock station"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.12)',
-                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                    color: '#f87171',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '0.62rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px',
-                  }}
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Log Out</span>
-                </button>
-              )}
             </div>
-            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px' }}>{currentUser?.name}</div>
+            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentUser?.name}
+            </div>
             <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
           </>
         )}
       </div>
 
       <div style={{ padding: '0.45rem 1.25rem 0.75rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
-        v1.0.29 · TechFile TF-001
+        v{APP_CURRENT_VERSION} · TechFile TF-001
       </div>
     </aside>
     </>

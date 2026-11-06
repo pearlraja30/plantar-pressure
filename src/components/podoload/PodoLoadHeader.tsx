@@ -126,11 +126,11 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
           <div
             className="podoload-header-title-block"
             onClick={handleHeaderTap}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', userSelect: 'none' }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', userSelect: 'none', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}
             title="Hospital Diagnostic Station (Tap 5x for Master Administrator Portal)"
           >
-            <Lock className="w-3.5 h-3.5 text-slate-400 opacity-60" />
-            <h2 className="podoload-header-title">{getHeaderTitle()}</h2>
+            <Lock className="w-3.5 h-3.5 text-slate-400 opacity-60 flex-shrink-0" />
+            <h2 className="podoload-header-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getHeaderTitle()}</h2>
           </div>
         </div>
 
@@ -162,10 +162,12 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
               border: 'none',
               cursor: 'pointer',
               backgroundColor: !cloudSynced ? '#fef3c7' : pendingSyncCount > 0 ? '#eff6ff' : '#ecfdf5',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
             <Cloud
-              className={`w-3.5 h-3.5 ${
+              className={`w-3.5 h-3.5 flex-shrink-0 ${
                 !cloudSynced
                   ? 'text-amber-600'
                   : isSyncing || pendingSyncCount > 0
@@ -177,20 +179,21 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
               style={{
                 color: !cloudSynced ? '#b45309' : pendingSyncCount > 0 ? '#1d4ed8' : '#047857',
                 fontWeight: 600,
+                whiteSpace: 'nowrap',
               }}
             >
               {!cloudSynced
-                ? 'Offline (Local)'
+                ? 'Offline'
                 : isSyncing
-                ? 'Syncing reports...'
+                ? 'Syncing...'
                 : pendingSyncCount > 0
-                ? `Cloud: ${pendingSyncCount} pending`
-                : 'Cloud: synced'}
+                ? `${pendingSyncCount} pending`
+                : 'Synced'}
             </span>
           </button>
 
           {/* Language Selector */}
-          <div className="podoload-lang-badge" title="Language: English">
+          <div className="podoload-lang-badge" title="Language: English" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
             <Globe className="w-3 h-3 mr-1 inline opacity-70" />
             <span>EN</span>
           </div>
@@ -213,10 +216,12 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                 fontWeight: 700,
                 fontSize: '0.72rem',
                 padding: '0.2rem 0.55rem',
+                maxWidth: '180px',
+                flexShrink: 1,
               }}
             >
-              <Building2 className="w-3.5 h-3.5 text-teal-600" />
-              <span>{clinicName}</span>
+              <Building2 className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clinicName}</span>
             </button>
           )}
 
@@ -238,6 +243,8 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                 border: 'none',
                 cursor: 'pointer',
                 boxShadow: '0 1px 3px rgba(13,148,136,0.2)',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
               title="Workstation session signed out. Click to sign in."
             >
@@ -251,22 +258,26 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                 className={`podoload-role-badge ${currentUser.role === 'superadmin' ? 'role-superadmin' : currentUser.role === 'admin' ? 'role-admin' : 'role-tech'}`}
                 onClick={onOpenUserSwitcher}
                 title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
-                style={currentUser.role === 'superadmin' ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' } : undefined}
+                style={{
+                  maxWidth: '220px',
+                  flexShrink: 1,
+                  ...(currentUser.role === 'superadmin' ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' } : {})
+                }}
               >
                 {currentUser.role === 'superadmin' ? (
                   <>
-                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                    <span>👑 Super Admin: {currentUser.name} ▾</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>👑 Super Admin: {currentUser.name} ▾</span>
                   </>
                 ) : currentUser.role === 'admin' ? (
                   <>
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Admin: {currentUser.name} ▾</span>
+                    <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin: {currentUser.name} ▾</span>
                   </>
                 ) : (
                   <>
-                    <UserCheck className="w-3.5 h-3.5" />
-                    <span>Tech: {currentUser.name} ▾</span>
+                    <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Tech: {currentUser.name} ▾</span>
                   </>
                 )}
               </button>
@@ -283,16 +294,18 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                     gap: '0.3rem',
                     padding: '0.3rem 0.65rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#64748b',
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fff5f5',
+                    color: '#dc2626',
                     fontSize: '0.72rem',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <LogOut className="w-3.5 h-3.5 text-slate-500" />
+                  <LogOut className="w-3.5 h-3.5 text-red-500" />
                   <span>Sign Out</span>
                 </button>
               )}
