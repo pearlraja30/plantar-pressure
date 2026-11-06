@@ -419,9 +419,10 @@ gantt
     Supabase SQL Generator & Migration Tool       :done, p1_1, 2026-11-06, 1d
     Bi-Directional Case Pull & Hydration           :done, p1_2, 2026-11-06, 1d
     Remote Station Revocation & Kill-Switch       :done, p1_3, 2026-11-06, 1d
-    section Phase 2 (Planned)
-    Electron Flatbed Scanner (TWAIN/WIA) Bridge   :active, p2_1, 2026-11-07, 3d
-    Camera Barcode/QR Code Scanner for MRN        :p2_2, after p2_1, 2d
+    section Phase 2 (Completed / Active)
+    Electron Flatbed Scanner (WIA/Printers) Bridge:done, p2_1, 2026-11-06, 1d
+    Web Browser Station Printer-Scanner Pairing   :done, p2_1b, 2026-11-06, 1d
+    Camera Barcode/QR Code Scanner for MRN        :p2_2, 2026-11-07, 2d
     section Phase 3 (Planned)
     Longitudinal Comparative Progression Viewer    :p3_1, after p2_2, 3d
     Automated Insole Offloading Calculator        :p3_2, after p3_1, 3d
@@ -431,6 +432,31 @@ gantt
     section Phase 5 (Planned)
     Reactive Multilingual i18n Engine (EN/ES/TA/HI):p5_1, after p4_2, 4d
 ```
+
+---
+
+## 14. Windows Hardware Scanner & Web Browser Printer-cum-Scanner Protocol
+
+### 14.1 Windows Desktop (EXE) Native WIA Automation
+1. **Device Discovery**:
+   - Executes PowerShell EncodedCommand querying `WIA.DeviceManager` (`$dm.DeviceInfos`) and `Win32_Printer`.
+   - Identifies whether an installed printer has `Default: True` and maps it to the associated scanner hardware.
+   - Sorts the default printer-cum-scanner to position #1 so it is selected automatically on boot.
+2. **Direct Scan Trigger (`scanner:acquire`)**:
+   - Communicates with the selected scanner or default scanner via WIA COM automation.
+   - Configures optical resolution to 300 DPI (`6147` & `6148` properties) and sets color intent (Color or Grayscale).
+   - `$item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")` initiates flatbed motor and optics directly.
+   - Seamless fallback to `WIA.CommonDialog` `ShowAcquireImage` if user interaction is needed.
+   - Encodes scanned JPEG buffer to Base64 and returns directly to `processIngestedScan()`.
+
+### 14.2 Web Browser Station Pairing & Elimination of False Webcam Interception
+1. **Webcam Isolation**:
+   - Laptop front webcams (`FaceTime HD`, integrated cameras) are strictly excluded from flatbed scanning devices to prevent false `getUserMedia` crashes.
+2. **Printer-cum-Scanner Selection Modal**:
+   - When running in web browser or unconfigured station, the app prompts to select the installed printer-cum-scanner first.
+   - Provides 1-click clinical presets (Epson EcoTank/L-Series, HP LaserJet MFP, Canon PIXMA, Brother MFC, CanoScan LiDE) or custom model input.
+   - Persists the selection in `localStorage` under `podoload_default_printer_scanner`.
+   - Clicking `[Change Printer / Scanner]` allows switching at any time.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

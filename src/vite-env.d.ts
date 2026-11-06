@@ -13,8 +13,32 @@ interface Window {
         status: string;
         manufacturer?: string;
         maxDpi?: number;
+        isDefault?: boolean;
+        isPrinterScanner?: boolean;
       }>
     >;
+    acquireScan?: (options?: {
+      deviceId?: string;
+      dpi?: number;
+      colorMode?: 'Color' | 'Grayscale';
+      deviceName?: string;
+    }) => Promise<{
+      success: boolean;
+      dataUrl?: string;
+      filename?: string;
+      deviceName?: string;
+      error?: string;
+    }>;
+    getPrinters?: () => Promise<
+      Array<{
+        name: string;
+        driverName?: string;
+        portName?: string;
+        isDefault: boolean;
+        status?: string;
+      }>
+    >;
+    getDefaultPrinter?: () => Promise<string | null>;
     openScannerFileDialog?: () => Promise<{
       dataUrl: string;
       filename: string;

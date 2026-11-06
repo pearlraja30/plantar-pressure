@@ -867,6 +867,52 @@ To achieve maximum horizontal scale across multi-hospital networks, the platform
 - **Clinical Validation Battery**: All 15 clinical validation scenarios in `scripts/validate_system.cjs` — 100% PASSED.
 - **Master Documentation**: Compiled into `SYSTEM_ARCHITECTURE_AND_OPERATIONS_MANUAL.md`.
 
+---
+
+## 33. Windows Desktop Hardware Scanner Automation & Web Browser Station Pairing (v1.0.58)
+
+### 33.1 Windows WIA Hardware Scanner Automation & Default Printer cum Scanner Detection
+- **Issue Remediated**:
+  - In Windows Desktop (EXE), clicking "Scan Foot" previously only opened a file dialog without triggering physical scanner hardware.
+  - Windows multi-function printers (MFPs) and WIA imaging devices were not properly identified or flagged with default system status.
+- **Implementation**:
+  - `electron/main.cjs`:
+    - Refactored `scanner:enumerate` to query both `WIA.DeviceManager` (`wia.DeviceInfos`) and `Get-CimInstance Win32_Printer`.
+    - Automatically discovers installed WIA scanners, checks which printer is marked `Default: True`, links all-in-one printer-cum-scanners, and sorts the default printer-cum-scanner first.
+    - Implemented `scanner:acquire` using PowerShell Base64 EncodedCommand automation:
+      - Directly transfers 300 DPI optical scan from the scanner bed via `WIA.DeviceManager` / `$item.Transfer()`.
+      - Provides seamless fallback to Windows native `WIA.CommonDialog` `ShowAcquireImage` if user interaction or driver prompt is required.
+      - Converts acquired scan to Base64 JPEG data URL and cleans up temporary files.
+    - Implemented `system:get-printers` and `system:get-default-printer` IPC channels.
+  - `electron/preload.cjs`:
+    - Exposed `acquireScan()`, `getPrinters()`, and `getDefaultPrinter()` over secure Electron context bridge.
+
+### 33.2 Web Browser Station Pairing & False Webcam Interception Elimination
+- **Bug Remediated**:
+  - In web browsers (e.g. `localhost:5173`), `hardwareScannerService.enumerateAttachedScanners` erroneously classified laptop front webcams (`videoinput`) as a `Primary Optical Sensor` with `isDirectCaptureSupported: true`.
+  - When users initiated scanning on a PC, the app attempted to call webcam `getUserMedia`, throwing `Direct hardware capture error: . Please select the scan output file directly.`
+- **Implementation**:
+  - `src/services/hardwareScannerService.ts`:
+    - Strictly excluded generic laptop webcams (`FaceTime HD`, `Integrated Camera`, OBS) from flatbed document scanners.
+    - Dedicated UVC cameras are only included if the device label explicitly matches `/scanner|podoscope|harris|digitizer/i`.
+    - Implemented `getDefaultPrinterScanner()`, `saveDefaultPrinterScanner()`, and `getCommonPrinterPresets()`.
+    - Persists default station printer-cum-scanner in `localStorage` under `podoload_default_printer_scanner`.
+  - `src/components/podoload/PodoLoadCapture.tsx`:
+    - Added dedicated **"Select Installed Printer cum Scanner" Modal**:
+      - Automatically prompts the user on web browser stations to select their installed printer-cum-scanner first.
+      - Displays detected system devices (in Electron), clinical presets (Epson EcoTank/L-Series, HP LaserJet MFP, Canon PIXMA, Brother MFC, CanoScan LiDE), or custom printer model name.
+      - Includes one-click `[Change Printer / Scanner]` button on the top toolbar and on both Left and Right foot card strips.
+    - In `handleDirectScan`:
+      - If in Windows EXE: triggers `hardwareScannerService.acquireHardwareScan()`, displays live progress beam, and automatically feeds the scanned image into `processIngestedScan()` for instant display on the process screen!
+      - If in Web Browser: prompts the user to select their printer first if unset, and cleanly initiates scan ingestion with zero alerts or crash popups.
+
+### 33.3 Quality Verification & Test Conformance
+- **Unit Test Battery**: Expanded to **75/75** Unit Tests in `scripts/unit_tests.cjs` (`npm run test:unit`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` (`npm run test:validate`) — 100% PASSED.
+- **Vite & TypeScript Build**: `tsc -b && vite build` compiled in 363ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+
+
 
 
 

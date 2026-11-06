@@ -198,13 +198,16 @@ export interface CloudBatchSyncResult {
 export interface ScannerDevice {
   id: string;
   name: string;
-  interface: 'TWAIN' | 'WIA' | 'SANE' | 'AirScan/eSCL' | 'USB Direct' | 'Direct Optical / UVC' | 'WebUSB' | 'USB' | 'Virtual Simulation';
+  interface: 'TWAIN' | 'WIA' | 'SANE' | 'AirScan/eSCL' | 'USB Direct' | 'Direct Optical / UVC' | 'WebUSB' | 'USB' | 'Virtual Simulation' | 'WIA / Print Scan' | 'System Printer/Scanner';
   status: 'Ready' | 'Busy' | 'Disconnected' | 'Connected' | 'Offline';
   maxDpi: number;
   supportsColor: boolean;
   supportsDuplex: boolean;
   manufacturer?: string;
   isDirectCaptureSupported?: boolean;
+  isDefault?: boolean;
+  isPrinterScanner?: boolean;
+  driverType?: string;
 }
 
 export interface AuditEvent {

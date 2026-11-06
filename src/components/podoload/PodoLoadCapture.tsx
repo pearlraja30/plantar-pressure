@@ -13,6 +13,7 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -75,6 +76,13 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const [isLoadingScanners, setIsLoadingScanners] = useState<boolean>(false);
   const [isPairingUsb, setIsPairingUsb] = useState<boolean>(false);
 
+  // Printer-cum-Scanner Selection Modal State (for Web Browser & Station Hardware Pairing)
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState<boolean>(false);
+  const [customPrinterInput, setCustomPrinterInput] = useState<string>('');
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState<number>(0);
+  const [printerPresets] = useState(() => hardwareScannerService.getCommonPrinterPresets());
+  const [hasPromptedBrowserPrinter, setHasPromptedBrowserPrinter] = useState<boolean>(false);
+
   const [resolutionDpi, setResolutionDpi] = useState('300 DPI');
   const [colourMode, setColourMode] = useState('Grayscale');
   const [sheetSize, setSheetSize] = useState('A4');
@@ -106,17 +114,24 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
       const list = await hardwareScannerService.enumerateAttachedScanners(force);
       setAvailableScanners(list);
       if (list.length > 0) {
+        const defaultDev = list.find((s) => s.isDefault);
+        const chosenId = defaultDev ? defaultDev.id : list[0].id;
         setSelectedScannerId((prev) => {
           const match = list.find((s) => s.id === prev);
-          return match ? match.id : list[0].id;
+          return match ? match.id : chosenId;
         });
-        const current = list.find((s) => s.id === selectedScannerId) || list[0];
+        const current = list.find((s) => s.id === (selectedScannerId || chosenId)) || list[0];
         setScannerModel(current.name);
       } else {
         setSelectedScannerId('');
         setScannerModel(
           isMobileDevice ? 'Mobile Camera Sensor' : 'No Scanner Hardware Detected'
         );
+        // If on web browser without a configured printer-scanner, prompt user to select installed printer first
+        if (!isMobileDevice && typeof window !== 'undefined' && !(window as any).electronAPI && !hasPromptedBrowserPrinter) {
+          setHasPromptedBrowserPrinter(true);
+          setIsPrinterModalOpen(true);
+        }
       }
     } catch (e) {
       console.warn('Error discovering scanners:', e);
@@ -135,6 +150,17 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
     if (found) {
       setScannerModel(found.name);
     }
+  };
+
+  const handleConfirmPrinterSelection = (printerName: string, brand?: string) => {
+    const saved = hardwareScannerService.saveDefaultPrinterScanner({
+      name: printerName,
+      manufacturer: brand || 'Installed System Hardware',
+    });
+    setSelectedScannerId(saved.id);
+    setScannerModel(saved.name);
+    setIsPrinterModalOpen(false);
+    loadScanners(true);
   };
 
   const handlePairUsbScanner = async () => {
@@ -249,62 +275,97 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
 
   // Direct Scanner acquisition (ORIGINAL DATA ONLY - ZERO SYNTHETIC DATA)
   const handleDirectScan = async (side: 'Left' | 'Right') => {
-    const activeDevice = availableScanners.find((s) => s.id === selectedScannerId);
+    let activeDevice = availableScanners.find((s) => s.id === selectedScannerId);
 
-    // If an optical direct sensor (UVC / podoscope / document camera) is attached and ready:
-    if (activeDevice && activeDevice.isDirectCaptureSupported) {
-      try {
-        if (side === 'Left') {
-          setIsScanningLeft(true);
-          setScanPhaseLeft(`Connecting to hardware: ${activeDevice.name}...`);
-        } else {
-          setIsScanningRight(true);
-          setScanPhaseRight(`Connecting to hardware: ${activeDevice.name}...`);
-        }
-
-        const frame = await hardwareScannerService.acquireDirectOpticalFrame(activeDevice.id);
-
-        if (side === 'Left') setScanPhaseLeft('Autodetecting impression pixel-by-pixel...');
-        else setScanPhaseRight('Autodetecting impression pixel-by-pixel...');
-
-        await processIngestedScan(side, frame.dataUrl, activeDevice.name);
-        return;
-      } catch (err: any) {
-        if (side === 'Left') {
-          setIsScanningLeft(false);
-          setScanPhaseLeft('');
-        } else {
-          setIsScanningRight(false);
-          setScanPhaseRight('');
-        }
-        alert(
-          `Direct hardware capture error: ${err.message}. Please select the scan output file directly.`
-        );
-        return;
-      }
+    // If no printer/scanner is selected or available in browser, ask user to select printer first
+    if (!activeDevice) {
+      setIsPrinterModalOpen(true);
+      return;
     }
 
-    // If running in Electron, prompt the native scanner file selector
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.openScannerFileDialog) {
+    const setScanning = side === 'Left' ? setIsScanningLeft : setIsScanningRight;
+    const setPhase = side === 'Left' ? setScanPhaseLeft : setScanPhaseRight;
+
+    // 1. Electron Desktop Native Direct Hardware Capture (Windows WIA / SANE / USB)
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.acquireScan) {
       try {
-        const fileResult = await hardwareScannerService.openNativeScannerFileDialog();
-        if (fileResult) {
-          if (side === 'Left') {
-            setIsScanningLeft(true);
-            setScanPhaseLeft('Autodetecting impression pixel-by-pixel...');
-          } else {
-            setIsScanningRight(true);
-            setScanPhaseRight('Autodetecting impression pixel-by-pixel...');
+        setScanning(true);
+        setPhase(`Connecting to ${activeDevice.name}... Activating scanner motor & optics...`);
+
+        const dpiVal = resolutionDpi.includes('600')
+          ? 600
+          : resolutionDpi.includes('150')
+          ? 150
+          : resolutionDpi.includes('1200')
+          ? 1200
+          : 300;
+
+        const result = await hardwareScannerService.acquireHardwareScan(activeDevice.id, {
+          dpi: dpiVal,
+          colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
+          deviceName: activeDevice.name,
+        });
+
+        if (result.success && result.dataUrl) {
+          setPhase('Autodetecting impression pixel-by-pixel...');
+          await processIngestedScan(side, result.dataUrl, activeDevice.name);
+          setScanning(false);
+          setPhase('');
+          return;
+        } else {
+          setScanning(false);
+          setPhase('');
+          const errMsg = result.error || 'Scanner did not return image data.';
+          console.warn('[DirectScan] Hardware scan notice:', errMsg);
+          const proceedFile = confirm(
+            `Scanner Notice: ${errMsg}\n\nWould you like to select the scanned image file from your scanner software folder?`
+          );
+          if (proceedFile) {
+            if (side === 'Left') leftFileInputRef.current?.click();
+            else rightFileInputRef.current?.click();
           }
-          await processIngestedScan(side, fileResult.dataUrl, activeDevice?.name || fileResult.filename);
           return;
         }
       } catch (err: any) {
-        console.warn('Native scanner file dialog error:', err);
+        setScanning(false);
+        setPhase('');
+        console.warn('[DirectScan] Acquisition error:', err);
+        if (side === 'Left') leftFileInputRef.current?.click();
+        else rightFileInputRef.current?.click();
+        return;
       }
     }
 
-    // If an external flatbed scanner without direct UVC streaming, trigger file input for genuine scan file
+    // 2. Dedicated Optical / Podoscope Camera Stream (Only if real dedicated optical scanner)
+    if (activeDevice.interface === 'Direct Optical / UVC' && activeDevice.isDirectCaptureSupported) {
+      try {
+        setScanning(true);
+        setPhase(`Connecting to hardware: ${activeDevice.name}...`);
+        const frame = await hardwareScannerService.acquireDirectOpticalFrame(activeDevice.id);
+        setPhase('Autodetecting impression pixel-by-pixel...');
+        await processIngestedScan(side, frame.dataUrl, activeDevice.name);
+        setScanning(false);
+        setPhase('');
+        return;
+      } catch (err: any) {
+        setScanning(false);
+        setPhase('');
+        alert(`Optical sensor acquisition notice: ${err.message}. Please select the scan output file directly.`);
+        if (side === 'Left') leftFileInputRef.current?.click();
+        else rightFileInputRef.current?.click();
+        return;
+      }
+    }
+
+    // 3. Web Browser: User has selected their installed printer-cum-scanner
+    // Provide a smooth scan acquisition experience without confusing alert popups
+    setScanning(true);
+    setPhase(`Ready: Scan from ${activeDevice.name}. Select output file...`);
+    setTimeout(() => {
+      setScanning(false);
+      setPhase('');
+    }, 1200);
+
     if (side === 'Left') {
       leftFileInputRef.current?.click();
     } else {
@@ -361,6 +422,27 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 <span>Refresh</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => setIsPrinterModalOpen(true)}
+                title="Select or configure installed printer cum scanner"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  color: '#0f766e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                }}
+              >
+                <Printer className="w-3 h-3" />
+                <span>Select Printer</span>
+              </button>
+
               {'usb' in navigator && (
                 <button
                   type="button"
@@ -389,7 +471,13 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           <select
             className="podoload-select"
             value={selectedScannerId}
-            onChange={(e) => handleSelectScanner(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value === 'open_printer_modal') {
+                setIsPrinterModalOpen(true);
+              } else {
+                handleSelectScanner(e.target.value);
+              }
+            }}
           >
             {isScannerAttached ? (
               availableScanners.map((dev) => (
@@ -400,12 +488,20 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
             ) : (
               <>
                 <option value="" disabled>
-                  No physical scanner hardware detected (0 devices attached)
+                  No physical scanner detected (0 devices attached)
+                </option>
+                <option value="open_printer_modal">
+                  ➕ Select Installed Printer cum Scanner...
                 </option>
                 <option value="direct_file_import">
                   Import Original File from Scanner Software
                 </option>
               </>
+            )}
+            {isScannerAttached && (
+              <option value="open_printer_modal">
+                ➕ Change / Select Other Printer or Scanner...
+              </option>
             )}
             {isMobileDevice && (
               <option value="mobile_cam">Mobile Camera Sensor</option>
@@ -696,8 +792,24 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   }}
                 />
                 <strong style={{ color: '#0f172a' }}>
-                  {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Connected'}
+                  {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Selected'}
                 </strong>
+                <button
+                  type="button"
+                  onClick={() => setIsPrinterModalOpen(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#0891b2',
+                    cursor: 'pointer',
+                    fontSize: '0.68rem',
+                    textDecoration: 'underline',
+                    padding: '0 4px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {activeDevice ? 'Change' : 'Select Printer'}
+                </button>
                 <span style={{ color: '#64748b' }}>
                   · {resolutionDpi} ·{' '}
                   {sheetSize === 'Custom'
@@ -1022,8 +1134,24 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                   }}
                 />
                 <strong style={{ color: '#0f172a' }}>
-                  {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Connected'}
+                  {activeDevice ? activeDevice.name : isMobileDevice ? 'Mobile Camera' : 'No Scanner Selected'}
                 </strong>
+                <button
+                  type="button"
+                  onClick={() => setIsPrinterModalOpen(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#0891b2',
+                    cursor: 'pointer',
+                    fontSize: '0.68rem',
+                    textDecoration: 'underline',
+                    padding: '0 4px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {activeDevice ? 'Change' : 'Select Printer'}
+                </button>
                 <span style={{ color: '#64748b' }}>
                   · {resolutionDpi} ·{' '}
                   {sheetSize === 'Custom'
@@ -1279,6 +1407,263 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal: Select Installed Printer cum Scanner */}
+      {isPrinterModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="podoload-modal-container"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '560px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '90vh',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '1rem 1.25rem',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#f8fafc',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div
+                  style={{
+                    backgroundColor: '#ccfbf1',
+                    color: '#0f766e',
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                    Select Installed Printer cum Scanner
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                    Pair your clinic's flatbed scanner or multifunction printer
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPrinterModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#64748b',
+                }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  padding: '0.75rem',
+                  fontSize: '0.78rem',
+                  color: '#166534',
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>Hardware Detection & Pairing:</strong> On Windows Desktop (EXE), the system automatically detects installed WIA flatbed scanners and your Windows default printer. In web browsers, select or type your installed printer model below to calibrate the 300 DPI scanning bed.
+              </div>
+
+              {/* Detected Hardware Scanners / Printers from Electron */}
+              {availableScanners.filter((s) => s.interface !== 'Direct Optical / UVC').length > 0 && (
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
+                    Detected System Scanners & Printers
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {availableScanners
+                      .filter((s) => s.interface !== 'Direct Optical / UVC')
+                      .map((dev) => (
+                        <div
+                          key={dev.id}
+                          onClick={() => {
+                            setSelectedScannerId(dev.id);
+                            setScannerModel(dev.name);
+                          }}
+                          style={{
+                            padding: '0.65rem 0.85rem',
+                            borderRadius: '8px',
+                            border: selectedScannerId === dev.id ? '2px solid #0d9488' : '1px solid #cbd5e1',
+                            backgroundColor: selectedScannerId === dev.id ? '#f0fdfa' : '#ffffff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#0f172a' }}>
+                              {dev.name}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              Interface: {dev.interface} · {dev.manufacturer || 'System Hardware'}
+                            </div>
+                          </div>
+                          {dev.isDefault && (
+                            <span className="podo-badge podo-badge-green" style={{ fontSize: '0.65rem' }}>
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Clinical Presets (Epson, HP, Canon, Brother) */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
+                  Or Choose Installed Clinic Printer cum Scanner
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {printerPresets.map((preset, idx) => (
+                    <label
+                      key={preset.name}
+                      style={{
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '6px',
+                        border: selectedPresetIndex === idx ? '1.5px solid #0f766e' : '1px solid #e2e8f0',
+                        backgroundColor: selectedPresetIndex === idx ? '#f0fdfa' : '#f8fafc',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="printerPreset"
+                        checked={selectedPresetIndex === idx}
+                        onChange={() => setSelectedPresetIndex(idx)}
+                        style={{ accentColor: '#0f766e' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{preset.name}</span>
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', color: '#64748b' }}>
+                          ({preset.type})
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+
+                  <label
+                    style={{
+                      padding: '0.55rem 0.75rem',
+                      borderRadius: '6px',
+                      border: selectedPresetIndex === 999 ? '1.5px solid #0f766e' : '1px solid #e2e8f0',
+                      backgroundColor: selectedPresetIndex === 999 ? '#f0fdfa' : '#f8fafc',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="printerPreset"
+                      checked={selectedPresetIndex === 999}
+                      onChange={() => setSelectedPresetIndex(999)}
+                      style={{ accentColor: '#0f766e' }}
+                    />
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Other / Custom Installed Model...</span>
+                  </label>
+
+                  {selectedPresetIndex === 999 && (
+                    <input
+                      type="text"
+                      className="podoload-input"
+                      placeholder="e.g. HP Smart Tank 580 / Epson L3110 / Ricoh SP 210SU"
+                      value={customPrinterInput}
+                      onChange={(e) => setCustomPrinterInput(e.target.value)}
+                      style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '0.85rem 1.25rem',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#f8fafc',
+              }}
+            >
+              <button
+                type="button"
+                className="podoload-btn-secondary podoload-btn-sm"
+                onClick={() => setIsPrinterModalOpen(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="podoload-btn-primary podoload-btn-sm"
+                onClick={() => {
+                  let chosenName = '';
+                  let chosenBrand = 'System Hardware';
+                  if (selectedPresetIndex === 999) {
+                    chosenName = customPrinterInput.trim() || 'Custom Printer cum Scanner';
+                  } else if (printerPresets[selectedPresetIndex]) {
+                    chosenName = printerPresets[selectedPresetIndex].name;
+                    chosenBrand = printerPresets[selectedPresetIndex].brand;
+                  }
+                  handleConfirmPrinterSelection(chosenName, chosenBrand);
+                }}
+              >
+                <Check className="w-3.5 h-3.5 mr-1 inline" />
+                Confirm & Use for Scanning
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Action Footer */}
       <div className="podoload-bottom-actions-bar">

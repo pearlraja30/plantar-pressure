@@ -4,15 +4,20 @@ export interface DiscoveredScanner extends ScannerDevice {
   isDirectCaptureSupported: boolean;
   manufacturer?: string;
   hardwareId?: string;
+  isDefault?: boolean;
+  isPrinterScanner?: boolean;
+  driverType?: string;
 }
 
 /**
  * HardwareScannerService: Real device discovery and direct hardware ingestion.
  * 
  * Strict Clinical Data Integrity Policy:
- * 1. NEVER generates or returns synthetic/sample scanner devices.
- * 2. If no hardware devices are physically attached, returns an empty array [].
- * 3. Acquires 100% genuine scan bytes via direct optical hardware sensor, OS scan interfaces, or user-selected scanner output file.
+ * 1. Automatically queries and discovers real Windows WIA scanners and installed Win32 printers.
+ * 2. Identifies and auto-selects the default printer cum scanner.
+ * 3. Never confuses laptop webcams with flatbed optical scanners.
+ * 4. Triggers genuine hardware scanning in Electron desktop via Windows WIA automation.
+ * 5. Provides structured printer-cum-scanner pairing for web browsers.
  */
 class HardwareScannerService {
   private cachedScanners: DiscoveredScanner[] = [];
@@ -20,7 +25,6 @@ class HardwareScannerService {
 
   /**
    * Enumerates genuine physical scanner and imaging devices connected to the host system.
-   * NEVER returns mock/stale devices.
    */
   public async enumerateAttachedScanners(forceRefresh = false): Promise<DiscoveredScanner[]> {
     const now = Date.now();
@@ -31,7 +35,7 @@ class HardwareScannerService {
     const discovered: DiscoveredScanner[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Electron Native OS Hardware Discovery (Windows WIA/TWAIN, macOS ImageCapture/USB, Linux SANE)
+    // 1. Electron Native OS Hardware Discovery (Windows WIA/Printers, macOS ImageCapture, Linux SANE)
     if (typeof window !== 'undefined' && (window as any).electronAPI?.enumerateScanners) {
       try {
         const electronScanners = await (window as any).electronAPI.enumerateScanners();
@@ -43,12 +47,14 @@ class HardwareScannerService {
                 id: s.id,
                 name: s.name || 'Flatbed Scanner',
                 manufacturer: s.manufacturer || 'System Hardware',
-                interface: (s.interface as any) || 'TWAIN',
+                interface: (s.interface as any) || 'WIA',
                 status: s.status === 'Ready' ? 'Ready' : 'Connected',
-                maxDpi: s.maxDpi || 2400,
+                maxDpi: s.maxDpi || 4800,
                 supportsColor: true,
                 supportsDuplex: false,
-                isDirectCaptureSupported: false,
+                isDirectCaptureSupported: true, // Native Electron WIA direct capture supported!
+                isDefault: Boolean(s.isDefault),
+                isPrinterScanner: Boolean(s.isPrinterScanner),
               });
             }
           }
@@ -58,35 +64,14 @@ class HardwareScannerService {
       }
     }
 
-    // 2. Web Media Devices Discovery (Direct UVC podoscopes, document cameras, high-res optical scanning bars)
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.enumerateDevices) {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
-
-        for (const v of videoInputs) {
-          const label = v.label || '';
-          const id = v.deviceId || 'uvc-' + Math.random().toString(36).slice(2, 7);
-          if (!seenIds.has(id)) {
-            seenIds.add(id);
-            const isDedicatedScanner =
-              /scanner|podoscope|harris|document|flatbed|digitizer/i.test(label);
-            discovered.push({
-              id,
-              name: label || (videoInputs.length === 1 ? 'Primary Optical Sensor' : `Optical Camera / Scanner (${id.slice(0, 6)})`),
-              manufacturer: isDedicatedScanner ? 'Medical Imaging Hardware' : 'UVC Optical Sensor',
-              interface: 'Direct Optical / UVC',
-              status: 'Ready',
-              maxDpi: 1200,
-              supportsColor: true,
-              supportsDuplex: false,
-              isDirectCaptureSupported: true,
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('[HardwareScanner] MediaDevices enumeration error:', err);
-      }
+    // 2. Saved / Configured Workstation Default Printer cum Scanner (for web browser or offline station)
+    const configuredDefault = this.getDefaultPrinterScanner();
+    if (configuredDefault && !seenIds.has(configuredDefault.id)) {
+      seenIds.add(configuredDefault.id);
+      discovered.push({
+        ...configuredDefault,
+        isDefault: discovered.length === 0 || configuredDefault.isDefault,
+      });
     }
 
     // 3. WebUSB Hardware Discovery (Paired USB flatbed scanners & digitizers)
@@ -112,6 +97,7 @@ class HardwareScannerService {
                 supportsColor: true,
                 supportsDuplex: false,
                 isDirectCaptureSupported: false,
+                isPrinterScanner: true,
               });
             }
           }
@@ -121,9 +107,145 @@ class HardwareScannerService {
       }
     }
 
+    // 4. Web Media Devices Discovery: STRICTLY for Dedicated Optical Scanners / Podoscope ONLY
+    // NOTE: Regular webcams are NOT flatbed scanners and must never hijack the scanner workflow!
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.enumerateDevices) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+
+        for (const v of videoInputs) {
+          const label = (v.label || '').toLowerCase();
+          const isDedicatedScanner =
+            /scanner|podoscope|harris|digitizer|document\s*camera/i.test(label);
+
+          // Only include if explicitly identified as an optical scanner/podoscope hardware
+          if (isDedicatedScanner) {
+            const id = v.deviceId || 'uvc-' + Math.random().toString(36).slice(2, 7);
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              discovered.push({
+                id,
+                name: v.label || 'Dedicated Optical Scanner / Podoscope',
+                manufacturer: 'Medical Imaging Hardware',
+                interface: 'Direct Optical / UVC',
+                status: 'Ready',
+                maxDpi: 1200,
+                supportsColor: true,
+                supportsDuplex: false,
+                isDirectCaptureSupported: true,
+                isPrinterScanner: false,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[HardwareScanner] MediaDevices enumeration error:', err);
+      }
+    }
+
+    // Sort: Default printer-cum-scanner first
+    discovered.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+
     this.cachedScanners = discovered;
     this.lastEnumeratedAt = now;
     return discovered;
+  }
+
+  /**
+   * Acquires genuine scan image from hardware scanner via Electron WIA automation
+   */
+  public async acquireHardwareScan(
+    deviceId?: string,
+    options?: { dpi?: number; colorMode?: 'Color' | 'Grayscale'; deviceName?: string }
+  ): Promise<{ success: boolean; dataUrl?: string; filename?: string; error?: string }> {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.acquireScan) {
+      try {
+        const res = await (window as any).electronAPI.acquireScan({
+          deviceId,
+          dpi: options?.dpi || 300,
+          colorMode: options?.colorMode || 'Grayscale',
+          deviceName: options?.deviceName,
+        });
+        return res;
+      } catch (err: any) {
+        return {
+          success: false,
+          error: err.message || 'Direct hardware scanning failed.',
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Direct hardware scanner acquisition is available in the Windows desktop app. In web browser, please select the scan output file.',
+    };
+  }
+
+  /**
+   * Retrieves configured default printer-cum-scanner for this workstation
+   */
+  public getDefaultPrinterScanner(): DiscoveredScanner | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('podoload_default_printer_scanner');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.name) return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading default printer scanner from storage:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Saves user-selected default printer-cum-scanner to workstation storage
+   */
+  public saveDefaultPrinterScanner(device: {
+    id?: string;
+    name: string;
+    manufacturer?: string;
+    interface?: string;
+  }): DiscoveredScanner {
+    const id = device.id || 'printer-' + device.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const newScanner: DiscoveredScanner = {
+      id,
+      name: device.name,
+      manufacturer: device.manufacturer || 'System Hardware',
+      interface: (device.interface as any) || 'System Printer/Scanner',
+      status: 'Ready',
+      maxDpi: 1200,
+      supportsColor: true,
+      supportsDuplex: false,
+      isDirectCaptureSupported: typeof window !== 'undefined' && Boolean((window as any).electronAPI?.acquireScan),
+      isDefault: true,
+      isPrinterScanner: true,
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('podoload_default_printer_scanner', JSON.stringify(newScanner));
+      } catch (e) {}
+    }
+
+    this.enumerateAttachedScanners(true);
+    return newScanner;
+  }
+
+  /**
+   * Clinical printer-cum-scanner presets commonly installed in clinics
+   */
+  public getCommonPrinterPresets(): Array<{ name: string; brand: string; type: string }> {
+    return [
+      { name: 'Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150)', brand: 'Epson', type: 'All-in-One Printer cum Scanner' },
+      { name: 'HP LaserJet / DeskJet Ink Advantage MFP (M140 / 415 / 2700)', brand: 'HP', type: 'All-in-One Printer cum Scanner' },
+      { name: 'Canon PIXMA / imageCLASS Multifunction (G2020 / G3010 / MF3010)', brand: 'Canon', type: 'All-in-One Printer cum Scanner' },
+      { name: 'Brother MFC / DCP Series Multifunction (L2520D / T520W / T720DW)', brand: 'Brother', type: 'All-in-One Printer cum Scanner' },
+      { name: 'Epson Perfection V39 / V19 Flatbed Scanner', brand: 'Epson', type: 'Dedicated Flatbed Optical Scanner' },
+      { name: 'Canon CanoScan LiDE 300 / 400 Flatbed Scanner', brand: 'Canon', type: 'Dedicated Flatbed Optical Scanner' },
+      { name: 'Generic Windows WIA / TWAIN Flatbed Scanner', brand: 'Windows', type: 'Standard Imaging Device' },
+    ];
   }
 
   /**
@@ -163,8 +285,11 @@ class HardwareScannerService {
         supportsColor: true,
         supportsDuplex: false,
         isDirectCaptureSupported: false,
+        isPrinterScanner: true,
+        isDefault: true,
       };
 
+      this.saveDefaultPrinterScanner(newScanner);
       await this.enumerateAttachedScanners(true);
       return newScanner;
     } catch (err: any) {
@@ -176,7 +301,7 @@ class HardwareScannerService {
   }
 
   /**
-   * Captures the genuine, uncompressed optical frame from a direct UVC / optical scanning sensor
+   * Captures the genuine, uncompressed optical frame from a dedicated UVC / podoscope sensor
    */
   public async acquireDirectOpticalFrame(
     deviceId: string
@@ -211,7 +336,6 @@ class HardwareScannerService {
         setTimeout(() => reject(new Error('Hardware scanner stream timed out.')), 6000);
       });
 
-      // Allow 350ms for automatic white balance / gain stabilization
       await new Promise((r) => setTimeout(r, 350));
 
       const w = video.videoWidth || 1920;
@@ -245,4 +369,3 @@ class HardwareScannerService {
 }
 
 export const hardwareScannerService = new HardwareScannerService();
-
