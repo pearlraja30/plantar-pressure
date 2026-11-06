@@ -478,7 +478,7 @@ export const PodoLoadDevicePaymentModal: React.FC<PodoLoadDevicePaymentModalProp
                     }}
                   >
                     <Key className="w-4 h-4" />
-                    <span>Activation Voucher</span>
+                    <span>Activation Key</span>
                   </button>
                 </div>
 

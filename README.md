@@ -91,10 +91,23 @@ GitHub Actions will automatically build all 4 platforms in parallel and publish 
 
 ---
 
-## 🧪 Regulatory Verification & Validation (VT-01 to VT-13)
+## 📖 Master Documentation & Developer Manual
+
+For the complete, in-depth architectural and operational manual, refer to:
+👉 **[SYSTEM_ARCHITECTURE_AND_OPERATIONS_MANUAL.md](SYSTEM_ARCHITECTURE_AND_OPERATIONS_MANUAL.md)**
+- Hardware Station Binding & MAC Fingerprinting
+- Single-Use Activation Codes & Burn-On-Use Protocol
+- Time-Bound Permit Enforcement (Hour/Day Licensing)
+- Supabase Cloud Mailbox & Telemetry Schema
+- Bi-directional Cloud Case Hydration & Remote Revocation Kill-Switch
+- Disaster Recovery & Troubleshooting Runbooks
+
+---
+
+## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **70 / 70 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, and activation engines.
+* **72 / 72 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -188,6 +201,7 @@ The system includes an automated clinical verification battery covering all test
 ## 📚 Enterprise Documentation & Architectural Roadmaps
 
 For detailed clinical, architectural, and developer references, consult the following comprehensive manuals:
+* 📄 [**`CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md) — **Master Enterprise Cloud Segregation & Offline Sync Plan**: 3-Tier cloud segregation (Frontend CDN/Native Shells, Backend Microservices on AWS ECS/EKS, Aurora PostgreSQL 16+ & S3), 100% offline-first working strategy across Windows `.exe`, Android `.apk`, and iOS `.ipa`, and technician-based online batch synchronization protocol for later-stage execution.
 * 📄 [**`CROSS_PLATFORM_OPERATIONS_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CROSS_PLATFORM_OPERATIONS_MANUAL.md) — Complete cross-platform operations guide covering Microsoft Windows Desktop (`.exe`), Google Android (`.apk`), and Apple iOS iPhone/iPad (`.ipa`), hardware scanners, mobile camera gyros, discreet admin routing, and packaging.
 * 📄 [**`POSTGRESQL_3TIER_MIGRATION_PLAN.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/POSTGRESQL_3TIER_MIGRATION_PLAN.md) — 3-Tier Distributed Architecture (Multi-platform Clients, Microservices, PostgreSQL 16+ & Cloud S3 Object Storage) with complete DDL schemas, migration scripts, and sync protocols.
 * 📄 [**`ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/ARCHITECTURE_AND_EXTENSIBILITY_MANUAL.md) — Clean Hexagonal Architecture, HAL, 10-Zone AI segmentation model, storage engines, and regulatory compliance.

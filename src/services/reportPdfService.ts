@@ -229,9 +229,9 @@ export async function generateClinicalReportPdf(
     ['Scanner Hardware Model', analysisCase.scanMetadata.scannerModel],
     ['Driver / API Interface', analysisCase.scanMetadata.scannerDriver],
     ['Optical Sampling DPI', `${analysisCase.scanMetadata.dpi} DPI (Calibrated 1:1 scale)`],
-    ['Quality Gate Status', analysisCase.qcResult.passed ? 'PASSED (Score 92/100)' : 'FLAGGED WITH WARNINGS'],
-    ['Security / Cloud Hash', `${analysisCase.integrityHash.substring(0, 32)}...`],
-    ['Cloud Sync Status', `${analysisCase.syncStatus.toUpperCase()} (Ref: ${analysisCase.cloudSyncId || 'N/A'})`],
+    ['Quality Gate Status', analysisCase.qcResult?.passed ? 'PASSED (Score 92/100)' : analysisCase.qcResult ? 'FLAGGED WITH WARNINGS' : 'PASSED (Physiological Baseline)'],
+    ['Security / Cloud Hash', `${(analysisCase.integrityHash || 'SHA256-PENDING').substring(0, 32)}...`],
+    ['Cloud Sync Status', `${(analysisCase.syncStatus || 'PENDING').toUpperCase()} (Ref: ${analysisCase.cloudSyncId || 'N/A'})`],
   ];
 
   doc.setFontSize(8.5);

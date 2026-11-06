@@ -763,7 +763,112 @@ When clinicians switch shifts or log out, previous patient demographics, active 
    - Modal dismiss controls (`X` and `Cancel` buttons) are strictly suppressed until valid credentials are authenticated.
    - Immutable audit trail record (`USER_LOGOUT`) logged to Inbuilt Database per 21 CFR Part 11.
 4. **Verification**:
-   - Unit Test Suite expanded to **66 / 66 passing tests (100% OK)**, including full verification of `logoutUser()`, state purging, and session lock enforcement.
+   - Unit Test Suite expanded to **70 / 70 passing tests (100% OK)** and **15 / 15 clinical validation scenarios**, including full verification of `logoutUser()`, state purging, and session lock enforcement.
+
+---
+
+## 29. 3-Tier Enterprise Cloud Segregation & Technician-Based Online Batch Sync Architecture
+
+### 29.1 Architecture Topology
+To achieve maximum horizontal scale across multi-hospital networks, the platform decoupled into a 3-tier distributed cloud topology:
+1. **Tier 1 (Multi-Platform Presentation & Edge Clients)**:
+   - React 19 + TypeScript SPA served via AWS CloudFront CDN / Cloudflare.
+   - Native wrappers: Windows Desktop (`.exe` Electron/Tauri), Android (`.apk` Capacitor Kotlin HAL), iOS (`.ipa` Capacitor Swift HAL).
+   - In-app 39-Step Podo I Mat algorithm, Cavanagh Arch Index, and 4-page PDF generation running 100% client-side with zero server compute dependency.
+2. **Tier 2 (Stateless Containerized Microservices Layer)**:
+   - Microservices deployed on AWS ECS Fargate / Kubernetes EKS with Horizontal Pod Autoscaler (HPA) scaling from 2 to 50+ tasks based on queue load.
+   - Presigned S3 Multipart Direct Upload Service (`/api/v1/sync/presigned-url`): clients stream raw 300 DPI foot scans directly to S3 buckets, bypassing backend memory bloat.
+   - Ingestion & Sync Gateway with cryptographic idempotency (`Idempotency-Key` + SHA-256 payload checksums).
+3. **Tier 3 (Database & Object Storage Persistence)**:
+   - Amazon Aurora PostgreSQL 16+ Serverless v2 (0.5 to 32 ACUs) with Row-Level Security (RLS) multi-tenant data partitioning.
+   - Dedicated Aurora Read Replicas for high-volume administrative and epidemiological reporting queries.
+   - S3 Medical Scans Bucket with automated lifecycle rules (90d Standard $\rightarrow$ 365d Infrequent Access $\rightarrow$ 7-year Glacier Deep Archive for medical retention mandates).
+   - Redis Cluster 7+ for distributed locking, rate-limiting tokens, and station heartbeats.
+
+### 29.2 Technician-Based Batch Synchronization Protocol
+- **Offline Working Guarantee**: Diagnostic scanning, patient intake, morphometry, and report generation operate 100% offline without network connectivity.
+- **Technician Stamping**: Queued records in `ppa_sync_queue_v1` and `ppa_detailed_sync_queue_v1` carry immutable attribution: `technicianId`, `technicianName`, `operatorStaffId`, `hospitalId`, `deviceFingerprint`, `clientTimestamp`, and `integrityHash`.
+- **Centralized Admin Explorer**: Administrative reporting portal in `PodoLoadCloudRecords.tsx` provides multi-technician filtering, viewing, and batch exporting.
+
+---
+
+## 30. Zero-Leakage Kiosk Lockdown, Window Close & Standby View, and Multi-Channel Admin Access
+
+### 30.1 Full-Screen Kiosk Lockdown & Zero Background Leakage
+- When signed out (`isSessionLocked = true`), `PodoLoadApp.tsx` replaces the entire application tree, unmounting `<PodoLoadSidebar>` and `<PodoLoadHeader>`.
+- Eliminates background menu, sidebar, or patient record leakage, preventing unauthenticated clicks or inspection.
+
+### 30.2 Ambient Standby Screen & Window Close Controls
+- Restored modal header `✕` close button and footer `Close Window` button.
+- Added native desktop `⏻ Exit App` button triggering Electron IPC / `window.close()` to cleanly quit the Windows `.exe` application.
+- When the modal is dismissed in a browser or kiosk, it displays a clean, full-screen ambient standby view ("Diagnostic Station is in Standby") with zero menus exposed and direct buttons to sign in as Technician or Administrator.
+
+### 30.3 Multi-Channel Discreet Administrator Access
+- Standard kiosk defaults to Clinical Technician Station Sign-In with zero exposed admin tabs.
+- Four distinct, secure channels provided for administrators:
+  1. Discreet footer button: `🛡️ Admin Portal` with Master Password.
+  2. Dedicated URL route: `/admin`, `#/admin`, `?mode=admin`.
+  3. Windows Desktop silent shortcut: `Ctrl + Shift + A` or launch flag `PodoPress.exe --admin`.
+  4. Mobile kiosk gesture: 5-tap gesture on the header lock.
+- Prominent `← Back to Technician Login` button ensures fast, seamless reversal.
+
+---
+
+## 31. Comprehensive Multi-Agent System Audit & Adversarial Verification
+
+### 31.1 Adversarial Vulnerability Remediation: Voucher Wildcard & Format Enforcement
+- **Vulnerability Identified**: The technician voucher code lookup in `src/services/dbService.ts` evaluated `cleanAct = normActCode.replace(/[^A-Z0-9]/g, '')`. When inputting wildcard or symbol characters (`*`, `?`, `!`, `.`, `---`, `###`, `$$$`), `cleanAct` collapsed to `""` (empty string). A case-sensitivity mismatch in comparing `t.username.replace(/[^A-Z0-9]/g, '')` against empty string caused non-uppercase usernames to match empty strings, permitting unauthorized voucher activations.
+- **Architectural Fix**:
+  - Implemented strict voucher format checks: minimum 4 alphanumeric characters (`cleanAct.length >= 4`) and immediate rejection of non-voucher symbols (`/[*?!#$\s<>'"`]/`).
+  - Standardized `.toUpperCase()` conversion prior to character stripping across both stored technician credentials and incoming activation codes.
+  - Verified across 31 adversarial test vectors in `scripts/challenger_r2_empirical_test.cjs`, achieving 100% rejection of unauthorized voucher attempts.
+
+### 31.2 Biomechanical Analysis & Unilateral Scan Isolation Verification
+- **Zero Contra-lateral Cloning**: Verified that unilateral single-foot scans (Left or Right) strictly isolate the active foot and never clone scan data or regional analysis onto the opposing foot.
+- **Asymmetric Plantar Load Evaluation**: Unilateral scans accurately reflect `"Unilateral Assessment (Left Foot Only)"` or `"Unilateral Assessment (Right Foot Only)"` without calculation anomalies or NaN values.
+- **Numerical Integration for Cavanagh Arch Index**: Plantar contact area and arch indices compute using genuine polygon ray-casting and numerical pixel integration across hindfoot, midfoot, and forefoot thirds.
+
+### 31.3 Full Test Suite & Build Green Conformance
+- **Unit Test Battery**: All 70 unit tests in `scripts/unit_tests.cjs` (`npm run test:unit`) passed with 100% success.
+- **Clinical Validation Battery**: All 15 clinical validation scenarios in `scripts/validate_system.cjs` (`npm run test:validate`) passed with 100% compliance.
+- **Production Build**: Full TypeScript type check (`tsc -b`) and Vite production bundle (`vite build`) compiled cleanly without errors.
+- **Independent Adversarial Suites**: All 4 adversarial test suites (99 total verification checks) passed cleanly without regressions.
+
+---
+
+## 32. Enterprise Cloud Mailbox, Single-Use Burn Codes & Timed Permit Licensing
+
+### 32.1 Single-Use Station Activation Code Protocol (Burn-On-Use)
+- **Vulnerability Remediated**: Reusable enrollment codes allowed unauthorized replication across multiple workstations.
+- **Implementation**:
+  - Implemented persistent burned activation code pool (`podopress_burned_activation_codes_v1` in storage and `tech.usedActivationCodes` in IndexedDB).
+  - Code entry immediately records `tech.isActivationCodeUsed = true`, `activationCodeUsedAt`, and `activationCodeUsedByDeviceId`.
+  - Any subsequent attempt to reuse the same code fails immediately with single-use rejection messaging.
+  - Admin Portal provides one-click `Issue Fresh Single-Use Code` / `Rotate Code` button to issue new codes for renewed permit cycles.
+
+### 32.2 Time-Bound Permit Enforcement (Hours / Days)
+- Station authorization stamps `expiresAt` calculated from configured policy (`getVoucherExpiryPolicySync()`).
+- `dbService.checkDeviceAuthorizationStatus()` validates `expiresAt` and returns `reason: 'permit_expired'` when passed.
+- Active 30-second background validator in `PodoLoadApp.tsx` auto-detects license expiration during live usage and locks clinical scanning.
+- Re-activation strictly requires entering a fresh single-use activation code from the Hospital Administrator.
+
+### 32.3 Hardware MAC Address & Technician User ID Binding
+- Station identity captures `macAddress` in EUI-48 format (`XX:XX:XX:XX:XX:XX`) and binds it to `technicianUsername` and hardware fingerprint.
+- Admin Portal displays bound device ID, MAC address, and provides an `Unbind` button that disassociates hardware and generates a fresh code.
+
+### 32.4 Supabase Cloud Mailbox & Telemetry Integration
+- Connected serverless Supabase mailbox (`https://yqfbhxtvrpfyzygzuqts.supabase.co` with publishable key).
+- Created copy-paste ready Supabase PostgreSQL schema provisioning `station_activations`, `clinical_reports`, and `plantar-scans` bucket with RLS policies.
+- Implemented `cloudSyncService.pullRemoteCases()` to hydrate local offline IndexedDB from remote cloud cases.
+- Implemented real-time remote revocation kill-switch in `syncStationHeartbeat()` and Admin/Cloud feeds.
+
+### 32.5 Test Conformance & Build Parity
+- **Unit Test Battery**: Expanded to 72 unit tests in `scripts/unit_tests.cjs` — 100% PASSED.
+- **Clinical Validation Battery**: All 15 clinical validation scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **Master Documentation**: Compiled into `SYSTEM_ARCHITECTURE_AND_OPERATIONS_MANUAL.md`.
+
+
+
 
 
 

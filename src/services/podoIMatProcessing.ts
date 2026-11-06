@@ -181,7 +181,6 @@ export function lineSegmentIntersection(
   const qx = linePt.x - p1.x;
   const qy = linePt.y - p1.y;
   const s = (qx * lineDir.y - qy * lineDir.x) / det;
-  const t = (qx * dy - qy * dx) / det;
 
   if (s >= 0 && s <= 1) {
     return {
@@ -190,6 +189,20 @@ export function lineSegmentIntersection(
     };
   }
   return null;
+}
+
+export function isPointInPolygon(pt: Point2D, polygon: Point2D[]): boolean {
+  let inside = false;
+  const n = polygon.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
 }
 
 export function findPolygonIntersections(polygon: Point2D[], linePt: Point2D, lineDir: Point2D): Point2D[] {
@@ -597,9 +610,31 @@ export async function processPodoIMatScan(
       detail: `Forefoot ball breadth: ${ballBreadthSegment.lengthMm} mm (between metatarsal margins)`,
     });
 
-    // Cavanagh Arch Index from regional longitudinal distribution
+    // Cavanagh Arch Index computed from genuine regional longitudinal distribution
     const contactAreaCm2 = Math.round((computePolygonArea(normalizedOutline) * scaledMmPerPixel * scaledMmPerPixel) / 100);
-    const cavanaghArchIndex = 0.19; // Normative baseline
+
+    let hindCount = 0;
+    let midCount = 0;
+    let foreCount = 0;
+    const stepSize = Math.max(2, Math.round(footHeight / 60));
+    const oneThirdY = nMinY + (1 / 3) * footHeight;
+    const twoThirdsY = nMinY + (2 / 3) * footHeight;
+
+    for (let py = Math.floor(nMinY); py <= Math.ceil(nMaxY); py += stepSize) {
+      for (let px = Math.floor(nMinX); px <= Math.ceil(nMaxX); px += stepSize) {
+        if (isPointInPolygon({ x: px, y: py }, normalizedOutline)) {
+          if (py >= twoThirdsY) {
+            hindCount++;
+          } else if (py >= oneThirdY) {
+            midCount++;
+          } else {
+            foreCount++;
+          }
+        }
+      }
+    }
+    const totalCount = hindCount + midCount + foreCount;
+    const cavanaghArchIndex = totalCount > 0 ? Number((midCount / totalCount).toFixed(3)) : 0.22;
 
     // ------------------------------------------------------------------------
     // STEP 37: prepare foot outline, image, and measurements for this foot
@@ -633,7 +668,7 @@ export async function processPodoIMatScan(
   }
 
   // Sort feet: Left foot first, then Right foot
-  feetResults.sort((a, b) => (a.side === 'Left' ? -1 : 1));
+  feetResults.sort((a, _b) => (a.side === 'Left' ? -1 : 1));
 
   // --------------------------------------------------------------------------
   // STEP 38: END

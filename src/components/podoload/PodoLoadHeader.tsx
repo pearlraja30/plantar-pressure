@@ -1,5 +1,5 @@
-import React from 'react';
-import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound, Lock } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
@@ -88,6 +88,26 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
     'report',
   ].includes(currentSection);
 
+  // Discreet 5-tap header lock gesture tracking for discrete Master Admin access
+  const [headerTapCount, setHeaderTapCount] = useState(0);
+  const lastHeaderTapRef = useRef<number>(0);
+
+  const handleHeaderTap = () => {
+    const now = Date.now();
+    if (now - lastHeaderTapRef.current < 700) {
+      const next = headerTapCount + 1;
+      if (next >= 5) {
+        setHeaderTapCount(0);
+        onOpenAdmin?.();
+      } else {
+        setHeaderTapCount(next);
+      }
+    } else {
+      setHeaderTapCount(1);
+    }
+    lastHeaderTapRef.current = now;
+  };
+
   return (
     <header className="podoload-top-header">
       {/* Top Row: Title, Search, Status & Profile */}
@@ -103,7 +123,13 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
               <Menu className="w-5 h-5 text-[#0e7477]" />
             </button>
           )}
-          <div className="podoload-header-title-block">
+          <div
+            className="podoload-header-title-block"
+            onClick={handleHeaderTap}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', userSelect: 'none' }}
+            title="Hospital Diagnostic Station (Tap 5x for Master Administrator Portal)"
+          >
+            <Lock className="w-3.5 h-3.5 text-slate-400 opacity-60" />
             <h2 className="podoload-header-title">{getHeaderTitle()}</h2>
           </div>
         </div>

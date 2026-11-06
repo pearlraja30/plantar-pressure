@@ -166,6 +166,33 @@ export interface AnalysisCase {
   cloudSyncId?: string;
   lastSyncAttempt?: string;
   integrityHash: string;
+  technicianId?: string;
+  technicianName?: string;
+  deviceFingerprint?: string;
+  syncedAt?: string;
+  cloudBatchId?: string;
+}
+
+export interface CloudBatchSyncPayload {
+  batchId: string;
+  technicianId: string;
+  technicianName: string;
+  technicianUsername?: string;
+  hospitalId: string;
+  hospitalCode: string;
+  deviceFingerprint: string;
+  clientTimestamp: string;
+  cases: AnalysisCase[];
+  patientProfiles?: Patient[];
+}
+
+export interface CloudBatchSyncResult {
+  success: boolean;
+  batchId: string;
+  processedCount: number;
+  syncedCaseIds: string[];
+  failedCaseIds: { caseId: string; error: string }[];
+  serverTimestamp: string;
 }
 
 export interface ScannerDevice {
@@ -273,9 +300,15 @@ export interface TechnicianUser {
   activationCode?: string; // Code-based enrollment voucher, e.g. "TMH-TECH-1001"
   activationCodeGeneratedAt?: string; // ISO date string of generation
   activationCodeExpiresAt?: string; // ISO date string of timed rotation (valid per configured policy)
+  usedActivationCodes?: string[]; // Permanently burned single-use activation codes
+  isActivationCodeUsed?: boolean; // True once used to register on any device; cannot be registered again
+  activationCodeUsedAt?: string; // ISO timestamp when voucher was consumed
+  activationCodeUsedByDeviceId?: string; // Hardware device fingerprint that consumed voucher
   registeredDeviceId?: string; // Bound hardware device fingerprint
+  macAddress?: string; // Bound station MAC address or hardware MAC fingerprint
   isRegisteredOnDevice?: boolean;
   authorizedAt?: string;
+  permitExpiresAt?: string; // Station license permit expiration timestamp
 }
 
 export type VoucherExpiryUnit = 'minutes' | 'hours' | 'days';
@@ -295,11 +328,14 @@ export interface DeviceAuthorizationToken {
   hospitalName: string;
   technicianId: string;
   technicianName: string;
+  technicianUsername?: string;
   deviceFingerprint: string;
+  macAddress?: string;
   deviceName?: string;
   appVersion?: string; // Authorized app build version, e.g. "1.0.55"
   authorizedAt: string;
-  expiresAt?: string;
+  expiresAt?: string; // Station permit expiration timestamp
+  permitPolicy?: VoucherExpiryPolicy; // Station permit security policy
   status: 'authorized' | 'revoked';
 }
 
@@ -351,6 +387,8 @@ export interface BoundDevice {
   name: string; // e.g. "Main Podiatry Lab iMac"
   platform: string; // e.g. "macOS / Chrome"
   fingerprint: string;
+  macAddress?: string; // Hardware MAC address (e.g. "3A:F2:88:9C:12:04")
+  boundUsername?: string; // Bound technician User ID
   ipAddress?: string;
   boundAt: string;
   lastActiveAt: string;

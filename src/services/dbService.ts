@@ -1,7 +1,7 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, LicenseInvoice, DeviceAuthorizationToken, VoucherExpiryPolicy, VoucherExpiryUnit } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy } from '../types';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
 import { cloudSyncService } from './cloudSyncService';
@@ -9,7 +9,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.56';
+export const APP_CURRENT_VERSION = '1.0.57';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -234,6 +234,7 @@ const LS_KEYS = {
   ADMIN_ACCOUNTS_LIST: 'podopress_admin_accounts_list_v1',
   DEVICE_AUTH_TOKEN: 'podopress_device_auth_token_v1',
   VOUCHER_EXPIRY_POLICY: 'podopress_voucher_expiry_policy_v1',
+  BURNED_ACTIVATION_CODES: 'podopress_burned_activation_codes_v1',
 };
 
 export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
@@ -1488,6 +1489,9 @@ class PodoPressDatabase {
       tech.activationCode = timed.code;
       tech.activationCodeGeneratedAt = timed.generatedAt;
       tech.activationCodeExpiresAt = timed.expiresAt;
+      tech.isActivationCodeUsed = false;
+      tech.activationCodeUsedAt = undefined;
+      tech.activationCodeUsedByDeviceId = undefined;
       this.saveTechnician(tech);
 
       logAuditEvent(
@@ -1524,6 +1528,7 @@ class PodoPressDatabase {
 
   /**
    * Manually rotate technician activation code on demand (starts fresh clock based on configured policy).
+   * Generates a fresh, unused single-use code and clears consumed status.
    */
   public rotateTechnicianActivationCode(techId: string): TechnicianUser | null {
     const list = this.getTechniciansSync();
@@ -1538,15 +1543,81 @@ class PodoPressDatabase {
     tech.activationCode = timed.code;
     tech.activationCodeGeneratedAt = timed.generatedAt;
     tech.activationCodeExpiresAt = timed.expiresAt;
+    tech.isActivationCodeUsed = false;
+    tech.activationCodeUsedAt = undefined;
+    tech.activationCodeUsedByDeviceId = undefined;
     this.saveTechnician(tech);
 
     logAuditEvent(
       'ACTIVATION_CODE_MANUAL_ROTATE',
-      `Administrator rotated activation voucher for ${tech.name} (${tech.username}) to ${timed.code} (Valid for ${policyLabel}).`,
+      `Administrator rotated activation voucher for ${tech.name} (${tech.username}) to ${timed.code} (Valid for ${policyLabel}). Fresh single-use code issued.`,
       'admin'
     );
 
     return tech;
+  }
+
+  /**
+   * Synchronously retrieves the list of burned/consumed single-use activation codes.
+   */
+  public getBurnedActivationCodesSync(): string[] {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.BURNED_ACTIVATION_CODES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Storage fallback
+    }
+    return [];
+  }
+
+  /**
+   * Permanently marks an activation code as burned/consumed so it can never be used again on any device.
+   */
+  public recordBurnedActivationCodeSync(code: string): void {
+    try {
+      const clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!clean) return;
+      const list = this.getBurnedActivationCodesSync();
+      if (!list.includes(clean)) {
+        list.push(clean);
+        localStorage.setItem(LS_KEYS.BURNED_ACTIVATION_CODES, JSON.stringify(list));
+      }
+    } catch (err) {
+      console.warn('PodoPress: Failed to record burned activation code:', err);
+    }
+  }
+
+  /**
+   * Verifies if an activation code has already been consumed/burned on any device.
+   */
+  public isActivationCodeBurned(code: string): boolean {
+    const clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!clean) return false;
+
+    const burnedList = this.getBurnedActivationCodesSync();
+    if (burnedList.includes(clean)) return true;
+
+    // Verify technician records across local storage
+    const techs = this.getTechniciansSync();
+    for (const t of techs) {
+      if (
+        t.usedActivationCodes &&
+        t.usedActivationCodes.some((c) => c.replace(/[^A-Z0-9]/g, '').toUpperCase() === clean)
+      ) {
+        return true;
+      }
+      if (
+        t.isActivationCodeUsed &&
+        t.activationCode &&
+        t.activationCode.replace(/[^A-Z0-9]/g, '').toUpperCase() === clean
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -1636,8 +1707,10 @@ class PodoPressDatabase {
   public async registerDeviceWithActivationCode(params: {
     hospitalCode: string;
     activationCode: string;
+    username?: string;
     password?: string;
     deviceName?: string;
+    macAddress?: string;
   }): Promise<{
     success: boolean;
     token?: DeviceAuthorizationToken;
@@ -1678,15 +1751,58 @@ class PodoPressDatabase {
       };
     }
 
-    // 2. Resolve Technician by Activation Code
-    const technicians = this.getTechniciansSync();
+    // Strict voucher validation: Must contain valid characters and minimum alphanumeric length
     const cleanAct = normActCode.replace(/[^A-Z0-9]/g, '');
+    if (!cleanAct || cleanAct.length < 4 || /[*?!#$\s<>'"`]/.test(normActCode)) {
+      logAuditEvent(
+        'DEVICE_ACTIVATION_FAILED',
+        `Failed device activation: Invalid or malformed voucher code "${params.activationCode}" for hospital ${params.hospitalCode}.`,
+        'system',
+        undefined,
+        'security'
+      );
+      return {
+        success: false,
+        error: `Invalid or unrecognized Activation Code "${params.activationCode}". Please request a fresh voucher from your Hospital Administrator.`,
+      };
+    }
 
-    let tech = technicians.find(
-      (t) =>
-        (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode) ||
-        (t.activationCode && t.activationCode.replace(/[^A-Z0-9]/g, '').toUpperCase() === cleanAct)
-    );
+    // Strict Single-Use Enforcement: Burned codes cannot be reused on any device
+    if (this.isActivationCodeBurned(normActCode)) {
+      logAuditEvent(
+        'DEVICE_ACTIVATION_REJECTED_ALREADY_USED',
+        `Activation Code "${normActCode}" has already been used on a workstation. Single-use voucher consumed.`,
+        params.username || 'unknown',
+        undefined,
+        'security',
+        'technician'
+      );
+      return {
+        success: false,
+        error: `Station Activation Code "${params.activationCode}" has already been used and registered. Each activation code is valid for single-use only on one station. Based on your hour/day permit policy, please contact your Hospital Administrator for a fresh activation code.`,
+      };
+    }
+
+    // 2. Resolve Technician by Username and/or Activation Code
+    const technicians = this.getTechniciansSync();
+    let tech: TechnicianUser | undefined;
+
+    // If explicit username provided, match technician account first
+    if (params.username && params.username.trim()) {
+      const cleanUser = params.username.trim().toLowerCase();
+      tech = technicians.find(
+        (t) => t.username.toLowerCase() === cleanUser || (t.email && t.email.toLowerCase() === cleanUser)
+      );
+    }
+
+    // Match by activation code if not matched by username or to verify voucher
+    if (!tech) {
+      tech = technicians.find(
+        (t) =>
+          (t.activationCode && t.activationCode.trim().toUpperCase() === normActCode) ||
+          (t.activationCode && t.activationCode.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanAct)
+      );
+    }
 
     // Fallback search by username or recovery key if technician entered that
     if (!tech) {
@@ -1694,46 +1810,8 @@ class PodoPressDatabase {
         (t) =>
           t.username.trim().toUpperCase() === normActCode ||
           (t.recoveryKey && t.recoveryKey.trim().toUpperCase() === normActCode) ||
-          t.username.replace(/[^A-Z0-9]/g, '').toUpperCase() === cleanAct
+          t.username.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanAct
       );
-    }
-
-    // Dynamic Multi-Platform Offline Enrollment:
-    // When the Administrator generates a voucher code (e.g. TMH-TECH-2805) on their PC
-    // and shares it to an Android, iOS, or Windows terminal, recognize valid clinic voucher pattern
-    // and automatically pair the station for 100% offline operation.
-    if (!tech) {
-      const hospPrefix = (hospital.code || 'TMH').split('-')[0].toUpperCase();
-      const isVoucherPattern =
-        normActCode.startsWith(`${hospPrefix}-TECH-`) ||
-        cleanAct.startsWith(`${hospPrefix}TECH`) ||
-        normActCode.includes('-TECH-');
-
-      if (isVoucherPattern) {
-        const hospTech = technicians.find((t) => t.hospitalId === hospital.id) || technicians[0];
-        if (hospTech) {
-          tech = {
-            ...hospTech,
-            activationCode: normActCode,
-            hospitalId: hospital.id,
-            hospitalName: hospital.name,
-          };
-        } else {
-          tech = {
-            id: `tech-${Date.now()}`,
-            name: 'Clinical Specialist',
-            username: `tech.${normActCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-            pin: params.password || '1234',
-            hospitalId: hospital.id,
-            hospitalName: hospital.name,
-            role: 'technician',
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            activationCode: normActCode,
-            isRegisteredOnDevice: true,
-          };
-        }
-      }
     }
 
     if (!tech) {
@@ -1750,15 +1828,33 @@ class PodoPressDatabase {
       };
     }
 
+    // Verify that the technician's assigned activation code is not already consumed
+    if (
+      tech.isActivationCodeUsed ||
+      (tech.usedActivationCodes &&
+        tech.usedActivationCodes.some((c) => c.replace(/[^A-Z0-9]/g, '').toUpperCase() === cleanAct))
+    ) {
+      logAuditEvent(
+        'DEVICE_ACTIVATION_REJECTED_ALREADY_USED',
+        `Technician ${tech.name} (${tech.username}) activation code "${normActCode}" has already been consumed. Re-registration rejected.`,
+        tech.username,
+        undefined,
+        'security',
+        'technician'
+      );
+      return {
+        success: false,
+        error: `Station Activation Code "${params.activationCode}" has already been used and registered. Each activation code is valid for single-use only on one station. Based on your hour/day permit policy, please contact your Hospital Administrator for a fresh activation code.`,
+      };
+    }
+
     // Check Configured Expiration on Activation Voucher (Hours / Days / Minutes)
     if (tech.activationCodeExpiresAt) {
       const expiresAtMs = new Date(tech.activationCodeExpiresAt).getTime();
       const pol = this.getVoucherExpiryPolicySync();
       const policyLabel = formatVoucherPolicyLabel(pol);
-      const durationMs = getVoucherExpiryMs(pol);
-      const gracePeriodMs = Math.min(60 * 60 * 1000, Math.max(15 * 60 * 1000, Math.floor(durationMs * 0.1)));
 
-      if (Date.now() > expiresAtMs + gracePeriodMs) {
+      if (Date.now() > expiresAtMs) {
         logAuditEvent(
           'DEVICE_ACTIVATION_REJECTED_EXPIRED',
           `Activation Code ${normActCode} expired (${policyLabel} policy). Station registration rejected.`,
@@ -1786,20 +1882,39 @@ class PodoPressDatabase {
       tech.pin = params.password.trim();
     }
 
-    // 4. Bind hardware device fingerprint
+    // 4. Bind hardware device fingerprint & MAC Address
     const hardwareDeviceId = deviceBindingService.getCurrentDeviceId();
+    const macAddress = params.macAddress || deviceBindingService.getDeviceMacAddress();
     const deviceName =
       params.deviceName?.trim() ||
       deviceBindingService.getCurrentDeviceInfo()?.name ||
       'Authorized Diagnostic Station';
 
+    // Calculate time-bound permit expiration based on configured hour/day policy
+    const expiryPolicy = this.getVoucherExpiryPolicySync();
+    const permitDurationMs = getVoucherExpiryMs(expiryPolicy);
+    const permitExpiresAt = new Date(Date.now() + permitDurationMs).toISOString();
+
+    // Burn / consume this single-use activation code immediately
+    this.recordBurnedActivationCodeSync(normActCode);
+    const updatedUsed = Array.from(new Set([...(tech.usedActivationCodes || []), cleanAct, normActCode]));
+
     tech.registeredDeviceId = hardwareDeviceId;
+    tech.macAddress = macAddress;
     tech.isRegisteredOnDevice = true;
     tech.authorizedAt = new Date().toISOString();
     tech.hospitalId = hospital.id;
     tech.hospitalName = hospital.name;
+    tech.isActivationCodeUsed = true;
+    tech.activationCodeUsedAt = new Date().toISOString();
+    tech.activationCodeUsedByDeviceId = hardwareDeviceId;
+    tech.usedActivationCodes = updatedUsed;
+    tech.permitExpiresAt = permitExpiresAt;
 
     await this.saveTechnician(tech);
+
+    // Bind station in device license fleet
+    deviceBindingService.bindCurrentDeviceWithUser(tech.username, tech.name, macAddress, deviceName);
 
     // 5. Generate persistent Device Authorization Token
     const randPart1 = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -1813,14 +1928,21 @@ class PodoPressDatabase {
       hospitalName: hospital.name,
       technicianId: tech.id,
       technicianName: tech.name,
+      technicianUsername: tech.username,
       deviceFingerprint: hardwareDeviceId,
+      macAddress,
       deviceName,
       appVersion: APP_CURRENT_VERSION,
       authorizedAt: new Date().toISOString(),
+      expiresAt: permitExpiresAt, // Time-bound permit expiration based on hour/day policy
+      permitPolicy: expiryPolicy,
       status: 'authorized',
     };
 
     await this.saveDeviceAuthorization(authToken);
+
+    // Opportunistically ping cloud mailbox with activation heartbeat
+    cloudSyncService.syncStationHeartbeat(authToken).catch(() => {});
 
     // 6. Set Active User & Hospital Session
     this.setActiveHospitalIdSync(hospital.id);
@@ -1844,13 +1966,32 @@ class PodoPressDatabase {
   }
 
   /**
+   * Station activation endpoint alias (conforms to test suite and multi-station activation).
+   */
+  public async activateStationWithCode(params: {
+    hospitalCode: string;
+    activationCode: string;
+    password?: string;
+    deviceName?: string;
+  }): Promise<{
+    success: boolean;
+    token?: DeviceAuthorizationToken;
+    technician?: TechnicianUser;
+    hospital?: HospitalProfile;
+    error?: string;
+  }> {
+    return this.registerDeviceWithActivationCode(params);
+  }
+
+
+  /**
    * Evaluates if this station is authorized to run examinations.
    * If a new device is detected OR an app update/new version was installed,
    * it requires re-authorization via activation code before unlocking further processings.
    */
   public checkDeviceAuthorizationStatus(): {
     isAuthorized: boolean;
-    reason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician';
+    reason?: 'unregistered' | 'new_device' | 'new_version' | 'revoked' | 'inactive_technician' | 'permit_expired';
     token: DeviceAuthorizationToken | null;
     deviceId: string;
     currentVersion: string;
@@ -1914,6 +2055,21 @@ class PodoPressDatabase {
       };
     }
 
+    // Time-bound permit check: if permit duration (hours/days) has expired, lock station
+    if (token.expiresAt) {
+      const expiresAtMs = new Date(token.expiresAt).getTime();
+      if (!isNaN(expiresAtMs) && Date.now() > expiresAtMs) {
+        return {
+          isAuthorized: false,
+          reason: 'permit_expired',
+          token,
+          deviceId: currentDeviceId,
+          currentVersion,
+          registeredVersion: token.appVersion,
+        };
+      }
+    }
+
     return {
       isAuthorized: true,
       token,
@@ -1925,6 +2081,25 @@ class PodoPressDatabase {
 
   public isDeviceAuthorized(): boolean {
     return this.checkDeviceAuthorizationStatus().isAuthorized;
+  }
+
+  /**
+   * Revokes the local device authorization token (e.g. on remote administrator kill-switch command).
+   */
+  public async revokeDeviceAuthorization(reason = 'Remote administrator revocation'): Promise<void> {
+    const token = this.getDeviceAuthorizationSync();
+    if (token) {
+      token.status = 'revoked';
+      await this.saveDeviceAuthorization(token);
+      logAuditEvent(
+        'DEVICE_AUTHORIZATION_REVOKED',
+        `Device authorization revoked for station ${token.deviceFingerprint}. Reason: ${reason}.`,
+        token.technicianUsername || 'system',
+        undefined,
+        'security',
+        'admin'
+      );
+    }
   }
 
   /**
@@ -1955,14 +2130,27 @@ class PodoPressDatabase {
       return { syncedCount: 0, totalPending: 0, errors: [] };
     }
 
+    const activeUser = this.getActiveUserSync();
+    const techMeta = activeUser
+      ? {
+          id: activeUser.technicianId || activeUser.username || 'tech-default',
+          name: activeUser.name || 'Technician',
+          hospitalId: activeUser.hospitalId,
+        }
+      : undefined;
+
     let syncedCount = 0;
     for (const c of pendingCases) {
       try {
-        const syncRes = await cloudSyncService.syncCase(c);
+        const syncRes = await cloudSyncService.syncCase(c, techMeta);
         if (syncRes.success) {
           c.syncStatus = 'synced';
           c.cloudSyncId = syncRes.cloudId || `CLOUD-SYNC-${(c.caseNumber || c.id).replace(/[^a-zA-Z0-9]/g, '')}`;
           c.lastSyncAttempt = new Date().toISOString();
+          if (techMeta) {
+            c.technicianId = techMeta.id;
+            c.technicianName = techMeta.name;
+          }
           await this.saveCase(c);
           syncedCount++;
           onProgress?.(syncedCount, totalPending);
@@ -2049,7 +2237,7 @@ class PodoPressDatabase {
     } catch {
       // Fallback
     }
-    return SYSTEM_ACCOUNTS.admin;
+    return SYSTEM_ACCOUNTS.technician;
   }
 
   public setActiveUser(
@@ -2255,6 +2443,45 @@ class PodoPressDatabase {
     usernameOrEmail: string,
     pin: string
   ): { success: boolean; account?: AdminAccount; error?: string } {
+    const LOCKOUT_KEY = 'podopress_admin_lockout_v1';
+    let lockoutState = { failedAttempts: 0, lockedUntil: 0 };
+    try {
+      const savedLockout = localStorage.getItem(LOCKOUT_KEY);
+      if (savedLockout) {
+        lockoutState = JSON.parse(savedLockout);
+      }
+    } catch {
+      // Fallback
+    }
+
+    if (lockoutState.lockedUntil && Date.now() < lockoutState.lockedUntil) {
+      const remainingSec = Math.ceil((lockoutState.lockedUntil - Date.now()) / 1000);
+      return {
+        success: false,
+        error: `Master Administrator authentication is locked due to consecutive failed attempts. Please wait ${remainingSec} seconds or use your Recovery Key.`,
+      };
+    }
+
+    const recordFailedAttempt = () => {
+      lockoutState.failedAttempts = (lockoutState.failedAttempts || 0) + 1;
+      if (lockoutState.failedAttempts >= 5) {
+        lockoutState.lockedUntil = Date.now() + 15 * 60 * 1000;
+      }
+      try {
+        localStorage.setItem(LOCKOUT_KEY, JSON.stringify(lockoutState));
+      } catch {
+        // Ignore
+      }
+    };
+
+    const clearLockout = () => {
+      try {
+        localStorage.removeItem(LOCKOUT_KEY);
+      } catch {
+        // Ignore
+      }
+    };
+
     const registered = this.getAdminAccountSync();
     const cleanUser = usernameOrEmail.trim().toLowerCase();
     const cleanPin = pin.trim();
@@ -2269,6 +2496,7 @@ class PodoPressDatabase {
       const matchPin = registered.pin && registered.pin.trim() === cleanPin;
 
       if (matchUser && matchPin) {
+        clearLockout();
         registered.lastLoginAt = new Date().toISOString();
         try {
           localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
@@ -2287,6 +2515,7 @@ class PodoPressDatabase {
         return { success: true, account: registered };
       }
 
+      recordFailedAttempt();
       logAuditEvent(
         'ADMIN_LOGIN_FAILED',
         `Failed Administrator login attempt for User ID "${usernameOrEmail}". Incorrect credentials.`,
@@ -2295,11 +2524,15 @@ class PodoPressDatabase {
         'security',
         'admin'
       );
+      if (lockoutState.failedAttempts >= 5) {
+        return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please try again later.' };
+      }
       return { success: false, error: 'Invalid Administrator User ID or Master Password.' };
     }
 
     // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
     if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin' || !cleanUser) && (cleanPin === '1234' || cleanPin === 'admin')) {
+      clearLockout();
       this.authorizeStationForAdmin(DEFAULT_ADMIN_ACCOUNT);
       logAuditEvent(
         'ADMIN_LOGIN_SUCCESS',
@@ -2312,6 +2545,7 @@ class PodoPressDatabase {
       return { success: true, account: DEFAULT_ADMIN_ACCOUNT };
     }
 
+    recordFailedAttempt();
     logAuditEvent(
       'ADMIN_LOGIN_FAILED',
       `Failed Administrator login attempt for User ID "${usernameOrEmail}". No account registered.`,
@@ -2320,6 +2554,9 @@ class PodoPressDatabase {
       'security',
       'admin'
     );
+    if (lockoutState.failedAttempts >= 5) {
+      return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please try again later.' };
+    }
     return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
   }
 
@@ -2382,6 +2619,12 @@ class PodoPressDatabase {
     updatedData: any,
     auditReason: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (!this.hasActiveSession()) {
+      return {
+        success: false,
+        error: 'Unauthorized access: No active authenticated session. Please log in as Hospital Administrator.',
+      };
+    }
     const activeUser = this.getActiveUserSync();
     if (activeUser.role !== 'admin') {
       return {

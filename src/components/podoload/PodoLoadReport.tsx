@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Patient, AnalysisCase } from '../../types';
-import { generateBilateralClubbedReportPdf } from '../../services/reportPdfService';
+import { generateBilateralClubbedReportPdf, generateClinicalReportPdf } from '../../services/reportPdfService';
+import { computeSha256 } from '../../services/storageUtils';
 import { FootCaptureData } from './PodoLoadCapture';
 import { dbService } from '../../services/dbService';
 import { generateSyntheticFootprintHeatmap, generateSyntheticHarrisMatScan } from '../../services/imageProcessingService';
@@ -242,8 +243,9 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
   const handleDownloadPdf = async () => {
     if (!selectedPatient) return;
     try {
+      const targetCaseId = currentCase?.id || 'case-current';
       const activeCase: AnalysisCase = currentCase || {
-        id: 'case-current',
+        id: targetCaseId,
         caseNumber: `PPA-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
         patientId: selectedPatient.id,
         footSide: leftFoot && rightFoot ? 'Bilateral' : leftFoot ? 'Left' : 'Right',
@@ -321,8 +323,11 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
           signedAt: new Date().toISOString(),
         },
         syncStatus: uploadToCloud ? 'synced' : 'pending',
-        integrityHash: 'sha256-verified-ok',
+        integrityHash: computeSha256(`${targetCaseId}-${selectedPatient.id}-${new Date().toISOString()}`),
       };
+
+      const hasRightData = Boolean(rightRawScan || activeCase.rightRawScanDataUrl);
+      const hasLeftData = Boolean(leftRawScan || activeCase.rawScanDataUrl);
 
       const leftCaseForPdf: AnalysisCase = {
         ...activeCase,
@@ -336,13 +341,18 @@ export const PodoLoadReport: React.FC<PodoLoadReportProps> = ({
       const rightCaseForPdf: AnalysisCase = {
         ...activeCase,
         footSide: 'Right',
-        rawScanDataUrl: rightRawScan || activeCase.rightRawScanDataUrl || activeCase.rawScanDataUrl,
-        processedHeatMapDataUrl: rightHeatmap || activeCase.rightProcessedHeatMapDataUrl || activeCase.processedHeatMapDataUrl,
-        regionalAnalysis: rightAnalysis?.regionalAnalysis || activeCase.regionalAnalysis,
-        orthoticMeasurements: rightAnalysis?.orthoticMeasurements || activeCase.orthoticMeasurements,
+        rawScanDataUrl: rightRawScan || activeCase.rightRawScanDataUrl || '',
+        processedHeatMapDataUrl: rightHeatmap || activeCase.rightProcessedHeatMapDataUrl || '',
+        regionalAnalysis: rightAnalysis?.regionalAnalysis || (hasRightData ? activeCase.regionalAnalysis : undefined),
+        orthoticMeasurements: rightAnalysis?.orthoticMeasurements || (hasRightData ? activeCase.orthoticMeasurements : undefined),
       };
 
-      const doc = await generateBilateralClubbedReportPdf(leftCaseForPdf, rightCaseForPdf, selectedPatient);
+      let doc;
+      if (hasLeftData && hasRightData) {
+        doc = await generateBilateralClubbedReportPdf(leftCaseForPdf, rightCaseForPdf, selectedPatient);
+      } else {
+        doc = await generateClinicalReportPdf(hasRightData && !hasLeftData ? rightCaseForPdf : leftCaseForPdf, selectedPatient);
+      }
       doc.save(`PodoPress-Clinical-Report-${selectedPatient.mrn || '00000'}.pdf`);
     } catch (err) {
       console.warn('PDF download error:', err);

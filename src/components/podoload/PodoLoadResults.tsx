@@ -190,15 +190,18 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
     ? `${activeAnalysis?.regionalAnalysis?.archClassification || currentCase?.orthoticMeasurements?.archType || currentCase?.regionalAnalysis?.archClassification || 'Normal Arch'} (AI: ${(activeAnalysis?.regionalAnalysis?.cavanaghArchIndex || currentCase?.orthoticMeasurements?.archIndex || currentCase?.regionalAnalysis?.cavanaghArchIndex || 0.25).toFixed(2)})`
     : 'Awaiting scan analysis';
 
-  const lAreaNum = leftAnalysis?.regionalAnalysis?.contactAreaCm2 || currentCase?.regionalAnalysis?.contactAreaCm2 || 0;
-  const rAreaNum = rightAnalysis?.regionalAnalysis?.contactAreaCm2 || currentCase?.regionalAnalysis?.contactAreaCm2 || 0;
+  const hasLeft = Boolean(leftAnalysis || leftFoot || (currentCase?.footSide !== 'Right' && currentCase?.rawScanDataUrl));
+  const hasRight = Boolean(rightAnalysis || rightFoot || currentCase?.rightRawScanDataUrl || (currentCase?.footSide === 'Right' && currentCase?.rawScanDataUrl));
+
+  const lAreaNum = hasLeft ? (leftAnalysis?.regionalAnalysis?.contactAreaCm2 || currentCase?.regionalAnalysis?.contactAreaCm2 || 0) : 0;
+  const rAreaNum = hasRight ? (rightAnalysis?.regionalAnalysis?.contactAreaCm2 || (currentCase?.footSide === 'Right' ? currentCase?.regionalAnalysis?.contactAreaCm2 : 0) || 0) : 0;
 
   let asymmetryLabel = 'Awaiting scan analysis';
-  if (lAreaNum > 0 && rAreaNum > 0) {
+  if (hasLeft && hasRight && lAreaNum > 0 && rAreaNum > 0) {
     const asymmetryVal = Math.round((Math.abs(lAreaNum - rAreaNum) / Math.max(lAreaNum, rAreaNum)) * 100);
     asymmetryLabel = `${asymmetryVal}% ${asymmetryVal <= 8 ? '(Symmetric Plantar Load)' : '(Asymmetric Plantar Load)'}`;
-  } else if (lAreaNum > 0 || rAreaNum > 0) {
-    asymmetryLabel = `Unilateral Assessment (${lAreaNum > 0 ? 'Left' : 'Right'} Foot Only)`;
+  } else if (hasLeft || hasRight || lAreaNum > 0 || rAreaNum > 0) {
+    asymmetryLabel = `Unilateral Assessment (${hasRight && !hasLeft ? 'Right' : 'Left'} Foot Only)`;
   }
 
   const highPressureRegion = hasAnalysis

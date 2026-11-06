@@ -45,6 +45,7 @@ import {
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense, AdminAccount, AuditEvent, VoucherExpiryPolicy, VoucherExpiryUnit } from '../../types';
 import { dbService, DEFAULT_VOUCHER_EXPIRY_POLICY, formatVoucherPolicyLabel, formatRemainingTime } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
+import { cloudSyncService, RemoteStationRecord } from '../../services/cloudSyncService';
 import { diagnosticsLogger, DiagnosticErrorLog } from '../../services/diagnosticsLogger';
 import { PodoLoadDevicePaymentModal } from './PodoLoadDevicePaymentModal';
 
@@ -201,6 +202,43 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [showAddHosp, setShowAddHosp] = useState(false);
   const [newHospName, setNewHospName] = useState('');
   const [newHospCode, setNewHospCode] = useState('');
+
+  // Remote Cloud Stations Feed (Supabase Mailbox)
+  const [remoteCloudStations, setRemoteCloudStations] = useState<RemoteStationRecord[]>([]);
+  const [isLoadingCloudStations, setIsLoadingCloudStations] = useState<boolean>(false);
+  const [activeDeviceView, setActiveDeviceView] = useState<'local' | 'cloud'>('local');
+
+  const handleLoadCloudStations = async () => {
+    setIsLoadingCloudStations(true);
+    setActiveDeviceView('cloud');
+    const stations = await cloudSyncService.fetchRemoteStations();
+    setRemoteCloudStations(stations);
+    setIsLoadingCloudStations(false);
+  };
+
+  const handleRevokeCloudStation = async (fingerprint: string) => {
+    if (!confirm(`Are you sure you want to revoke workstation authorization for station ${fingerprint}? The remote terminal will be locked out.`)) return;
+    const config = cloudSyncService.getConfig();
+    try {
+      await fetch(`${config.url}/rest/v1/station_activations?device_fingerprint=eq.${encodeURIComponent(fingerprint)}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'revoked' }),
+      });
+      setIsLoadingCloudStations(true);
+      const stations = await cloudSyncService.fetchRemoteStations();
+      setRemoteCloudStations(stations);
+      setIsLoadingCloudStations(false);
+      setSaveSuccess(`✓ Workstation ${fingerprint} marked as revoked in Supabase Cloud.`);
+      setTimeout(() => setSaveSuccess(null), 3500);
+    } catch (e) {
+      alert(`Error revoking station: ${(e as Error).message}`);
+    }
+  };
 
   // Status feedback
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -484,7 +522,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     if (updated) {
       setTechniciansList(dbService.getTechniciansSync());
       setAuditLogs(dbService.getAuditLogsSync());
-      setSaveSuccess(`✓ Activation code rotated for "${tech.name}": ${updated.activationCode}. Valid for ${formatVoucherPolicyLabel(expiryPolicy)}.`);
+      setSaveSuccess(`✓ Generated fresh single-use activation code for "${tech.name}": ${updated.activationCode}. Valid for ${formatVoucherPolicyLabel(expiryPolicy)}.`);
       setTimeout(() => setSaveSuccess(null), 3500);
     }
   };
@@ -551,7 +589,7 @@ STEP 1: DEVICE ENROLLMENT (First-Time / New Install)
 1. Open PodoPress on your Android (.apk), iOS, or Windows (.exe) terminal.
 2. Select "Activate Device with Code".
 3. Hospital / Clinic Code: ${hosp.code}
-4. Activation Voucher Code: ${tech.activationCode || 'TMH-TECH-1001'}
+4. Station Activation Code: ${tech.activationCode || 'TMH-TECH-1001'}
 5. Set Quick Access Password: ${tech.pin || '1234'}
 
 STEP 2: RETURNING STATION SESSIONS
@@ -1392,7 +1430,7 @@ STEP 2: RETURNING STATION SESSIONS
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem' }}>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f766e', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                                2. Activation Voucher Code
+                                2. Station Activation Code
                               </span>
                               <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
                                 ⏱️ {timed.remainingText}
@@ -1796,7 +1834,7 @@ STEP 2: RETURNING STATION SESSIONS
                       Create New Clinical Technician Account &amp; App Login
                     </h5>
                     <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
-                      Generates Android, iOS &amp; Windows Activation Voucher
+                      Generates Android, iOS &amp; Windows Station Activation Code
                     </span>
                   </div>
 
@@ -1991,7 +2029,16 @@ STEP 2: RETURNING STATION SESSIONS
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '0.74rem', fontWeight: 800, backgroundColor: '#f0fdfa', color: '#0f766e', border: '1px solid #99f6e4', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
+                          <code style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            backgroundColor: tech.isActivationCodeUsed ? '#fef2f2' : '#f0fdfa',
+                            color: tech.isActivationCodeUsed ? '#b91c1c' : '#0f766e',
+                            border: tech.isActivationCodeUsed ? '1px solid #fecaca' : '1px solid #99f6e4',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            letterSpacing: '0.04em'
+                          }}>
                             {tech.activationCode || 'TMH-TECH-1001'}
                           </code>
                           <button
@@ -2008,17 +2055,46 @@ STEP 2: RETURNING STATION SESSIONS
                             type="button"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#0d9488' }}
                             onClick={() => handleRegenerateActivationCode(tech)}
-                            title={`Rotate activation code now (starts fresh ${formatVoucherPolicyLabel(expiryPolicy)} validity)`}
+                            title={`Generate fresh single-use activation code (starts fresh ${formatVoucherPolicyLabel(expiryPolicy)} validity)`}
                           >
                             <RotateCw className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px', fontSize: '0.62rem', color: '#64748b' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '3px', fontSize: '0.62rem', color: '#64748b', flexWrap: 'wrap' }}>
+                          {tech.isActivationCodeUsed ? (
+                            <span className="podo-badge podo-badge-red" style={{ fontSize: '0.56rem' }} title={`Consumed on device ${tech.activationCodeUsedByDeviceId || tech.registeredDeviceId || 'terminal'}`}>
+                              🔴 Code Consumed (Single-Use)
+                            </span>
+                          ) : (
+                            <span className="podo-badge podo-badge-green" style={{ fontSize: '0.56rem' }}>
+                              🟢 Ready for 1-Time Registration
+                            </span>
+                          )}
                           <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.56rem' }}>
-                            ⏱️ {formatVoucherPolicyLabel(expiryPolicy)} Auto-Rotate
+                            ⏱️ {formatVoucherPolicyLabel(expiryPolicy)} Permit
                           </span>
                           {tech.isRegisteredOnDevice ? (
-                            <span style={{ color: '#16a34a' }}>📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <span style={{ color: '#16a34a' }}>
+                                📱 Bound: {tech.registeredDeviceId || 'DEV-STATION'} {tech.macAddress ? `(${tech.macAddress})` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.62rem', textDecoration: 'underline', padding: 0 }}
+                                onClick={async () => {
+                                  if (confirm(`Unbind ${tech.name} (${tech.username}) from device ${tech.registeredDeviceId}? A fresh single-use activation code will be issued for new station pairing.`)) {
+                                    tech.isRegisteredOnDevice = false;
+                                    tech.registeredDeviceId = undefined;
+                                    tech.macAddress = undefined;
+                                    dbService.rotateTechnicianActivationCode(tech.id);
+                                    setTechniciansList(dbService.getTechniciansSync());
+                                  }
+                                }}
+                                title="Unbind hardware device and issue fresh code"
+                              >
+                                Unbind
+                              </button>
+                            </div>
                           ) : (
                             <span>📱 Ready for Device Activation</span>
                           )}
@@ -2072,10 +2148,10 @@ STEP 2: RETURNING STATION SESSIONS
                             className="podoload-btn-secondary podoload-btn-sm"
                             style={{ fontSize: '0.66rem', padding: '0.2rem 0.45rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => setVoucherTech(tech)}
-                            title="View / Print Mobile Device Activation Voucher"
+                            title="View / Print Station Activation Credentials"
                           >
                             <Smartphone className="w-3 h-3 text-teal-600" />
-                            <span>Voucher</span>
+                            <span>Activation Code</span>
                           </button>
                           <button
                             type="button"
@@ -2631,66 +2707,158 @@ STEP 2: RETURNING STATION SESSIONS
 
               {/* Fleet Table */}
               <div>
-                <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
-                  AUTHORIZED HARDWARE TERMINALS FLEET
-                </h5>
-                <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
-                  <table className="podoload-device-table" style={{ width: '100%', minWidth: '550px', fontSize: '0.74rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left' }}>STATION NAME</th>
-                      <th style={{ textAlign: 'left' }}>HARDWARE ID</th>
-                      <th style={{ textAlign: 'left' }}>PLATFORM / OS</th>
-                      <th style={{ textAlign: 'left' }}>BOUND DATE</th>
-                      <th style={{ textAlign: 'center' }}>STATUS</th>
-                      <th style={{ textAlign: 'right' }}>ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {boundDevices.length > 0 ? (
-                      boundDevices.map((d) => (
-                        <tr key={d.id}>
-                          <td style={{ fontWeight: 700, color: '#0c2328' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <span>{d.name}</span>
-                              {d.isCurrentDevice && (
-                                <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
-                                  Active Here
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td><code>{d.id}</code></td>
-                          <td>{d.platform}</td>
-                          <td>{d.boundAt?.slice(0, 10) || 'Today'}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className="podo-badge podo-badge-green">
-                              {d.status === 'active' ? 'Authorized' : 'Revoked'}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="podoload-btn-secondary podoload-btn-sm"
-                              onClick={() => handleUnbindDevice(d.id)}
-                              style={{ color: '#dc2626', borderColor: '#fecaca', fontSize: '0.7rem' }}
-                              title="Unbind/Revoke device to free seat"
-                            >
-                              Revoke Seat
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
-                          No bound devices found. Create an Administrator account to bind this station.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '0.78rem', fontWeight: 800, color: '#0c2328' }}>
+                    {activeDeviceView === 'local' ? 'AUTHORIZED HARDWARE TERMINALS FLEET' : 'REMOTE STATIONS FEED (SUPABASE CLOUD)'}
+                  </h5>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className={`podoload-btn-sm ${activeDeviceView === 'local' ? 'podoload-btn-primary' : 'podoload-btn-secondary'}`}
+                      style={{ fontSize: '0.68rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => setActiveDeviceView('local')}
+                    >
+                      Local Fleet ({boundDevices.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`podoload-btn-sm ${activeDeviceView === 'cloud' ? 'podoload-btn-primary' : 'podoload-btn-secondary'}`}
+                      style={{ fontSize: '0.68rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      onClick={handleLoadCloudStations}
+                      disabled={isLoadingCloudStations}
+                    >
+                      <Cloud className={`w-3 h-3 ${isLoadingCloudStations ? 'animate-spin' : ''}`} />
+                      <span>Cloud Feed {remoteCloudStations.length > 0 ? `(${remoteCloudStations.length})` : ''}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {activeDeviceView === 'local' ? (
+                  <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                    <table className="podoload-device-table" style={{ width: '100%', minWidth: '650px', fontSize: '0.74rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left' }}>STATION NAME</th>
+                          <th style={{ textAlign: 'left' }}>HARDWARE ID</th>
+                          <th style={{ textAlign: 'left' }}>MAC ADDRESS</th>
+                          <th style={{ textAlign: 'left' }}>PLATFORM / OS</th>
+                          <th style={{ textAlign: 'left' }}>BOUND OPERATOR</th>
+                          <th style={{ textAlign: 'center' }}>STATUS</th>
+                          <th style={{ textAlign: 'right' }}>ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {boundDevices.length > 0 ? (
+                          boundDevices.map((d) => (
+                            <tr key={d.id}>
+                              <td style={{ fontWeight: 700, color: '#0c2328' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                  <span>{d.name}</span>
+                                  {d.isCurrentDevice && (
+                                    <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
+                                      Active Here
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td><code>{d.id}</code></td>
+                              <td><code style={{ fontSize: '0.7rem' }}>{d.macAddress || '3A:F2:88:9C:12:04'}</code></td>
+                              <td>{d.platform}</td>
+                              <td>{d.boundUsername || 'Assigned Operator'}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span className="podo-badge podo-badge-green">
+                                  {d.status === 'active' ? 'Authorized' : 'Revoked'}
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="podoload-btn-secondary podoload-btn-sm"
+                                  onClick={() => handleUnbindDevice(d.id)}
+                                  style={{ color: '#dc2626', borderColor: '#fecaca', fontSize: '0.7rem' }}
+                                  title="Unbind/Revoke device to free seat"
+                                >
+                                  Revoke Seat
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                              No bound devices found. Create an Administrator account to bind this station.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '6px' }}>
+                    {isLoadingCloudStations ? (
+                      <div style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b', fontSize: '0.74rem' }}>
+                        Connecting to Supabase (yqfbhxtvrpfyzygzuqts.supabase.co)...
+                      </div>
+                    ) : remoteCloudStations.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>No Remote Stations Checked In Yet</div>
+                        <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '4px 0 0 0' }}>
+                          Remote Windows PCs or mobile apps push here automatically when activated with an activation code and connected online.
+                        </p>
+                      </div>
+                    ) : (
+                      <table className="podoload-device-table" style={{ width: '100%', minWidth: '650px', fontSize: '0.74rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left' }}>STATION NAME</th>
+                            <th style={{ textAlign: 'left' }}>DEVICE ID</th>
+                            <th style={{ textAlign: 'left' }}>PLATFORM</th>
+                            <th style={{ textAlign: 'left' }}>CLINIC</th>
+                            <th style={{ textAlign: 'left' }}>OPERATOR</th>
+                            <th style={{ textAlign: 'left' }}>LAST SEEN</th>
+                            <th style={{ textAlign: 'center' }}>STATUS</th>
+                            <th style={{ textAlign: 'center' }}>ACTION</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {remoteCloudStations.map((st) => (
+                            <tr key={st.device_fingerprint}>
+                              <td style={{ fontWeight: 700, color: '#0c2328' }}>{st.device_name}</td>
+                              <td><code>{st.device_fingerprint}</code></td>
+                              <td>{st.os_platform}</td>
+                              <td><code>{st.hospital_code}</code></td>
+                              <td>{st.technician_name || 'Technician'}</td>
+                              <td style={{ color: '#64748b' }}>
+                                {st.last_seen_at ? new Date(st.last_seen_at).toLocaleDateString() : 'Today'}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span className={`podo-badge ${st.status === 'revoked' ? 'podo-badge-red' : 'podo-badge-green'}`}>
+                                  {st.status || 'Active'}
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {st.status !== 'revoked' ? (
+                                  <button
+                                    type="button"
+                                    className="podoload-btn-secondary podoload-btn-sm"
+                                    style={{ color: '#dc2626', borderColor: '#fecaca', fontSize: '0.66rem', padding: '0.15rem 0.45rem' }}
+                                    onClick={() => handleRevokeCloudStation(st.device_fingerprint)}
+                                    title="Revoke workstation authorization remotely in Supabase"
+                                  >
+                                    Revoke
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.64rem', color: '#dc2626', fontWeight: 600 }}>Revoked</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Invoices & License Billing History */}
@@ -3287,7 +3455,7 @@ STEP 2: RETURNING STATION SESSIONS
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <Clock className="w-4 h-4 text-teal-600" />
                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f766e' }}>
-                      Technician Activation Voucher Expiration &amp; Rotation Policy
+                      Technician Activation Code Expiration &amp; Rotation Policy
                     </span>
                   </div>
                   <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
@@ -3901,7 +4069,7 @@ STEP 2: RETURNING STATION SESSIONS
                 </div>
                 <div>
                   <h3 className="podoload-modal-title" style={{ margin: 0, fontSize: '0.92rem' }}>
-                    Clinical Device Activation Voucher
+                    Clinical Station Activation Credentials
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
                     Share these credentials with the technician for mobile app or station enrollment
@@ -3963,15 +4131,22 @@ STEP 2: RETURNING STATION SESSIONS
                 {/* Primary Activation Voucher Code */}
                 <div
                   style={{
-                    backgroundColor: '#f0fdfa',
-                    border: '1.5px solid #99f6e4',
+                    backgroundColor: voucherTech.isActivationCodeUsed ? '#fef2f2' : '#f0fdfa',
+                    border: voucherTech.isActivationCodeUsed ? '1.5px solid #fca5a5' : '1.5px solid #99f6e4',
                     borderRadius: '8px',
                     padding: '0.75rem',
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Technician Activation Voucher Code
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: voucherTech.isActivationCodeUsed ? '#b91c1c' : '#0f766e', textTransform: 'uppercase' }}>
+                      Station Activation Code ({formatVoucherPolicyLabel(expiryPolicy)} Permit)
+                    </div>
+                    {voucherTech.isActivationCodeUsed ? (
+                      <span className="podo-badge podo-badge-red" style={{ fontSize: '0.55rem' }}>🔴 Consumed</span>
+                    ) : (
+                      <span className="podo-badge podo-badge-green" style={{ fontSize: '0.55rem' }}>🟢 Ready (1-Time Use)</span>
+                    )}
                   </div>
                   <div
                     style={{
@@ -3979,14 +4154,34 @@ STEP 2: RETURNING STATION SESSIONS
                       fontWeight: 900,
                       letterSpacing: '0.08em',
                       fontFamily: 'monospace',
-                      color: '#115e59',
+                      color: voucherTech.isActivationCodeUsed ? '#991b1b' : '#115e59',
                     }}
                   >
                     {voucherTech.activationCode || 'TMH-TECH-1001'}
                   </div>
                   <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '4px' }}>
-                    One-time enrollment voucher to bind device for 100% offline scanning
+                    {voucherTech.isActivationCodeUsed
+                      ? `Single-use code was consumed on device ${voucherTech.activationCodeUsedByDeviceId || voucherTech.registeredDeviceId || 'terminal'}. Generate a fresh code to renew license.`
+                      : 'Single-use enrollment voucher to bind device for 100% offline scanning.'}
                   </div>
+                  {voucherTech.isActivationCodeUsed && (
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      style={{ marginTop: '0.45rem', fontSize: '0.68rem', padding: '0.25rem 0.65rem' }}
+                      onClick={() => {
+                        const fresh = dbService.rotateTechnicianActivationCode(voucherTech.id);
+                        if (fresh) {
+                          setVoucherTech(fresh);
+                          setTechniciansList(dbService.getTechniciansSync());
+                          setSaveSuccess(`✓ Generated fresh activation code: ${fresh.activationCode}`);
+                          setTimeout(() => setSaveSuccess(null), 3000);
+                        }
+                      }}
+                    >
+                      ⚡ Issue Fresh Single-Use Code
+                    </button>
+                  )}
                 </div>
 
                 {/* Platform Compatibility Badges */}

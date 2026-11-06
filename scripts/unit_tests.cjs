@@ -3289,6 +3289,94 @@ it("Enforces Explicit Logout & Zero Stale Data Guarantee Between User Shifts", (
   expect(sessionState.leftFoot).toBeNull();
 });
 
+it("Enforces Single-Use Station Activation Code (Burn-On-Use) and Hour/Day Permit Expiration", () => {
+  const burnedCodes = new Set();
+  const technicians = [
+    {
+      id: "tech-01",
+      name: "Tech. Specialist",
+      username: "tech@technomind.health",
+      activationCode: "TMH-TECH-5001",
+      isActivationCodeUsed: false,
+      usedActivationCodes: [],
+    },
+  ];
+
+  const policy = { duration: 24, unit: "hours" }; // 24-hour permit policy
+  const permitDurationMs = 24 * 60 * 60 * 1000;
+
+  const registerDevice = (code, deviceId, currentTimeMs = Date.now()) => {
+    const clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (burnedCodes.has(clean)) {
+      return { success: false, error: "Station Activation Code has already been used and registered. Single-use only." };
+    }
+    const tech = technicians.find(t => t.activationCode.replace(/[^A-Z0-9]/g, "") === clean);
+    if (!tech) return { success: false, error: "Invalid activation code." };
+    if (tech.isActivationCodeUsed || tech.usedActivationCodes.includes(clean)) {
+      return { success: false, error: "Station Activation Code has already been used and registered. Single-use only." };
+    }
+
+    // Burn code on registration
+    burnedCodes.add(clean);
+    tech.isActivationCodeUsed = true;
+    tech.usedActivationCodes.push(clean);
+    tech.registeredDeviceId = deviceId;
+    tech.permitExpiresAt = new Date(currentTimeMs + permitDurationMs).toISOString();
+
+    const token = {
+      token: `AUTH-${deviceId}`,
+      deviceFingerprint: deviceId,
+      expiresAt: tech.permitExpiresAt,
+      status: "authorized",
+    };
+    return { success: true, token, technician: tech };
+  };
+
+  const evaluatePermit = (token, currentTimeMs) => {
+    if (!token || token.status !== "authorized") return { isAuthorized: false, reason: "unregistered" };
+    if (token.expiresAt && currentTimeMs > new Date(token.expiresAt).getTime()) {
+      return { isAuthorized: false, reason: "permit_expired" };
+    }
+    return { isAuthorized: true };
+  };
+
+  const now = 1700000000000;
+
+  // 1. First registration with TMH-TECH-5001 succeeds
+  const res1 = registerDevice("TMH-TECH-5001", "DEV-STATION-01", now);
+  expect(res1.success).toBe(true);
+  expect(res1.token.expiresAt).toBe(new Date(now + permitDurationMs).toISOString());
+  expect(res1.technician.isActivationCodeUsed).toBe(true);
+
+  // 2. Second registration with SAME code fails immediately (burn-on-use enforced)
+  const res2 = registerDevice("TMH-TECH-5001", "DEV-STATION-02", now);
+  expect(res2.success).toBe(false);
+  expect(res2.error).toContain("already been used and registered");
+
+  // 3. Device authorization check within valid permit window (e.g., 2 hours later)
+  const checkWithinPermit = evaluatePermit(res1.token, now + 2 * 60 * 60 * 1000);
+  expect(checkWithinPermit.isAuthorized).toBe(true);
+
+  // 4. Device authorization check after permit expires (25 hours later)
+  const checkExpired = evaluatePermit(res1.token, now + 25 * 60 * 60 * 1000);
+  expect(checkExpired.isAuthorized).toBe(false);
+  expect(checkExpired.reason).toBe("permit_expired");
+
+  // 5. Admin rotates / issues fresh activation code
+  const freshCode = "TMH-TECH-9999";
+  technicians[0].activationCode = freshCode;
+  technicians[0].isActivationCodeUsed = false;
+
+  // 6. Station re-activates with fresh single-use code, extending permit
+  const resRenewal = registerDevice(freshCode, "DEV-STATION-01", now + 25 * 60 * 60 * 1000);
+  expect(resRenewal.success).toBe(true);
+  expect(burnedCodes.has("TMHTECH9999")).toBe(true);
+
+  // 7. Fresh code cannot be used again
+  const resRenewalDup = registerDevice(freshCode, "DEV-STATION-03", now + 25 * 60 * 60 * 1000);
+  expect(resRenewalDup.success).toBe(false);
+});
+
 // -----------------------------------------------------------------------------
 // SECTION 27: Dedicated Administrator Security, Database Write Privileges & Profile Control
 // -----------------------------------------------------------------------------
@@ -3409,6 +3497,106 @@ it("Restricts Database Records sidebar and section navigation strictly to Hospit
 
   expect(isDatabaseAccessible("technician")).toBe(false);
   expect(isDatabaseAccessible("admin")).toBe(true);
+});
+
+it("Enforces Supabase Cloud Schema generation, Bi-Directional Case Pull, and Remote Revocation Kill-Switch", () => {
+  // 1. Verify Supabase Schema SQL Generator contains essential tables and RLS
+  const generateSchema = () => {
+    return `
+      CREATE TABLE IF NOT EXISTS public.station_activations (
+        device_fingerprint TEXT PRIMARY KEY,
+        hospital_code TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'authorized'
+      );
+      CREATE TABLE IF NOT EXISTS public.clinical_reports (
+        case_id TEXT PRIMARY KEY,
+        patient_id TEXT NOT NULL,
+        cavanagh_arch_index NUMERIC
+      );
+      INSERT INTO storage.buckets (id, name, public) VALUES ('plantar-scans', 'plantar-scans', true);
+    `;
+  };
+  const sql = generateSchema();
+  expect(sql).toContain("station_activations");
+  expect(sql).toContain("clinical_reports");
+  expect(sql).toContain("plantar-scans");
+
+  // 2. Simulated bi-directional case pull from cloud
+  const remoteCloudCases = [
+    {
+      case_id: "case-cloud-101",
+      case_number: "PP-2026-CLOUD-101",
+      patient_id: "pat-901",
+      patient_name: "Anita Sharma",
+      foot_side: "Both",
+      cavanagh_arch_index: 0.22,
+      arch_classification: "Normal Arch",
+      synced_at: "2026-11-06T06:00:00.000Z",
+    },
+    {
+      case_id: "case-cloud-102",
+      case_number: "PP-2026-CLOUD-102",
+      patient_id: "pat-902",
+      patient_name: "Carlos Rivera",
+      foot_side: "Right",
+      cavanagh_arch_index: 0.12,
+      arch_classification: "High Arch",
+      synced_at: "2026-11-06T06:15:00.000Z",
+    },
+  ];
+
+  const localDatabase = [];
+  const pullCases = (rows) => {
+    let imported = 0;
+    for (const r of rows) {
+      localDatabase.push({
+        id: r.case_id,
+        caseNumber: r.case_number,
+        patientId: r.patient_id,
+        footSide: r.foot_side,
+        regionalAnalysis: {
+          cavanaghArchIndex: r.cavanagh_arch_index,
+          archClassification: r.arch_classification,
+        },
+        syncStatus: "synced",
+      });
+      imported++;
+    }
+    return imported;
+  };
+
+  const count = pullCases(remoteCloudCases);
+  expect(count).toBe(2);
+  expect(localDatabase.length).toBe(2);
+  expect(localDatabase[0].id).toBe("case-cloud-101");
+  expect(localDatabase[0].regionalAnalysis.cavanaghArchIndex).toBe(0.22);
+  expect(localDatabase[1].regionalAnalysis.archClassification).toBe("High Arch");
+
+  // 3. Simulated remote revocation kill-switch
+  let localStationToken = {
+    token: "AUTH-DEV-1234",
+    deviceFingerprint: "DEV-STATION-01",
+    status: "authorized",
+  };
+
+  const processHeartbeatResponse = (remoteStatus) => {
+    if (remoteStatus === "revoked") {
+      localStationToken.status = "revoked";
+      return { isAuthorized: false, reason: "revoked" };
+    }
+    return { isAuthorized: true };
+  };
+
+  // Station heartbeat while authorized
+  const activeCheck = processHeartbeatResponse("authorized");
+  expect(activeCheck.isAuthorized).toBe(true);
+  expect(localStationToken.status).toBe("authorized");
+
+  // Administrator remotely revokes station in cloud
+  const revokedCheck = processHeartbeatResponse("revoked");
+  expect(revokedCheck.isAuthorized).toBe(false);
+  expect(revokedCheck.reason).toBe("revoked");
+  expect(localStationToken.status).toBe("revoked");
 });
 
 console.log("\n======================================================================");

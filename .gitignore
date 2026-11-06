@@ -7,6 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+.agents/
+
 node_modules
 dist
 dist-ssr
@@ -53,5 +55,7 @@ ios/App/DerivedData/
 !/DEVELOPER_REFERENCE_GUIDE.md
 !/PROJECT_ACTIVITY_AND_IMPLEMENTATION_RECORD.md
 !/POSTGRESQL_3TIER_MIGRATION_PLAN.md
+!/CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md
+!/SYSTEM_ARCHITECTURE_AND_OPERATIONS_MANUAL.md
 
 
