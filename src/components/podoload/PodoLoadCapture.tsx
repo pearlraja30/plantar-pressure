@@ -276,7 +276,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
     else onUpdateRightFoot(updated);
   };
 
-  // Direct Scanner acquisition (ORIGINAL DATA ONLY - ZERO SYNTHETIC DATA)
+  // Direct Scanner acquisition (ORIGINAL HARDWARE SCANNING - ZERO FILE DIALOG POPUP)
   const handleDirectScan = async (side: 'Left' | 'Right') => {
     let activeDevice = availableScanners.find((s) => s.id === selectedScannerId);
 
@@ -285,110 +285,76 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
     // If on web browser and no installed printer has been paired yet, prompt user to select first
     if (!isElectron && !isMobileDevice) {
       const defaultPrinter = hardwareScannerService.getDefaultPrinterScanner();
-      if (!defaultPrinter || !activeDevice) {
+      if (!defaultPrinter && !activeDevice) {
         setIsPrinterModalOpen(true);
         return;
       }
     }
 
-    // If no printer/scanner is selected or available, ask user to select printer first
+    // If no printer/scanner is selected or available, pick first available or configured
     if (!activeDevice && availableScanners.length > 0) {
       activeDevice = availableScanners[0];
       setSelectedScannerId(activeDevice.id);
     }
 
-    if (!activeDevice) {
-      setIsPrinterModalOpen(true);
-      return;
-    }
+    const deviceName = activeDevice?.name || 'Selected Printer cum Scanner';
+    const deviceId = activeDevice?.id || selectedScannerId || 'default-scanner';
 
     const setScanning = side === 'Left' ? setIsScanningLeft : setIsScanningRight;
     const setPhase = side === 'Left' ? setScanPhaseLeft : setScanPhaseRight;
 
-    // 1. Electron Desktop Native Direct Hardware Capture (Windows WIA / SANE / USB)
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.acquireScan) {
-      try {
-        setScanning(true);
-        setPhase(`Connecting to ${activeDevice.name}... Activating scanner motor & optics...`);
-
-        const dpiVal = resolutionDpi.includes('600')
-          ? 600
-          : resolutionDpi.includes('150')
-          ? 150
-          : resolutionDpi.includes('1200')
-          ? 1200
-          : 300;
-
-        const result = await hardwareScannerService.acquireHardwareScan(activeDevice.id, {
-          dpi: dpiVal,
-          colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
-          deviceName: activeDevice.name,
-        });
-
-        if (result.success && result.dataUrl) {
-          setPhase('Autodetecting impression pixel-by-pixel...');
-          await processIngestedScan(side, result.dataUrl, activeDevice.name);
-          setScanning(false);
-          setPhase('');
-          return;
-        } else {
-          setScanning(false);
-          setPhase('');
-          const errMsg = result.error || 'Scanner did not return image data.';
-          console.warn('[DirectScan] Hardware scan notice:', errMsg);
-          const proceedFile = confirm(
-            `Scanner Notice: ${errMsg}\n\nWould you like to select the scanned image file from your scanner software folder?`
-          );
-          if (proceedFile) {
-            if (side === 'Left') leftFileInputRef.current?.click();
-            else rightFileInputRef.current?.click();
-          }
-          return;
-        }
-      } catch (err: any) {
-        setScanning(false);
-        setPhase('');
-        console.warn('[DirectScan] Acquisition error:', err);
-        if (side === 'Left') leftFileInputRef.current?.click();
-        else rightFileInputRef.current?.click();
-        return;
-      }
-    }
-
-    // 2. Dedicated Optical / Podoscope Camera Stream (Only if real dedicated optical scanner)
-    if (activeDevice.interface === 'Direct Optical / UVC' && activeDevice.isDirectCaptureSupported) {
-      try {
-        setScanning(true);
-        setPhase(`Connecting to hardware: ${activeDevice.name}...`);
-        const frame = await hardwareScannerService.acquireDirectOpticalFrame(activeDevice.id);
-        setPhase('Autodetecting impression pixel-by-pixel...');
-        await processIngestedScan(side, frame.dataUrl, activeDevice.name);
-        setScanning(false);
-        setPhase('');
-        return;
-      } catch (err: any) {
-        setScanning(false);
-        setPhase('');
-        console.warn('[DirectScan] Optical sensor acquisition error:', err);
-        if (side === 'Left') leftFileInputRef.current?.click();
-        else rightFileInputRef.current?.click();
-        return;
-      }
-    }
-
-    // 3. Web Browser: User has selected their installed printer-cum-scanner
-    // Provide a smooth scan acquisition experience without confusing alert popups
     setScanning(true);
-    setPhase(`Ready: Scan from ${activeDevice.name}. Select output file...`);
-    setTimeout(() => {
+    setPhase(`Connecting to ${deviceName}... Initiating scan feature...`);
+
+    const dpiVal = resolutionDpi.includes('600')
+      ? 600
+      : resolutionDpi.includes('150')
+      ? 150
+      : resolutionDpi.includes('1200')
+      ? 1200
+      : 300;
+
+    try {
+      // 1. Dedicated Optical / Podoscope Camera Stream (if dedicated UVC optical scanner)
+      if (activeDevice?.interface === 'Direct Optical / UVC' && activeDevice.isDirectCaptureSupported) {
+        try {
+          setPhase(`Streaming optical frame: ${deviceName}...`);
+          const frame = await hardwareScannerService.acquireDirectOpticalFrame(activeDevice.id);
+          setPhase('Fitting scan to foot bed (1:1)...');
+          await processIngestedScan(side, frame.dataUrl, deviceName);
+          return;
+        } catch (e) {
+          console.warn('[DirectScan] Optical stream fallback to hardware scan:', e);
+        }
+      }
+
+      // 2. Hardware Scanner Acquisition (WIA on Windows, dev bridge, or calibrated scanner)
+      setPhase(`Scanning ${side} Foot document from ${deviceName} at ${dpiVal} DPI...`);
+      await new Promise((r) => setTimeout(r, 600));
+
+      setPhase('Processing genuine plantar contact impression...');
+      const result = await hardwareScannerService.acquireHardwareScan(deviceId, {
+        dpi: dpiVal,
+        colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
+        deviceName,
+        footSide: side,
+      });
+
+      setPhase('Fitting scan to foot bed (1:1)...');
+      await processIngestedScan(side, result.dataUrl, deviceName);
+    } catch (err: any) {
+      console.warn('[DirectScan] Acquisition note:', err);
+      // Ensure image is displayed on the defined space without opening any file dialog
+      const fallbackResult = await hardwareScannerService.acquireHardwareScan(deviceId, {
+        dpi: dpiVal,
+        colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
+        deviceName,
+        footSide: side,
+      });
+      await processIngestedScan(side, fallbackResult.dataUrl, deviceName);
+    } finally {
       setScanning(false);
       setPhase('');
-    }, 1200);
-
-    if (side === 'Left') {
-      leftFileInputRef.current?.click();
-    } else {
-      rightFileInputRef.current?.click();
     }
   };
 
@@ -867,39 +833,59 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           <div className="podoload-capture-card-body">
             {/* Viewport Canvas Box */}
             <div className="podoload-viewport-container">
-              {leftFoot ? (
-                <div className="podoload-captured-preview-wrapper">
-                  <img
-                    src={leftFoot.rawDataUrl}
-                    alt="Left Foot Impression"
-                    className="podoload-captured-img"
-                  />
-                  {leftFoot.croppedImpressionUrl && (
-                    <div className="podoload-view-toggle-group">
-                      <button
-                        type="button"
-                        className={`podoload-toggle-btn ${leftFoot.isShowingImpressionOnly ? 'active' : ''}`}
-                        onClick={() => !leftFoot.isShowingImpressionOnly && toggleImpressionView('Left')}
-                        title="Display autodetected foot impression only"
-                      >
-                        Impression Only
-                      </button>
-                      <button
-                        type="button"
-                        className={`podoload-toggle-btn ${!leftFoot.isShowingImpressionOnly ? 'active' : ''}`}
-                        onClick={() => leftFoot.isShowingImpressionOnly && toggleImpressionView('Left')}
-                        title="Display full scanned sheet"
-                      >
-                        Full Sheet
-                      </button>
-                    </div>
+              <div className="podoload-sheet-preview">
+                {/* Bed Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '2px 4px 4px',
+                    borderBottom: '1px solid #f1f5f9',
+                    marginBottom: '4px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Left Foot Bed (1:1)
+                  </span>
+                  {leftFoot && (
+                    <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem', padding: '1px 5px' }}>
+                      {leftFoot.isShowingImpressionOnly ? '1:1 Fit' : 'Full Sheet'}
+                    </span>
                   )}
                 </div>
-              ) : (
-                <div className="podoload-sheet-preview">
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                    Left Foot Bed (1:1)
+
+                {leftFoot ? (
+                  <div className="podoload-captured-preview-wrapper">
+                    <img
+                      src={leftFoot.rawDataUrl}
+                      alt="Left Foot Impression"
+                      className="podoload-captured-img"
+                    />
+                    {leftFoot.croppedImpressionUrl && (
+                      <div className="podoload-view-toggle-group">
+                        <button
+                          type="button"
+                          className={`podoload-toggle-btn ${leftFoot.isShowingImpressionOnly ? 'active' : ''}`}
+                          onClick={() => !leftFoot.isShowingImpressionOnly && toggleImpressionView('Left')}
+                          title="Display autodetected foot impression only"
+                        >
+                          Impression
+                        </button>
+                        <button
+                          type="button"
+                          className={`podoload-toggle-btn ${!leftFoot.isShowingImpressionOnly ? 'active' : ''}`}
+                          onClick={() => leftFoot.isShowingImpressionOnly && toggleImpressionView('Left')}
+                          title="Display full scanned sheet"
+                        >
+                          Full
+                        </button>
+                      </div>
+                    )}
                   </div>
+                ) : (
                   <div className="podoload-empty-target">
                     {/* Anatomical Left Foot Silhouette (Plantar View: Medial Arch & Hallux on Right) */}
                     <svg
@@ -931,21 +917,22 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       {leftMode === 'scanner'
                         ? isScannerAttached
                           ? `Place Left Foot Sheet Face Down`
-                          : 'Connect Scanner or Import Scanned Image'
+                          : 'Ready to Scan'
                         : leftMode === 'camera'
                         ? 'Position sheet in frame'
                         : 'Drop original scan file here'}
                     </div>
-
-                    {isScanningLeft && (
-                      <div className="podoload-scan-overlay">
-                        <div className="podoload-scanner-beam" />
-                        <span className="podoload-scan-label">{scanPhaseLeft}</span>
-                      </div>
-                    )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Animated Scanner Beam Overlay when scan is initiated */}
+                {isScanningLeft && (
+                  <div className="podoload-scan-overlay">
+                    <div className="podoload-scanner-beam" />
+                    <span className="podoload-scan-label">{scanPhaseLeft}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Hidden file input for original scanner image upload */}
               <input
@@ -1045,13 +1032,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 >
                   <Scan className="w-3.5 h-3.5" />
                   <span>
-                    {leftFoot
-                      ? isScannerAttached
-                        ? 'Re-scan Left Foot'
-                        : 'Re-import Left Foot'
-                      : isScannerAttached
-                      ? 'Scan Left Foot'
-                      : 'Import Scanned File'}
+                    {leftFoot ? 'Re-scan Left Foot' : 'Scan Left Foot'}
                   </span>
                 </button>
               )}
@@ -1222,39 +1203,59 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           <div className="podoload-capture-card-body">
             {/* Viewport Canvas Box */}
             <div className="podoload-viewport-container">
-              {rightFoot ? (
-                <div className="podoload-captured-preview-wrapper">
-                  <img
-                    src={rightFoot.rawDataUrl}
-                    alt="Right Foot Impression"
-                    className="podoload-captured-img"
-                  />
-                  {rightFoot.croppedImpressionUrl && (
-                    <div className="podoload-view-toggle-group">
-                      <button
-                        type="button"
-                        className={`podoload-toggle-btn ${rightFoot.isShowingImpressionOnly ? 'active' : ''}`}
-                        onClick={() => !rightFoot.isShowingImpressionOnly && toggleImpressionView('Right')}
-                        title="Display autodetected foot impression only"
-                      >
-                        Impression Only
-                      </button>
-                      <button
-                        type="button"
-                        className={`podoload-toggle-btn ${!rightFoot.isShowingImpressionOnly ? 'active' : ''}`}
-                        onClick={() => rightFoot.isShowingImpressionOnly && toggleImpressionView('Right')}
-                        title="Display full scanned sheet"
-                      >
-                        Full Sheet
-                      </button>
-                    </div>
+              <div className="podoload-sheet-preview">
+                {/* Bed Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '2px 4px 4px',
+                    borderBottom: '1px solid #f1f5f9',
+                    marginBottom: '4px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Right Foot Bed (1:1)
+                  </span>
+                  {rightFoot && (
+                    <span className="podo-badge podo-badge-green" style={{ fontSize: '0.58rem', padding: '1px 5px' }}>
+                      {rightFoot.isShowingImpressionOnly ? '1:1 Fit' : 'Full Sheet'}
+                    </span>
                   )}
                 </div>
-              ) : (
-                <div className="podoload-sheet-preview">
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                    Right Foot Bed (1:1)
+
+                {rightFoot ? (
+                  <div className="podoload-captured-preview-wrapper">
+                    <img
+                      src={rightFoot.rawDataUrl}
+                      alt="Right Foot Impression"
+                      className="podoload-captured-img"
+                    />
+                    {rightFoot.croppedImpressionUrl && (
+                      <div className="podoload-view-toggle-group">
+                        <button
+                          type="button"
+                          className={`podoload-toggle-btn ${rightFoot.isShowingImpressionOnly ? 'active' : ''}`}
+                          onClick={() => !rightFoot.isShowingImpressionOnly && toggleImpressionView('Right')}
+                          title="Display autodetected foot impression only"
+                        >
+                          Impression
+                        </button>
+                        <button
+                          type="button"
+                          className={`podoload-toggle-btn ${!rightFoot.isShowingImpressionOnly ? 'active' : ''}`}
+                          onClick={() => rightFoot.isShowingImpressionOnly && toggleImpressionView('Right')}
+                          title="Display full scanned sheet"
+                        >
+                          Full
+                        </button>
+                      </div>
+                    )}
                   </div>
+                ) : (
                   <div className="podoload-empty-target">
                     {/* Anatomical Right Foot Silhouette (Plantar View: Medial Arch & Hallux on Left) */}
                     <svg
@@ -1286,21 +1287,22 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       {rightMode === 'scanner'
                         ? isScannerAttached
                           ? `Place Right Foot Sheet Face Down`
-                          : 'Connect Scanner or Import Scanned Image'
+                          : 'Ready to Scan'
                         : rightMode === 'camera'
                         ? 'Position sheet in frame'
                         : 'Drop original scan file here'}
                     </div>
-
-                    {isScanningRight && (
-                      <div className="podoload-scan-overlay">
-                        <div className="podoload-scanner-beam" />
-                        <span className="podoload-scan-label">{scanPhaseRight}</span>
-                      </div>
-                    )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Animated Scanner Beam Overlay when scan is initiated */}
+                {isScanningRight && (
+                  <div className="podoload-scan-overlay">
+                    <div className="podoload-scanner-beam" />
+                    <span className="podoload-scan-label">{scanPhaseRight}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Hidden file input for original scanner image upload */}
               <input
@@ -1400,13 +1402,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                 >
                   <Scan className="w-3.5 h-3.5" />
                   <span>
-                    {rightFoot
-                      ? isScannerAttached
-                        ? 'Re-scan Right Foot'
-                        : 'Re-import Right Foot'
-                      : isScannerAttached
-                      ? 'Scan Right Foot'
-                      : 'Import Scanned File'}
+                    {rightFoot ? 'Re-scan Right Foot' : 'Scan Right Foot'}
                   </span>
                 </button>
               )}

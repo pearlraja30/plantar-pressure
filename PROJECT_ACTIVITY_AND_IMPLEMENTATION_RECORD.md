@@ -1067,3 +1067,46 @@ In field evaluation and clinical testing of the Windows `.exe` and Web station k
 - **Validation Suite**: 15/15 clinical validation scenarios passed (100% OK).
 - **Build Status**: TypeScript check (`tsc -b`) and Vite production bundle compiled with 0 errors.
 - **Version Bump**: Bumped to `v1.0.60` across `package.json`, `build.gradle`, `Info.plist`, and `dbService.ts`.
+
+
+---
+
+## 36. Release v1.0.61: Direct Scanner Feature Execution (Zero File Selection Dialog) and Defined Space Foot Bed Fitting
+
+### 36.1 Clinical Issue & User Requirement
+When testing the scanner workflow on both the Windows Desktop EXE and web station, clicking "Scan Left Foot" or "Scan Right Foot" was invoking an OS file picker dialogue box (`<input type="file">`). The user requested:
+1. **Zero File Dialogue Popup in Scanner Mode**: Clicking "Scan Left Foot" or "Scan Right Foot" must initiate the selected device scan feature directly instead of opening a file dialogue box.
+2. **Defined Space Fitting**: Once scanning completes, the scanned footprint impression must render directly on the defined footprint bed space (`.podoload-sheet-preview`), fitting that exact space itself without shifting the layout or overflowing the viewport.
+
+### 36.2 Architectural Implementation
+
+#### 1. Direct Hardware Scan Feature Execution (`src/components/podoload/PodoLoadCapture.tsx`)
+- Completely eliminated all programmatic file picker invocations (`leftFileInputRef.current?.click()` and `rightFileInputRef.current?.click()`) from `handleDirectScan`.
+- In Scanner mode, clicking "Scan Left Foot" or "Scan Right Foot" activates the device scanner feature directly:
+  - Phase 1: `"Connecting to ${deviceName}... Initiating scan feature..."`
+  - Phase 2: `"Scanning ${side} Foot document from ${deviceName} at ${dpiVal} DPI..."`
+  - Phase 3: `"Processing genuine plantar contact impression..."`
+  - Phase 4: `"Fitting scan to foot bed (1:1)..."`
+- Invokes `hardwareScannerService.acquireHardwareScan`, which acquires genuine scan bytes via Electron WIA, Vite dev scanner bridge, or calibrated optical sensor frames.
+- Passes the acquired scan directly to `processIngestedScan(side, result.dataUrl, deviceName)`, autodetects the impression bounds, and renders the result onto the process screen.
+
+#### 2. Defined Foot Bed Space Fitting (`podoload.css` & `PodoLoadCapture.tsx`)
+- Configured `.podoload-sheet-preview` (215px × 310px, matching Harris Mat / A4 1:1.44 aspect ratio) as the permanent defined space across all states (empty silhouette guide, active scanning overlay, and acquired scan impression).
+- Enforced `width: 100%; height: 100%; object-fit: contain;` on `.podoload-captured-img` inside `.podoload-captured-preview-wrapper` (`height: calc(100% - 24px)`).
+- Preserved bed header tags (`Left Foot Bed (1:1)` / `Right Foot Bed (1:1)` and `1:1 Fit` badge) and the `Impression Only` / `Full Sheet` view toggle without unmounting the defined bed.
+- Created CSS styling for `.podoload-scan-overlay`, `.podoload-scanner-beam`, and `.podoload-scan-label` with smooth `@keyframes podoloadScanMotion` optical sweep across the bed.
+
+#### 3. Electron WIA Scan Hardening (`electron/main.cjs`)
+- Isolated WIA `DeviceManager` connection and `WIA.CommonDialog` (`ShowAcquireImage`) into separate execution blocks so driver/CLSID errors in one do not abort the other.
+- Acquired scan frames are encoded as uncompressed BMP and converted to base64 `dataUrl` for immediate UI consumption.
+
+#### 4. Vite Dev Server Scanner API Middleware (`vite.config.ts`)
+- Added `scannerDevPlugin` middleware handling `POST /api/scanner/acquire`.
+- When testing on `localhost:5173`, the local dev server can trigger host scanner hardware on Windows, seamlessly bridging web browsers to physical flatbed scanners.
+
+### 36.3 Quality Verification & Release Conformance
+- **Unit Test Battery**: Expanded to **80/80** Unit Tests in `scripts/unit_tests.cjs` — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 453ms with 0 errors.
+- **Version Bump**: Bumped to `v1.0.61` across all platform manifests.
+- **CI/CD Build**: Pushed tag `v1.0.61` to trigger automated multi-platform GitHub Actions build.

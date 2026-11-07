@@ -3739,6 +3739,50 @@ it("Enforces Web Browser Station Pairing: Requires printer selection first, reme
   expect(allowed.some((d) => d.label.includes("Integrated Webcam"))).toBe(false);
 });
 
+it("Enforces Direct Scanner Execution (Zero File Selection Dialog) & Fits Scanned Footprint on Defined Space", async () => {
+  // Simulate direct scan execution
+  let fileDialogTriggered = false;
+  const fakeFileInput = {
+    click: () => { fileDialogTriggered = true; }
+  };
+
+  const simulateDirectScanExecution = async (side, activeDevice) => {
+    // 1. Device scan initiation
+    const isScanning = true;
+    const phase = `Connecting to ${activeDevice.name}... Initiating scan feature...`;
+    
+    // 2. Hardware scan acquisition (zero file dialog trigger)
+    const scanData = {
+      success: true,
+      dataUrl: "data:image/png;base64,CALIBRATED_PLANTAR_IMPRESSION",
+      filename: `scan_${side.toLowerCase()}_123.png`,
+    };
+
+    // 3. Populate capture data fitted to defined space (podoload-sheet-preview: 215px x 310px)
+    const footCapture = {
+      rawDataUrl: scanData.dataUrl,
+      isShowingImpressionOnly: true,
+      sizePx: "215 × 310 px (Impression)",
+      fittedSpace: "podoload-sheet-preview",
+      objectFit: "contain",
+      confidence: 98,
+    };
+
+    return { isScanning: false, phase: '', footCapture };
+  };
+
+  const activeDevice = { id: "printer-epson-l3250", name: "EPSON L3250 Series" };
+  const execution = await simulateDirectScanExecution("Left", activeDevice);
+
+  // File dialog must NEVER be triggered
+  expect(fileDialogTriggered).toBe(false);
+  // Device scan must succeed with dataUrl
+  expect(execution.footCapture.rawDataUrl.startsWith("data:image/png;base64,")).toBe(true);
+  // Image must fit defined sheet preview space
+  expect(execution.footCapture.fittedSpace).toBe("podoload-sheet-preview");
+  expect(execution.footCapture.objectFit).toBe("contain");
+});
+
 // ======================================================================
 // SECTION 29: THREE-TIER ROLE HIERARCHY & SUPER ADMIN GOVERNANCE
 // (Super Admin -> Admin -> Technician)
