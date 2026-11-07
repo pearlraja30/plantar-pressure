@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye, Building2, Sliders, FileText } from 'lucide-react';
+import { Play, Database, Download, Upload, Check, Settings as SettingsIcon, RefreshCw, Usb, Table, Eye, Building2, Sliders, FileText, ShieldCheck } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { dbService } from '../../services/dbService';
+import { deviceBindingService } from '../../services/deviceBindingService';
 import { PatientIdConfig, PatientIdMode, HospitalProfile } from '../../types';
 import { hardwareScannerService, DiscoveredScanner } from '../../services/hardwareScannerService';
 import { PodoLoadDatabaseViewer } from './PodoLoadDatabaseViewer';
@@ -34,8 +36,10 @@ interface PodoLoadSettingsProps {
 
 export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllData, onOpenAdmin }) => {
   const [activeMenu, setActiveMenu] = useState<
-    'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital' | 'database_id'
+    'language' | 'scanner' | 'processing' | 'report' | 'cloud' | 'hospital' | 'database_id' | 'security'
   >('scanner');
+
+  const [allowStationAdminLogin, setAllowStationAdminLogin] = useState<boolean>(() => dbService.isStationAdminLoginAllowed());
 
   // Scanner settings matching Screenshot 5
   const [attachedScanners, setAttachedScanners] = useState<DiscoveredScanner[]>([]);
@@ -246,6 +250,9 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
         serverAddress,
         account,
       },
+      stationSecurity: {
+        allowStationAdminLogin,
+      },
     });
 
     await dbService.savePatientIdConfig(idConfig);
@@ -341,6 +348,15 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
             >
               <Database className="w-3.5 h-3.5 text-teal-600" />
               <span>Patient ID & Database</span>
+            </button>
+            <button
+              type="button"
+              className={`podoload-settings-menu-item ${activeMenu === 'security' ? 'active' : ''}`}
+              onClick={() => setActiveMenu('security')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+              <span>Station Role Policy</span>
             </button>
           </div>
         </div>
@@ -1210,6 +1226,95 @@ export const PodoLoadSettings: React.FC<PodoLoadSettingsProps> = ({ onPurgeAllDa
                   >
                     Test connection
                   </button>
+                </div>
+              </div>
+            </div>
+          ) : activeMenu === 'security' ? (
+            /* Dedicated Station Security & Role Access Policy Tab */
+            <div className="podoload-card" style={{ padding: '1rem', maxWidth: '720px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem' }}>
+                <div>
+                  <h4 className="podoload-card-title" style={{ margin: 0, fontSize: '0.9rem' }}>
+                    WORKSTATION ROLE & LOGIN ACCESS POLICY
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Configure role visibility on this physical device. Prevent administrative portal exposure on kiosk machines.
+                  </span>
+                </div>
+                <span className={`podo-badge ${allowStationAdminLogin ? 'podo-badge-blue' : 'podo-badge-green'}`}>
+                  {allowStationAdminLogin ? 'Admin Login Visible' : 'Technician-Only Kiosk'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Station Toggle Card */}
+                <div
+                  style={{
+                    padding: '0.95rem 1rem',
+                    borderRadius: '8px',
+                    border: allowStationAdminLogin ? '1.5px solid #0f766e' : '1px solid #cbd5e1',
+                    backgroundColor: allowStationAdminLogin ? '#f0fdfa' : '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id="toggleStationAdmin"
+                    checked={allowStationAdminLogin}
+                    onChange={(e) => setAllowStationAdminLogin(e.target.checked)}
+                    style={{ accentColor: 'var(--podo-primary)', width: '18px', height: '18px', marginTop: '2px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="toggleStationAdmin" style={{ cursor: 'pointer', flex: 1 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0c2328', marginBottom: '0.2rem' }}>
+                      Allow Administrator & Super Admin Login on this Workstation
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                      <strong>When unchecked (Recommended for Clinical Kiosks, Windows .exe stations, and Tablets):</strong> The workstation strictly displays the Certified Clinical Technician login and voucher activation interface. Clinic Admin and Super Admin sign-in options are hidden to prevent administrative tampering on exam floor kiosks.
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, marginTop: '0.35rem' }}>
+                      <strong>When checked (Browser & Administrative Terminals):</strong> Displays the three-tier role tabs switcher (🔬 Technician | 🏥 Clinic Admin | 🛡️ Super Admin) in the sign-in modal.
+                    </div>
+                  </label>
+                </div>
+
+                {/* Hardware Environment Telemetry */}
+                <div style={{ padding: '0.75rem 0.85rem', backgroundColor: '#f1f5f9', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0c2328', marginBottom: '0.35rem' }}>
+                    WORKSTATION ENVIRONMENT TELEMETRY
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', fontSize: '0.72rem', color: '#475569' }}>
+                    <div>
+                      Deployment Mode:{' '}
+                      <strong style={{ color: '#0f172a' }}>
+                        {typeof window !== 'undefined' && Boolean((window as any).electronAPI?.isDesktop)
+                          ? 'Windows Installer (.exe Electron)'
+                          : Capacitor.isNativePlatform()
+                          ? `Mobile Native (${Capacitor.getPlatform().toUpperCase()})`
+                          : 'Web Browser Station'}
+                      </strong>
+                    </div>
+                    <div>
+                      Default Policy:{' '}
+                      <strong style={{ color: '#0f172a' }}>
+                        {(typeof window !== 'undefined' && Boolean((window as any).electronAPI?.isDesktop)) || Capacitor.isNativePlatform()
+                          ? 'Strict Technician Kiosk'
+                          : 'Browser Administrative Mode'}
+                      </strong>
+                    </div>
+                    <div>
+                      Station Device ID:{' '}
+                      <strong style={{ color: '#0f766e' }}>
+                        {deviceBindingService.getCurrentDeviceId()}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hierarchy Governance Info */}
+                <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45, borderLeft: '3px solid #0f766e', paddingLeft: '0.65rem' }}>
+                  <strong>Role Hierarchy Governance:</strong> Super Administrators provision Hospital/Clinic Administrators and monitor global multi-clinic telemetry. Clinic Administrators provision Technicians and generate single-use station activation permits. Technicians operate diagnostic exam stations.
                 </div>
               </div>
             </div>

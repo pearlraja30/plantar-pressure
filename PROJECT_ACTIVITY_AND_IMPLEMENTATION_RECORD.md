@@ -1110,3 +1110,87 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 453ms with 0 errors.
 - **Version Bump**: Bumped to `v1.0.61` across all platform manifests.
 - **CI/CD Build**: Pushed tag `v1.0.61` to trigger automated multi-platform GitHub Actions build.
+
+---
+
+## 37. Station Role Policy (Technician-Only Kiosk) & Truthful Scanner Hardware Connectivity (v1.0.62)
+
+### 37.1 Clinical & Regulatory Context
+- **Clinical Floor Role Isolation Requirement**:
+  - On dedicated exam floor kiosks (Windows `.exe` Electron installer, Android `.apk`, iOS `.ipa`), exposing Hospital Administrator or Super Administrator login options creates severe compliance and operational risks (accidental elevation, credential tampering, unauthorized voucher generation on exam stations).
+  - Only Clinical Technicians should have visible login and voucher activation interfaces on native station devices.
+  - Super Admin and Hospital Admin options must remain strictly restricted to web browsers or administrative terminals.
+  - A configurable policy flag (`allowStationAdminLogin`) must allow authorized administrators to enable station admin login when required.
+- **Clinical Truth Hardware Connectivity Requirement**:
+  - When scanning is initiated without a physical scanner attached or when the scanner is powered off/unreachable, the platform previously fell back to procedural sample data (`generateHarrisMatFootprint`).
+  - This is clinically impermissible. The system must query actual hardware connectivity, display the real connection status directly on the foot bed, and NEVER show dummy, synthetic, or random data.
+
+### 37.2 Architectural Implementation
+
+#### 1. Station Role Policy Engine (`src/types/index.ts` & `src/services/dbService.ts`)
+- Added `stationSecurity: { allowStationAdminLogin?: boolean }` to `SystemSettings`.
+- In `DatabaseService`:
+  - Implemented `isStationAdminLoginAllowed()`:
+    - Automatically checks deployment platform: Windows Electron (`window.electronAPI.isDesktop`), Android APK (`Capacitor.isNativePlatform()`), iOS IPA (`Capacitor.isNativePlatform()`), or Web Browser.
+    - On native kiosks (`.exe`, `.apk`, `.ipa`), defaults to `false` (Strict Technician Kiosk Mode).
+    - In standard web browsers, defaults to `true` (Full Multi-Tier Role Switcher).
+    - Checks `settings.stationSecurity.allowStationAdminLogin` to allow explicit administrative overrides.
+  - Implemented `setStationAdminLoginAllowed(allowed: boolean)`: Persists policy to IndexedDB and LocalStorage.
+
+#### 2. Strict Role Modal & Header Isolation (`PodoLoadRoleModal.tsx` & `PodoLoadHeader.tsx`)
+- In `PodoLoadRoleModal.tsx`:
+  - Computed `allowAdminTabs = isStationAdminAllowed || initialAdminMode || initialSuperAdminMode`.
+  - When `!allowAdminTabs`:
+    - Completely hides the three-tier switcher tabs (Clinic Admin & Super Admin tabs removed).
+    - Displays a clean kiosk operator badge: `🔬 Clinical Workstation · Technician Sign-In (Station Kiosk)`.
+    - Forces `selectedRole` to `'technician'`.
+    - Hides the "Admin Portal" button in the modal footer.
+  - When `allowAdminTabs` is `true` (Web browsers or when explicitly enabled):
+    - Displays full role tabs switcher (`🔬 Technician | 🏥 Clinic Admin | 🛡️ Super Admin`).
+- In `PodoLoadHeader.tsx`:
+  - Clicking the facility/hospital pill is gated by `(!isMobileDevice && isStationAdminAllowed)`.
+  - Prevents non-administrators from opening admin panels on native kiosks.
+
+#### 3. Station Security Configuration Console (`src/components/podoload/PodoLoadSettings.tsx`)
+- Added dedicated **"Station Role Policy"** section in System Settings.
+- Provides a master toggle: `"Allow Administrator & Super Admin Login on this Workstation"`.
+- Displays real-time hardware telemetry:
+  - Deployment Mode: Windows Installer (.exe Electron) / Mobile Native (Android/iOS) / Web Browser Station.
+  - Default Policy: Strict Technician Kiosk vs Browser Administrative Mode.
+  - Station Device ID: Cryptographic hardware UUID.
+- Explains role hierarchy governance: Super Admin provisions Clinic Admins; Clinic Admins provision Technicians; Technicians operate exam stations.
+
+#### 4. Truthful Scanner Hardware Connectivity & Zero Sample Data Policy (`hardwareScannerService.ts`)
+- **COMPLETELY REMOVED `generateHarrisMatFootprint`** from `hardwareScannerService.ts`.
+- In `acquireHardwareScan()`:
+  - Queries physical hardware via Electron WIA or local bridge.
+  - If the scanner is not attached, powered off, or disconnected:
+    - Returns `{ success: false, connected: false, error: 'Scanner "[Device Name]" is offline or disconnected...' }`.
+    - **NEVER** generates or displays synthetic/sample foot data.
+  - If the scanner is connected and online:
+    - Acquires genuine 300 DPI optical scan bytes and returns `{ success: true, connected: true, dataUrl }`.
+
+#### 5. Real-Time Hardware Status HUD on Foot Bed (`src/components/podoload/PodoLoadCapture.tsx`)
+- Added `scannerErrorLeft` and `scannerErrorRight` error state tracking.
+- When `handleDirectScan` returns `success: false`:
+  - Does NOT populate `leftFoot` or `rightFoot` with fake data.
+  - Does NOT trigger file dialog popups or browser alert windows.
+  - Renders a prominent hardware connection HUD within the 1:1 defined bed (`.podoload-sheet-preview`):
+    - ⚠️ **Scanner Offline / Disconnected** badge with pulsating indicator.
+    - Exact hardware diagnostic status and device name.
+    - **[🔄 Retry Connection]** button to test connection immediately after user powers on or connects USB/Wi-Fi cable.
+    - **[Change Scanner / Printer]** shortcut to switch target hardware.
+    - **[Dismiss]** button to return to empty silhouette alignment guide.
+
+#### 6. Electron WIA Pre-Flight Connectivity Check (`electron/main.cjs`)
+- In `scanner:acquire`, PowerShell checks `$infos.Length -eq 0` before initiating transfer.
+- If no optical imaging devices exist, immediately outputs `FAILED:No scanner hardware is detected on this workstation...` preventing device manager hangs or modal lockups.
+
+### 37.3 Quality Verification & Release Conformance
+- **Unit Test Battery**: Expanded to **82/82** Unit Tests in `scripts/unit_tests.cjs` — 100% PASSED.
+  - Added Section 30 verifying Station Role Policy across Windows, APK, IPA, and Web Browser.
+  - Added Section 30 verifying zero dummy data policy on hardware scanner disconnection.
+- **Clinical Validation Battery**: All **15/15** Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 316ms with 0 errors.
+- **Version Bump**: Bumped to `v1.0.62` across `package.json`, `package-lock.json`, and `dbService.ts`.
+- **CI/CD Build**: Pushed commit and tag `v1.0.62` to remote GitHub repository (`origin main --tags`).

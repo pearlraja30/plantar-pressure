@@ -3,7 +3,7 @@ import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
-import { SystemUserSession, SYSTEM_ACCOUNTS } from '../../services/dbService';
+import { SystemUserSession, SYSTEM_ACCOUNTS, dbService } from '../../services/dbService';
 
 interface PodoLoadHeaderProps {
   currentSection: PodoLoadNavSection;
@@ -87,6 +87,8 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
     'results',
     'report',
   ].includes(currentSection);
+
+  const isStationAdminAllowed = dbService.isStationAdminLoginAllowed();
 
   // Discreet 5-tap header lock gesture tracking for discrete Master Admin access
   const [headerTapCount, setHeaderTapCount] = useState(0);
@@ -203,10 +205,10 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
             <button
               type="button"
               className="podoload-lang-badge"
-              onClick={isMobileDevice ? undefined : onOpenAdmin}
-              title={isMobileDevice ? `Facility: ${clinicName}` : "Active Hospital Account (Click to open Admin Panel)"}
+              onClick={(!isMobileDevice && isStationAdminAllowed) ? onOpenAdmin : undefined}
+              title={(!isMobileDevice && isStationAdminAllowed) ? "Active Hospital Account (Click to open Admin Panel)" : `Facility: ${clinicName}`}
               style={{
-                cursor: isMobileDevice ? 'default' : 'pointer',
+                cursor: (!isMobileDevice && isStationAdminAllowed) ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',

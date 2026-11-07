@@ -1,5 +1,13 @@
 import { ScannerDevice } from '../types';
-import { generateHarrisMatFootprint } from './sampleDataService';
+
+export interface ScanAcquisitionResult {
+  success: boolean;
+  connected: boolean;
+  dataUrl?: string;
+  filename?: string;
+  error?: string;
+  deviceName?: string;
+}
 
 export interface DiscoveredScanner extends ScannerDevice {
   isDirectCaptureSupported: boolean;
@@ -154,7 +162,9 @@ class HardwareScannerService {
   }
 
   /**
-   * Acquires genuine scan image from hardware scanner via Electron WIA automation or calibrated sensor acquisition
+   * Acquires genuine scan image from hardware scanner via Electron WIA automation or local bridge.
+   * STRICT CLINICAL TRUTH POLICY: Zero dummy, random, or sample footprint generation.
+   * If physical hardware is offline, disconnected, or unpowered, returns truthful connectivity error.
    */
   public async acquireHardwareScan(
     deviceId?: string,
@@ -164,7 +174,7 @@ class HardwareScannerService {
       deviceName?: string;
       footSide?: 'Left' | 'Right';
     }
-  ): Promise<{ success: boolean; dataUrl: string; filename: string }> {
+  ): Promise<ScanAcquisitionResult> {
     const side = options?.footSide || 'Left';
     const dpi = options?.dpi || 300;
     const devName = options?.deviceName || 'Calibrated Scanner';
@@ -181,12 +191,28 @@ class HardwareScannerService {
         if (res && res.success && res.dataUrl) {
           return {
             success: true,
+            connected: true,
             dataUrl: res.dataUrl,
             filename: res.filename || `scan_${side.toLowerCase()}_${Date.now()}.jpg`,
+            deviceName: devName,
+          };
+        } else {
+          return {
+            success: false,
+            connected: false,
+            error:
+              res?.error ||
+              `Scanner "${devName}" is offline or disconnected. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON.`,
+            deviceName: devName,
           };
         }
       } catch (err: any) {
-        console.warn('[HardwareScanner] Electron scan error, utilizing calibrated hardware frame:', err);
+        return {
+          success: false,
+          connected: false,
+          error: `Hardware scanner communication error: ${err.message || 'Device disconnected'}. Please check cable and power.`,
+          deviceName: devName,
+        };
       }
     }
 
@@ -209,8 +235,10 @@ class HardwareScannerService {
           if (apiData && apiData.success && apiData.dataUrl) {
             return {
               success: true,
+              connected: true,
               dataUrl: apiData.dataUrl,
               filename: apiData.filename || `scan_${side.toLowerCase()}_${Date.now()}.jpg`,
+              deviceName: devName,
             };
           }
         }
@@ -219,12 +247,13 @@ class HardwareScannerService {
       }
     }
 
-    // 3. Calibrated Genuine 300 DPI Harris Mat Footprint (No File Dialog Required)
-    const calibratedUrl = generateHarrisMatFootprint(side, 'normal', 720, 1080);
+    // 3. Clinical Truth Enforcement: ZERO DUMMY/RANDOM DATA
+    // When no physical device responds or is attached, truthfully report offline status!
     return {
-      success: true,
-      dataUrl: calibratedUrl,
-      filename: `scan_${side.toLowerCase()}_calibrated_${Date.now()}.png`,
+      success: false,
+      connected: false,
+      error: `Scanner "${devName}" is not responding or disconnected. Please ensure the physical scanner is connected via USB/Wi-Fi, powered ON, and installed on this workstation.`,
+      deviceName: devName,
     };
   }
 

@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Check,
   AlertCircle,
+  AlertTriangle,
   Camera,
   RefreshCw,
   Usb,
@@ -103,6 +104,8 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
   const [isScanningRight, setIsScanningRight] = useState(false);
   const [scanPhaseLeft, setScanPhaseLeft] = useState('');
   const [scanPhaseRight, setScanPhaseRight] = useState('');
+  const [scannerErrorLeft, setScannerErrorLeft] = useState<string | null>(null);
+  const [scannerErrorRight, setScannerErrorRight] = useState<string | null>(null);
 
   const leftFileInputRef = useRef<HTMLInputElement | null>(null);
   const rightFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -303,6 +306,10 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
     const setScanning = side === 'Left' ? setIsScanningLeft : setIsScanningRight;
     const setPhase = side === 'Left' ? setScanPhaseLeft : setScanPhaseRight;
 
+    // Reset previous hardware status error for this side
+    if (side === 'Left') setScannerErrorLeft(null);
+    else setScannerErrorRight(null);
+
     setScanning(true);
     setPhase(`Connecting to ${deviceName}... Initiating scan feature...`);
 
@@ -321,6 +328,8 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
           setPhase(`Streaming optical frame: ${deviceName}...`);
           const frame = await hardwareScannerService.acquireDirectOpticalFrame(activeDevice.id);
           setPhase('Fitting scan to foot bed (1:1)...');
+          if (side === 'Left') setScannerErrorLeft(null);
+          else setScannerErrorRight(null);
           await processIngestedScan(side, frame.dataUrl, deviceName);
           return;
         } catch (e) {
@@ -332,7 +341,7 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
       setPhase(`Scanning ${side} Foot document from ${deviceName} at ${dpiVal} DPI...`);
       await new Promise((r) => setTimeout(r, 600));
 
-      setPhase('Processing genuine plantar contact impression...');
+      setPhase('Querying hardware scanner connection...');
       const result = await hardwareScannerService.acquireHardwareScan(deviceId, {
         dpi: dpiVal,
         colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
@@ -340,18 +349,29 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
         footSide: side,
       });
 
+      if (!result.success || !result.dataUrl) {
+        // Physical scanner is offline, disconnected, or unpowered - ZERO DUMMY DATA
+        const errorMsg =
+          result.error ||
+          `Scanner "${deviceName}" is offline or disconnected. Please connect the USB/Wi-Fi cable and turn ON the scanner.`;
+        if (side === 'Left') setScannerErrorLeft(errorMsg);
+        else setScannerErrorRight(errorMsg);
+        return;
+      }
+
+      // Genuine scan received from physical hardware
+      if (side === 'Left') setScannerErrorLeft(null);
+      else setScannerErrorRight(null);
+
       setPhase('Fitting scan to foot bed (1:1)...');
       await processIngestedScan(side, result.dataUrl, deviceName);
     } catch (err: any) {
-      console.warn('[DirectScan] Acquisition note:', err);
-      // Ensure image is displayed on the defined space without opening any file dialog
-      const fallbackResult = await hardwareScannerService.acquireHardwareScan(deviceId, {
-        dpi: dpiVal,
-        colorMode: colourMode === 'RGB' ? 'Color' : 'Grayscale',
-        deviceName,
-        footSide: side,
-      });
-      await processIngestedScan(side, fallbackResult.dataUrl, deviceName);
+      console.warn('[DirectScan] Acquisition error:', err);
+      const errorMsg =
+        err?.message ||
+        `Scanner "${deviceName}" failed to communicate. Please ensure hardware is powered on and connected.`;
+      if (side === 'Left') setScannerErrorLeft(errorMsg);
+      else setScannerErrorRight(errorMsg);
     } finally {
       setScanning(false);
       setPhase('');
@@ -885,6 +905,73 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       </div>
                     )}
                   </div>
+                ) : scannerErrorLeft ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.85rem 0.65rem',
+                      height: '100%',
+                      textAlign: 'center',
+                      backgroundColor: '#fef2f2',
+                      borderRadius: '6px',
+                      border: '1.5px dashed #f87171',
+                      gap: '0.45rem',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse flex-shrink-0" />
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#991b1b' }}>
+                      Scanner Offline / Disconnected
+                    </span>
+                    <span style={{ fontSize: '0.66rem', color: '#7f1d1d', lineHeight: 1.35, maxWidth: '190px' }}>
+                      {scannerErrorLeft}
+                    </span>
+                    <button
+                      type="button"
+                      className="podoload-btn-primary podoload-btn-sm"
+                      onClick={() => handleDirectScan('Left')}
+                      style={{ marginTop: '0.4rem', fontSize: '0.7rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Retry Connection</span>
+                    </button>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.2rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsPrinterModalOpen(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0891b2',
+                          fontSize: '0.66rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          fontWeight: 600,
+                          padding: '2px',
+                        }}
+                      >
+                        Change Scanner / Printer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScannerErrorLeft(null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748b',
+                          fontSize: '0.66rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: '2px',
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="podoload-empty-target">
                     {/* Anatomical Left Foot Silhouette (Plantar View: Medial Arch & Hallux on Right) */}
@@ -1068,7 +1155,10 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                onClick={() => onUpdateLeftFoot(null)}
+                onClick={() => {
+                  onUpdateLeftFoot(null);
+                  setScannerErrorLeft(null);
+                }}
                 title="Clear scan"
               >
                 <Trash2 className="w-3 h-3 text-red-500 inline mr-1" />
@@ -1255,6 +1345,73 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       </div>
                     )}
                   </div>
+                ) : scannerErrorRight ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.85rem 0.65rem',
+                      height: '100%',
+                      textAlign: 'center',
+                      backgroundColor: '#fef2f2',
+                      borderRadius: '6px',
+                      border: '1.5px dashed #f87171',
+                      gap: '0.45rem',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <AlertTriangle className="w-8 h-8 text-red-500 animate-pulse flex-shrink-0" />
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#991b1b' }}>
+                      Scanner Offline / Disconnected
+                    </span>
+                    <span style={{ fontSize: '0.66rem', color: '#7f1d1d', lineHeight: 1.35, maxWidth: '190px' }}>
+                      {scannerErrorRight}
+                    </span>
+                    <button
+                      type="button"
+                      className="podoload-btn-primary podoload-btn-sm"
+                      onClick={() => handleDirectScan('Right')}
+                      style={{ marginTop: '0.4rem', fontSize: '0.7rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Retry Connection</span>
+                    </button>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.2rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsPrinterModalOpen(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0891b2',
+                          fontSize: '0.66rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          fontWeight: 600,
+                          padding: '2px',
+                        }}
+                      >
+                        Change Scanner / Printer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScannerErrorRight(null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748b',
+                          fontSize: '0.66rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: '2px',
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="podoload-empty-target">
                     {/* Anatomical Right Foot Silhouette (Plantar View: Medial Arch & Hallux on Left) */}
@@ -1438,7 +1595,10 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
               <button
                 type="button"
                 className="podoload-btn-secondary podoload-btn-sm"
-                onClick={() => onUpdateRightFoot(null)}
+                onClick={() => {
+                  onUpdateRightFoot(null);
+                  setScannerErrorRight(null);
+                }}
                 title="Clear scan"
               >
                 <Trash2 className="w-3 h-3 text-red-500 inline mr-1" />

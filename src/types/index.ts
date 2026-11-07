@@ -270,6 +270,9 @@ export interface SystemSettings {
     hospitalId?: string;
     role?: 'admin' | 'doctor' | 'technician';
   };
+  stationSecurity?: {
+    allowStationAdminLogin?: boolean; // Default false on native kiosks (.exe, .apk, .ipa), true in browser
+  };
 }
 
 export interface HospitalDoctor {

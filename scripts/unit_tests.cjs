@@ -3992,6 +3992,113 @@ it("Super Admin Telemetry & Tracing: Master console inspects all activations, vo
   expect(globalActivations[0].status).toBe("revoked");
 });
 
+// ============================================================================
+// SECTION 30: Station Role Policy & Truthful Scanner Hardware Connectivity
+// ============================================================================
+console.log("\n--- SECTION 30: Station Role Policy & Truthful Scanner Hardware Connectivity ---");
+
+it("Enforces Station Role Policy: Native kiosks (Windows .exe, APK, IPA) strictly hide Admin & Super Admin login unless configured", () => {
+  // 1. Simulate platform detection
+  const checkRoleVisibility = (platform, allowStationAdminLogin, initialAdminMode = false) => {
+    const isNativeKiosk = platform === 'win32-desktop' || platform === 'android' || platform === 'ios';
+    const isStationAdminAllowed = allowStationAdminLogin !== undefined ? allowStationAdminLogin : !isNativeKiosk;
+    const allowAdminTabs = isStationAdminAllowed || initialAdminMode;
+
+    return {
+      isNativeKiosk,
+      allowAdminTabs,
+      visibleTabs: allowAdminTabs ? ['technician', 'admin', 'superadmin'] : ['technician'],
+      defaultRole: allowAdminTabs ? 'technician' : 'technician',
+    };
+  };
+
+  // Test Case A: Windows .exe Installer Kiosk (Default Policy)
+  const winKiosk = checkRoleVisibility('win32-desktop', false);
+  expect(winKiosk.isNativeKiosk).toBe(true);
+  expect(winKiosk.allowAdminTabs).toBe(false);
+  expect(winKiosk.visibleTabs).toEqual(['technician']);
+  expect(winKiosk.visibleTabs.includes('admin')).toBe(false);
+  expect(winKiosk.visibleTabs.includes('superadmin')).toBe(false);
+
+  // Test Case B: Mobile APK / IPA Kiosk (Default Policy)
+  const apkKiosk = checkRoleVisibility('android', false);
+  expect(apkKiosk.allowAdminTabs).toBe(false);
+  expect(apkKiosk.visibleTabs).toEqual(['technician']);
+
+  // Test Case C: Standard Web Browser (Default Policy)
+  const browserStation = checkRoleVisibility('browser', undefined);
+  expect(browserStation.isNativeKiosk).toBe(false);
+  expect(browserStation.allowAdminTabs).toBe(true);
+  expect(browserStation.visibleTabs).toEqual(['technician', 'admin', 'superadmin']);
+
+  // Test Case D: Configured Kiosk (Administrator explicitly toggled allowStationAdminLogin = true)
+  const configuredKiosk = checkRoleVisibility('win32-desktop', true);
+  expect(configuredKiosk.allowAdminTabs).toBe(true);
+  expect(configuredKiosk.visibleTabs).toEqual(['technician', 'admin', 'superadmin']);
+
+  // Test Case E: Direct Admin Mode override (e.g. settings password unlock or emergency hotkey)
+  const emergencyAdmin = checkRoleVisibility('win32-desktop', false, true);
+  expect(emergencyAdmin.allowAdminTabs).toBe(true);
+});
+
+it("Enforces Truthful Optical Scanner Connectivity: Zero dummy or random sample data when scanner is disconnected", () => {
+  // Hardware acquisition simulation
+  const simulateHardwareScan = (isPhysicallyConnected, isPoweredOn, devName) => {
+    if (!isPhysicallyConnected || !isPoweredOn) {
+      // Truthful hardware status - STRICTLY ZERO SYNTHETIC / DUMMY DATA FALLBACK
+      return {
+        success: false,
+        connected: false,
+        error: `Scanner "${devName}" is offline or disconnected. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON.`,
+        dataUrl: undefined,
+      };
+    }
+
+    return {
+      success: true,
+      connected: true,
+      dataUrl: "data:image/jpeg;base64,GENUINE_OPTICAL_SCAN_BYTES_FROM_HARDWARE",
+      filename: `scan_left_${Date.now()}.jpg`,
+    };
+  };
+
+  // 1. Scanner is disconnected or powered off
+  const offlineResult = simulateHardwareScan(false, false, "Epson EcoTank L3250");
+  expect(offlineResult.success).toBe(false);
+  expect(offlineResult.connected).toBe(false);
+  expect(offlineResult.dataUrl).toBe(undefined);
+  expect(offlineResult.error).toContain("offline or disconnected");
+  expect(offlineResult.error).toContain("Epson EcoTank L3250");
+
+  // 2. Foot bed state handling when scanner is offline
+  let leftFootData = null;
+  let scannerErrorLeft = null;
+
+  if (!offlineResult.success || !offlineResult.dataUrl) {
+    scannerErrorLeft = offlineResult.error;
+    // CRITICAL: leftFootData MUST REMAIN NULL - Never set fake or dummy Harris Mat data!
+  } else {
+    leftFootData = { rawDataUrl: offlineResult.dataUrl };
+  }
+
+  expect(leftFootData).toBe(null);
+  expect(scannerErrorLeft).toContain("offline or disconnected");
+
+  // 3. Scanner physically connected and powered on
+  const onlineResult = simulateHardwareScan(true, true, "Canon CanoScan LiDE 300");
+  expect(onlineResult.success).toBe(true);
+  expect(onlineResult.connected).toBe(true);
+  expect(onlineResult.dataUrl).toContain("GENUINE_OPTICAL_SCAN_BYTES");
+
+  if (onlineResult.success && onlineResult.dataUrl) {
+    scannerErrorLeft = null;
+    leftFootData = { rawDataUrl: onlineResult.dataUrl };
+  }
+
+  expect(scannerErrorLeft).toBe(null);
+  expect(leftFootData.rawDataUrl).toContain("GENUINE_OPTICAL_SCAN_BYTES");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

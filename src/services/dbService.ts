@@ -2,6 +2,7 @@
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
 import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, SuperAdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy } from '../types';
+import { Capacitor } from '@capacitor/core';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
 import { cloudSyncService } from './cloudSyncService';
@@ -9,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.61';
+export const APP_CURRENT_VERSION = '1.0.62';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -137,6 +138,9 @@ export const DEFAULT_SETTINGS: SystemSettings = {
     defaultTechnician: 'Tech. Specialist',
     hospitalId: 'hosp-001',
     role: 'admin',
+  },
+  stationSecurity: {
+    allowStationAdminLogin: false,
   },
 };
 
@@ -677,6 +681,7 @@ class PodoPressDatabase {
       cloud: { ...current.cloud, ...newSettings.cloud },
       clinical: { ...current.clinical, ...newSettings.clinical },
       patientIdConfig: { ...current.patientIdConfig, ...newSettings.patientIdConfig },
+      stationSecurity: { ...current.stationSecurity, ...newSettings.stationSecurity },
     };
 
     try {
@@ -696,6 +701,40 @@ class PodoPressDatabase {
     }
 
     return updated;
+  }
+
+  /**
+   * Checks whether Administrator and Super Administrator login options are allowed on this workstation.
+   * On native kiosk builds (Windows .exe, Android APK, iOS IPA), defaults to false (Technician-only station).
+   * In standard web browsers, defaults to true.
+   * Can be overridden by the administrator in System Settings.
+   */
+  public isStationAdminLoginAllowed(): boolean {
+    const isNativeKiosk =
+      (typeof window !== 'undefined' && Boolean((window as any).electronAPI?.isDesktop || (window as any).electronAPI)) ||
+      Capacitor.isNativePlatform();
+
+    const settings = this.getSettingsSync();
+    if (settings.stationSecurity && typeof settings.stationSecurity.allowStationAdminLogin === 'boolean') {
+      return settings.stationSecurity.allowStationAdminLogin;
+    }
+    // Default: false on native kiosks (Windows installer exe, APK, IPA), true on browser
+    return !isNativeKiosk;
+  }
+
+  /**
+   * Configures whether Administrator and Super Admin logins are permitted on this device.
+   */
+  public async setStationAdminLoginAllowed(allowed: boolean): Promise<void> {
+    const current = this.getSettingsSync();
+    const updated: SystemSettings = {
+      ...current,
+      stationSecurity: {
+        ...current.stationSecurity,
+        allowStationAdminLogin: allowed,
+      },
+    };
+    await this.saveSettings(updated);
   }
 
   // =========================================================================

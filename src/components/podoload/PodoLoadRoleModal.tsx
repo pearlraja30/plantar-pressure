@@ -65,6 +65,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
 
+  const isStationAdminAllowed = dbService.isStationAdminLoginAllowed();
+  const allowAdminTabs = isStationAdminAllowed || initialAdminMode || initialSuperAdminMode;
+
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
   const [isAdminContext, setIsAdminContext] = useState<boolean>(() => Boolean(initialAdminMode));
@@ -73,6 +76,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       ? 'superadmin'
       : initialAdminMode
       ? 'admin'
+      : !allowAdminTabs
+      ? 'technician'
       : currentUser.role === 'superadmin'
       ? 'superadmin'
       : isMobileDevice
@@ -90,13 +95,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     } else if (initialAdminMode) {
       setIsAdminContext(true);
       setSelectedRole('admin');
-    } else if (currentUser.role === 'superadmin') {
+    } else if (allowAdminTabs && currentUser.role === 'superadmin') {
       setSelectedRole('superadmin');
+    } else if (allowAdminTabs && currentUser.role === 'admin') {
+      setSelectedRole('admin');
     } else {
       setIsAdminContext(false);
       setSelectedRole('technician');
     }
-  }, [initialAdminMode, initialSuperAdminMode, currentUser.role, isOpen]);
+  }, [initialAdminMode, initialSuperAdminMode, currentUser.role, isOpen, allowAdminTabs]);
 
   // Discreet 5-tap header gesture tracking
   const [headerTapCount, setHeaderTapCount] = useState(0);
@@ -1172,103 +1179,128 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
               <>
                 {/* Role Tabs Switcher: Technician | Hospital Admin | Super Admin */}
                 {!isMandatoryActivation && !deviceLockout && recoveryMode === 'none' && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.35rem',
-                      marginBottom: '0.65rem',
-                      backgroundColor: '#f1f5f9',
-                      padding: '4px',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRole('technician');
-                        setIsAdminContext(false);
-                        setPinError(null);
-                      }}
+                  allowAdminTabs ? (
+                    <div
                       style={{
-                        flex: 1,
-                        padding: '0.45rem 0.35rem',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        backgroundColor: selectedRole === 'technician' ? '#ffffff' : 'transparent',
-                        color: selectedRole === 'technician' ? '#0f766e' : '#64748b',
-                        boxShadow: selectedRole === 'technician' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                         gap: '0.35rem',
-                        transition: 'all 0.15s ease',
+                        marginBottom: '0.65rem',
+                        backgroundColor: '#f1f5f9',
+                        padding: '4px',
+                        borderRadius: '8px',
                       }}
                     >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>🔬 Technician</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRole('technician');
+                          setIsAdminContext(false);
+                          setPinError(null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0.45rem 0.35rem',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: selectedRole === 'technician' ? '#ffffff' : 'transparent',
+                          color: selectedRole === 'technician' ? '#0f766e' : '#64748b',
+                          boxShadow: selectedRole === 'technician' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>🔬 Technician</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRole('admin');
-                        setIsAdminContext(true);
-                        setPinError(null);
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '0.45rem 0.35rem',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        backgroundColor: selectedRole === 'admin' ? '#ffffff' : 'transparent',
-                        color: selectedRole === 'admin' ? '#0f766e' : '#64748b',
-                        boxShadow: selectedRole === 'admin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.35rem',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>🏥 Clinic Admin</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRole('admin');
+                          setIsAdminContext(true);
+                          setPinError(null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0.45rem 0.35rem',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: selectedRole === 'admin' ? '#ffffff' : 'transparent',
+                          color: selectedRole === 'admin' ? '#0f766e' : '#64748b',
+                          boxShadow: selectedRole === 'admin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>🏥 Clinic Admin</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedRole('superadmin');
-                        setIsAdminContext(false);
-                        setPinError(null);
-                      }}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRole('superadmin');
+                          setIsAdminContext(false);
+                          setPinError(null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0.45rem 0.35rem',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: selectedRole === 'superadmin' ? '#ffffff' : 'transparent',
+                          color: selectedRole === 'superadmin' ? '#7e22ce' : '#64748b',
+                          boxShadow: selectedRole === 'superadmin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>🛡️ Super Admin</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div
                       style={{
-                        flex: 1,
-                        padding: '0.45rem 0.35rem',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        backgroundColor: selectedRole === 'superadmin' ? '#ffffff' : 'transparent',
-                        color: selectedRole === 'superadmin' ? '#7e22ce' : '#64748b',
-                        boxShadow: selectedRole === 'superadmin' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.35rem',
-                        transition: 'all 0.15s ease',
+                        justifyContent: 'space-between',
+                        marginBottom: '0.65rem',
+                        backgroundColor: '#f0fdfa',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '8px',
+                        border: '1px solid #ccfbf1',
                       }}
                     >
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      <span>🛡️ Super Admin</span>
-                    </button>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <UserCheck className="w-4 h-4 text-teal-600" />
+                        <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f766e' }}>
+                          Clinical Workstation · Technician Sign-In
+                        </span>
+                      </div>
+                      <span className="podo-badge podo-badge-green" style={{ fontSize: '0.65rem' }}>
+                        Station Kiosk
+                      </span>
+                    </div>
+                  )
                 )}
 
                 {selectedRole === 'superadmin' ? (
@@ -2084,7 +2116,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 )}
 
-                {!isAdminContext && !isMandatoryActivation && (
+                {!isAdminContext && !isMandatoryActivation && allowAdminTabs && (
                   <button
                     type="button"
                     onClick={() => {

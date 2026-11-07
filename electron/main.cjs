@@ -365,78 +365,86 @@ try {
     $dev = $null
     $infos = @($dm.DeviceInfos)
 
-    # 1. Match by exact DeviceID
-    if ($target -and $target -ne "default" -and -not $target.StartsWith("printer-")) {
-      foreach ($info in $infos) {
-        if ($info.DeviceID -eq $target) {
-          $dev = try { $info.Connect() } catch { $null }
-          break
-        }
-      }
-    }
-
-    # 2. Match by printer / scanner friendly name substring
-    if (-not $dev -and $target) {
-      $cleanTarget = $target.Replace("printer-", "").Replace("-", " ").ToLower()
-      foreach ($info in $infos) {
-        try {
-          $n = [string]$info.Properties.Item("Name").Value
-          if ($n -and ($cleanTarget.Contains($n.ToLower()) -or $n.ToLower().Contains($cleanTarget))) {
+    if ($infos.Length -eq 0) {
+      $errMsg = "No scanner hardware is detected on this workstation. Please connect your printer cum scanner via USB or Wi-Fi, ensure power is ON, and try again."
+    } else {
+      # 1. Match by exact DeviceID
+      if ($target -and $target -ne "default" -and -not $target.StartsWith("printer-")) {
+        foreach ($info in $infos) {
+          if ($info.DeviceID -eq $target) {
             $dev = try { $info.Connect() } catch { $null }
             break
           }
-        } catch {}
+        }
       }
-    }
 
-    # 3. Match default / first WIA scanner
-    if (-not $dev) {
-      foreach ($info in $infos) {
-        $dev = try { $info.Connect() } catch { $null }
-        if ($dev) { break }
-      }
-    }
-
-    # 4. Fallback to any imaging device in DeviceInfos
-    if (-not $dev -and $infos.Length -gt 0) {
-      $dev = try { $infos[0].Connect() } catch { $null }
-    }
-
-    if ($dev) {
-      $item = try { $dev.Items.Item(1) } catch { try { $dev.Items | Select-Object -First 1 } catch { $null } }
-      if ($item) {
-        try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
-        try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
-        try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
-
-        $image = $null
-        # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
-        try {
-          $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
-        } catch {
+      # 2. Match by printer / scanner friendly name substring
+      if (-not $dev -and $target) {
+        $cleanTarget = $target.Replace("printer-", "").Replace("-", " ").ToLower()
+        foreach ($info in $infos) {
           try {
-            $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+            $n = [string]$info.Properties.Item("Name").Value
+            if ($n -and ($cleanTarget.Contains($n.ToLower()) -or $n.ToLower().Contains($cleanTarget))) {
+              $dev = try { $info.Connect() } catch { $null }
+              break
+            }
+          } catch {}
+        }
+      }
+
+      # 3. Match default / first WIA scanner
+      if (-not $dev) {
+        foreach ($info in $infos) {
+          $dev = try { $info.Connect() } catch { $null }
+          if ($dev) { break }
+        }
+      }
+
+      # 4. Fallback to any imaging device in DeviceInfos
+      if (-not $dev -and $infos.Length -gt 0) {
+        $dev = try { $infos[0].Connect() } catch { $null }
+      }
+
+      if ($dev) {
+        $item = try { $dev.Items.Item(1) } catch { try { $dev.Items | Select-Object -First 1 } catch { $null } }
+        if ($item) {
+          try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
+          try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
+          try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
+
+          $image = $null
+          # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
+          try {
+            $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
           } catch {
             try {
-              $image = $item.Transfer()
-            } catch {}
+              $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+            } catch {
+              try {
+                $image = $item.Transfer()
+              } catch {}
+            }
+          }
+
+          if ($image) {
+            if (Test-Path $temp) { Remove-Item $temp -Force }
+            $image.SaveFile($temp)
+            $scanned = $true
           }
         }
-
-        if ($image) {
-          if (Test-Path $temp) { Remove-Item $temp -Force }
-          $image.SaveFile($temp)
-          $scanned = $true
-        }
+      } else {
+        $errMsg = "Scanner hardware is offline or failed to respond. Please check cable and power."
       }
     }
+  } else {
+    $errMsg = "Windows Image Acquisition (WIA) service is unavailable on this machine."
   }
 } catch {
   $errMsg = $_.Exception.Message
 }
 
-# 2. Fallback: If programmatic transfer did not produce a file, use native WIA CommonDialog!
-if (-not $scanned) {
+# 2. Fallback: Only invoke WIA CommonDialog if device infos exist, not already scanned, and not explicitly failed
+if (-not $scanned -and -not $errMsg) {
   try {
     $cd = New-Object -ComObject WIA.CommonDialog -ErrorAction SilentlyContinue
     if ($cd) {
