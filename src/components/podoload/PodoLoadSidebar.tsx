@@ -127,7 +127,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         {/* Navigation Section according to Role Hierarchy */}
         {currentUser?.role === 'admin' ? (
           <>
-            {/* Primary Section for Hospital Admin: HOSPITAL MANAGEMENT */}
+            {/* Dedicated Management Sections for Hospital Admin */}
             <div className="podoload-nav-section">
               <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>HOSPITAL MANAGEMENT</span>
@@ -167,7 +167,12 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                   <Sliders className="podoload-nav-item-icon" />
                   <span>Settings & Hardware</span>
                 </button>
+              </nav>
+            </div>
 
+            <div className="podoload-nav-section">
+              <div className="podoload-section-label">RECORDS</div>
+              <nav className="podoload-nav-list">
                 <button
                   type="button"
                   className={`podoload-nav-item ${currentSection === 'reports_cloud' ? 'active' : ''}`}
@@ -189,64 +194,10 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 </button>
               </nav>
             </div>
-
-            {/* Secondary Section for Hospital Admin: CLINICAL EXAMINATIONS (TECH ONLY) */}
-            <div className="podoload-nav-section">
-              <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>NEW EXAM</span>
-                <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Lock className="w-2.5 h-2.5 text-amber-400" /> Tech Only
-                </span>
-              </div>
-              <nav className="podoload-nav-list">
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'registration' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('registration')}
-                  title="Clinical examination restricted to Technician login"
-                >
-                  <UserPlus className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Registration</span>
-                  <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-                </button>
-
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'capture' || currentSection === 'process' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('capture')}
-                  title="Scanning restricted to Technician login"
-                >
-                  <Scan className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Scan and process</span>
-                  <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-                </button>
-
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'results' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('results')}
-                  title="Analysis results"
-                >
-                  <BarChart2 className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Results</span>
-                  <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-                </button>
-
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'report' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('report')}
-                  title="Report preview"
-                >
-                  <FileText className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Report</span>
-                </button>
-              </nav>
-            </div>
           </>
         ) : currentUser?.role === 'superadmin' ? (
           <>
-            {/* Primary Section for Super Admin: GOVERNANCE */}
+            {/* Dedicated Governance Sections for Super Admin */}
             <div className="podoload-nav-section">
               <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>SUPER ADMIN</span>
@@ -287,51 +238,10 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 </button>
               </nav>
             </div>
-
-            {/* Secondary Section for Super Admin: CLINICAL EXAMINATIONS (TECH ONLY) */}
-            <div className="podoload-nav-section">
-              <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>NEW EXAM</span>
-                <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Lock className="w-2.5 h-2.5 text-purple-400" /> Tech Only
-                </span>
-              </div>
-              <nav className="podoload-nav-list">
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'registration' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('registration')}
-                >
-                  <UserPlus className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Registration</span>
-                  <Lock className="w-3 h-3 text-purple-400 opacity-80" />
-                </button>
-
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'capture' || currentSection === 'process' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('capture')}
-                >
-                  <Scan className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Scan and process</span>
-                  <Lock className="w-3 h-3 text-purple-400 opacity-80" />
-                </button>
-
-                <button
-                  type="button"
-                  className={`podoload-nav-item ${currentSection === 'results' ? 'active' : ''}`}
-                  onClick={() => handleItemClick('results')}
-                >
-                  <BarChart2 className="podoload-nav-item-icon" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Results</span>
-                  <Lock className="w-3 h-3 text-purple-400 opacity-80" />
-                </button>
-              </nav>
-            </div>
           </>
         ) : (
           <>
-            {/* Primary Section for Clinical Technician: NEW EXAM */}
+            {/* Dedicated Clinical Examination Sections for Technician (Clean, Zero Lock Icons) */}
             <div className="podoload-nav-section">
               <div className="podoload-section-label">NEW EXAM</div>
               <nav className="podoload-nav-list">
@@ -400,45 +310,6 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
                 </button>
               </nav>
             </div>
-
-            {/* Section 3: ADMINISTRATION & SYSTEM (Requires Admin Login) */}
-            {!isMobileDevice && (
-              <div className="podoload-nav-section">
-                <div className="podoload-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem' }}>
-                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>ADMIN & SYSTEM</span>
-                  <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    <Lock className="w-2.5 h-2.5" /> Admin
-                  </span>
-                </div>
-                <nav className="podoload-nav-list">
-                  <button
-                    type="button"
-                    className={`podoload-nav-item ${currentSection === 'admin' ? 'active' : ''}`}
-                    onClick={() => {
-                      if (onOpenUserSwitcher) onOpenUserSwitcher('admin');
-                    }}
-                    title="Requires Hospital Administrator login"
-                  >
-                    <Building2 className="podoload-nav-item-icon" />
-                    <span style={{ flex: 1, textAlign: 'left' }}>Hospital & Admin</span>
-                    <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`podoload-nav-item ${currentSection === 'settings' ? 'active' : ''}`}
-                    onClick={() => {
-                      if (onOpenUserSwitcher) onOpenUserSwitcher('admin');
-                    }}
-                    title="Requires Hospital Administrator login"
-                  >
-                    <Sliders className="podoload-nav-item-icon" />
-                    <span style={{ flex: 1, textAlign: 'left' }}>Settings</span>
-                    <Lock className="w-3 h-3 text-amber-400 opacity-80" />
-                  </button>
-                </nav>
-              </div>
-            )}
           </>
         )}
       </div>

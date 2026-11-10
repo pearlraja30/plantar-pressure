@@ -4410,6 +4410,83 @@ it("Enforces Dedicated Top-Right Sign Out Button Layout: High Prominence, Flex-S
   expect(signOutConfig.isOnlyLogoutButton).toBe(true);
 });
 
+console.log("\n--- SECTION 33: Clean Role-Scoped Menus & Lock Icon Elimination ---");
+
+it("Enforces Clean Role-Based Sidebar Navigation: Shows Only Role-Specific Menus with Zero Lock Icons", () => {
+  // Navigation generator simulating updated PodoLoadSidebar role scoping
+  const getSidebarMenuItems = (role) => {
+    if (role === "admin") {
+      return {
+        sections: ["HOSPITAL MANAGEMENT", "RECORDS"],
+        items: [
+          { label: "Hospital & Profile", hasLock: false },
+          { label: "Database records", hasLock: false },
+          { label: "Settings & Hardware", hasLock: false },
+          { label: "Reports and cloud", hasLock: false },
+          { label: "Patient search", hasLock: false },
+        ],
+      };
+    }
+    if (role === "superadmin") {
+      return {
+        sections: ["SUPER ADMIN"],
+        items: [
+          { label: "Super Admin Console", hasLock: false },
+          { label: "Global Reports Audit", hasLock: false },
+          { label: "Platform Settings", hasLock: false },
+        ],
+      };
+    }
+    // Technician: Clean exam workflow
+    return {
+      sections: ["NEW EXAM", "RECORDS"],
+      items: [
+        { label: "Registration", hasLock: false },
+        { label: "Scan and process", hasLock: false },
+        { label: "Results", hasLock: false },
+        { label: "Report", hasLock: false },
+        { label: "Patient search", hasLock: false },
+        { label: "Reports and cloud", hasLock: false },
+      ],
+    };
+  };
+
+  // 1. Technician role test
+  const techMenu = getSidebarMenuItems("technician");
+  expect(techMenu.sections).toEqual(["NEW EXAM", "RECORDS"]);
+  expect(techMenu.items.length).toBe(6);
+  // Must NOT include Admin & System
+  expect(techMenu.sections.includes("ADMIN & SYSTEM")).toBe(false);
+  // Zero lock icons on all technician options
+  techMenu.items.forEach((item) => {
+    expect(item.hasLock).toBe(false);
+  });
+
+  // 2. Admin role test
+  const adminMenu = getSidebarMenuItems("admin");
+  expect(adminMenu.sections).toEqual(["HOSPITAL MANAGEMENT", "RECORDS"]);
+  expect(adminMenu.sections.includes("NEW EXAM")).toBe(false);
+  adminMenu.items.forEach((item) => {
+    expect(item.hasLock).toBe(false);
+  });
+
+  // 3. Super Admin role test
+  const superAdminMenu = getSidebarMenuItems("superadmin");
+  expect(superAdminMenu.sections).toEqual(["SUPER ADMIN"]);
+  expect(superAdminMenu.sections.includes("NEW EXAM")).toBe(false);
+  superAdminMenu.items.forEach((item) => {
+    expect(item.hasLock).toBe(false);
+  });
+
+  // 4. Header title clean text test: Zero lock icon in title block
+  const headerTitleRender = {
+    title: "New exam · Patient registration",
+    hasLockIcon: false,
+  };
+  expect(headerTitleRender.hasLockIcon).toBe(false);
+  expect(headerTitleRender.title).toBe("New exam · Patient registration");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound, Lock } from 'lucide-react';
+import { Cloud, Globe, Menu, Building2, ShieldCheck, UserCheck, LogOut, KeyRound } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../../types';
 import { PodoLoadNavSection } from './PodoLoadSidebar';
@@ -128,10 +128,9 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
           <div
             className="podoload-header-title-block"
             onClick={handleHeaderTap}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', userSelect: 'none', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}
+            style={{ cursor: 'pointer', userSelect: 'none', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}
             title="Hospital Diagnostic Station (Tap 5x for Master Administrator Portal)"
           >
-            <Lock className="w-3.5 h-3.5 text-slate-400 opacity-60 flex-shrink-0" />
             <h2 className="podoload-header-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getHeaderTitle()}</h2>
           </div>
         </div>

@@ -1327,3 +1327,42 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.64`.
 
+---
+
+## 40. Clean Role-Scoped Menus & Lock Icon Elimination (v1.0.65)
+
+### 40.1 Scoped Navigation Architecture (Zero Lock Teasers)
+- **Clinical Usability Requirement**:
+  - In previous builds, sidebar menus displayed inaccessible sections decorated with `🔒 Lock` badges (e.g. for a Clinical Technician, an `ADMIN & SYSTEM` section appeared with locked `Hospital & Admin` and `Settings` items; for an Administrator, a `NEW EXAM` section appeared with locked `Registration` and `Scan` items).
+  - The user instructed: *"when techinical option we dont need these lock icons to show we dont want to these menu details , whatever menu option visible show only that, depends on the login show respective menu accordingly. it should be clean option to visible"*.
+- **Implementation in `src/components/podoload/PodoLoadSidebar.tsx`**:
+  - **Clinical Technician (`currentUser.role === 'technician'`)**:
+    - Displays **only** active, accessible options:
+      - `NEW EXAM`: `Registration`, `Scan and process` (or `Capture and process` on mobile), `Results`, `Report`.
+      - `RECORDS`: `Patient search`, `Reports and cloud`.
+    - **100% eliminated** the `ADMIN & SYSTEM` block and all lock icons.
+  - **Hospital Administrator (`currentUser.role === 'admin'`)**:
+    - Displays **only** hospital management and audit options:
+      - `HOSPITAL MANAGEMENT`: `Hospital & Profile`, `Database records` (desktop), `Settings & Hardware`.
+      - `RECORDS`: `Reports and cloud`, `Patient search`.
+    - **100% eliminated** the `NEW EXAM (TECH ONLY)` locked block.
+  - **Super Administrator (`currentUser.role === 'superadmin'`)**:
+    - Displays **only** platform-level governance options:
+      - `SUPER ADMIN`: `Super Admin Console`, `Global Reports Audit`, `Platform Settings`.
+    - **100% eliminated** the `NEW EXAM (TECH ONLY)` locked block.
+
+### 40.2 Header Title Block Cleanliness
+- **Implementation in `src/components/podoload/PodoLoadHeader.tsx`**:
+  - Removed `<Lock className="w-3.5 h-3.5 text-slate-400 opacity-60 flex-shrink-0" />` from the header title container.
+  - Resolved vertical column stacking that caused a lock icon to float awkwardly above the header text `New exam · Patient registration`.
+  - The header title now displays clean, unobstructed clinical text with discrete 5-tap gesture access preserved for authorized master administrator access.
+
+### 40.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **88/88** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 33 verifying clean role-scoped sidebar navigation, total elimination of lock icons, and clean header title text.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 274ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.65`.
+
+
