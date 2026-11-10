@@ -1153,8 +1153,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                         </button>
                       </div>
                     </td>
-                  </tr>
-                )))}
+                    </tr>
+                  )))}
               </tbody>
             </table>
           </div>
@@ -1239,13 +1239,12 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                       </td>
                       <td>
                         <span
-                          className={`podo-badge ${
-                            item.status === 'active'
+                          className={`podo-badge ${item.status === 'active'
                               ? 'podo-badge-green'
                               : item.status === 'revoked'
-                              ? 'podo-badge-neutral'
-                              : 'podo-badge-neutral'
-                          }`}
+                                ? 'podo-badge-neutral'
+                                : 'podo-badge-neutral'
+                            }`}
                           style={{ fontSize: '0.68rem' }}
                         >
                           {item.status.toUpperCase()}
@@ -1457,13 +1456,12 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                     </td>
                     <td>
                       <span
-                        className={`podo-badge ${
-                          log.severity === 'security'
+                        className={`podo-badge ${log.severity === 'security'
                             ? 'podo-badge-neutral'
                             : log.severity === 'warning'
-                            ? 'podo-badge-neutral'
-                            : 'podo-badge-green'
-                        }`}
+                              ? 'podo-badge-neutral'
+                              : 'podo-badge-green'
+                          }`}
                         style={{ fontSize: '0.62rem' }}
                       >
                         {log.severity || 'info'}
