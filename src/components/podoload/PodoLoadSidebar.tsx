@@ -314,14 +314,15 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         )}
       </div>
 
-      {/* User Login Profile & Switcher Card */}
+      {/* User Login Profile Card (Static Read-Only Display - Zero Confusing Link) */}
       <div
-        className="podoload-sidebar-user-card"
-        onClick={() => {
-          if (onOpenUserSwitcher) onOpenUserSwitcher(currentUser?.role === 'superadmin' ? 'superadmin' : currentUser?.role === 'admin' ? 'admin' : 'technician');
+        className={`podoload-sidebar-user-card ${isSessionLocked ? 'clickable' : 'static'}`}
+        onClick={isSessionLocked ? () => {
+          if (onOpenUserSwitcher) onOpenUserSwitcher('technician');
           if (onCloseMobile) onCloseMobile();
-        }}
-        title={isSessionLocked ? 'Click to sign in to station' : 'Click to switch active user account'}
+        } : undefined}
+        style={{ cursor: isSessionLocked ? 'pointer' : 'default' }}
+        title={isSessionLocked ? 'Click to sign in to station' : `Active Station Operator: ${currentUser?.name}`}
       >
         {isSessionLocked ? (
           <div>
@@ -357,7 +358,9 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
             <div className="podoload-sidebar-user-name" style={{ marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {currentUser?.name}
             </div>
-            <div className="podoload-sidebar-user-sub">Click to switch login ▾</div>
+            <div className="podoload-sidebar-user-sub" style={{ color: '#64748b' }}>
+              {currentUser?.role === 'superadmin' ? 'Platform Authority' : currentUser?.role === 'admin' ? 'Hospital Authority' : 'Clinical Operator'}
+            </div>
           </>
         )}
       </div>

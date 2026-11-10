@@ -1365,4 +1365,37 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.65`.
 
+---
+
+## 41. Static Left Side Operator Identity & Zero Confusing Link (v1.0.66)
+
+### 41.1 Left Side Operator Identity Card Read-Only Enforcement
+- **Problem & Root Cause**:
+  - In `PodoLoadSidebar.tsx`, the bottom user profile card (`.podoload-sidebar-user-card`) was configured with `onClick` and `cursor: pointer` showing `Click to switch login ▾`.
+  - When logged in as `superadmin` (or `admin`), clicking this card called `onOpenUserSwitcher('superadmin')`. However, `PodoLoadApp.tsx` previously evaluated `if (mode === 'admin') setRoleModalAdminMode(true); else setRoleModalAdminMode(false);`, inadvertently falling back to Technician Voucher Login mode!
+  - This confused users who asked: *"left side option if i click superadmin option it shows technicial login which is get confused, hence dont give any link there just keep if necessary or remove that one also"*.
+- **Implementation & Architecture**:
+  - `src/components/podoload/PodoLoadSidebar.tsx`:
+    - Converted the bottom user profile card into a static, read-only status indicator during active sessions (`cursor: default`, zero `onClick` handler, zero link).
+    - Removed `Click to switch login ▾` subtext. Subtitle now displays clean status:
+      - For Super Admin: `Platform Authority`
+      - For Hospital Admin: `Hospital Authority`
+      - For Clinical Technician: `Clinical Operator`
+    - When the session is explicitly locked/signed out (`isSessionLocked`), the card acts as a standby prompt allowing one-click sign in.
+  - `src/components/podoload/podoload.css`:
+    - Updated `.podoload-sidebar-user-card` default cursor to `default`. Hover highlights are restricted to `.clickable` state (standby/signed-out only).
+  - `src/components/podoload/PodoLoadApp.tsx`:
+    - Fixed `onOpenUserSwitcher` handler to properly inspect `mode === 'superadmin'` and set `setRoleModalSuperAdminMode(true)`, ensuring role modals open to the correct domain when triggered from the top-right header role badge.
+  - `src/components/podoload/PodoLoadSuperAdmin.tsx`:
+    - Cleaned up the Super Administrator Master Console banner: removed confusing `[Technician View]` shortcut and redundant duplicate `[Sign Out]` button.
+
+### 41.2 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **89/89** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 34 verifying static read-only sidebar user card behavior and elimination of confusing technician login dialogs.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 274ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.66`.
+
+
 

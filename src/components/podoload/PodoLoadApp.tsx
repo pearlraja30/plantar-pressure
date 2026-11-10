@@ -1344,8 +1344,13 @@ export function PodoLoadApp() {
         onOpenUserSwitcher={(mode) => {
           if (mode === 'admin') {
             setRoleModalAdminMode(true);
+            setRoleModalSuperAdminMode(false);
+          } else if (mode === 'superadmin') {
+            setRoleModalAdminMode(false);
+            setRoleModalSuperAdminMode(true);
           } else {
             setRoleModalAdminMode(false);
+            setRoleModalSuperAdminMode(false);
           }
           setIsRoleModalOpen(true);
         }}
@@ -1372,7 +1377,19 @@ export function PodoLoadApp() {
           clinicName={activeHospital.name}
           currentUser={currentUser}
           isSessionLocked={isSessionLocked}
-          onOpenUserSwitcher={() => setIsRoleModalOpen(true)}
+          onOpenUserSwitcher={() => {
+            if (currentUser.role === 'superadmin') {
+              setRoleModalAdminMode(false);
+              setRoleModalSuperAdminMode(true);
+            } else if (currentUser.role === 'admin') {
+              setRoleModalAdminMode(true);
+              setRoleModalSuperAdminMode(false);
+            } else {
+              setRoleModalAdminMode(false);
+              setRoleModalSuperAdminMode(false);
+            }
+            setIsRoleModalOpen(true);
+          }}
           onLogout={handleLogout}
           onOpenAdmin={handleOpenAdminSection}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}

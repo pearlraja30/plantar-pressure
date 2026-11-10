@@ -2157,11 +2157,15 @@
   border-radius: 8px;
   background-color: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  cursor: pointer;
+  cursor: default;
   transition: all 0.15s ease;
 }
 
-.podoload-sidebar-user-card:hover {
+.podoload-sidebar-user-card.clickable {
+  cursor: pointer;
+}
+
+.podoload-sidebar-user-card.clickable:hover {
   background-color: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.25);
 }

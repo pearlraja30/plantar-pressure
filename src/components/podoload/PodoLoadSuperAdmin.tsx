@@ -434,26 +434,6 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
             <Building2 className="w-3.5 h-3.5 mr-1 inline" />
             Hospital Admin Portal
           </button>
-
-          <button
-            type="button"
-            className="podoload-btn-secondary podoload-btn-sm"
-            onClick={() => onSwitchRole('technician')}
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)' }}
-          >
-            <Users className="w-3.5 h-3.5 mr-1 inline" />
-            Technician View
-          </button>
-
-          <button
-            type="button"
-            className="podoload-btn-danger podoload-btn-sm"
-            onClick={onLogout}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Sign Out
-          </button>
         </div>
       </div>
 

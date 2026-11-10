@@ -4487,6 +4487,54 @@ it("Enforces Clean Role-Based Sidebar Navigation: Shows Only Role-Specific Menus
   expect(headerTitleRender.title).toBe("New exam · Patient registration");
 });
 
+console.log("\n--- SECTION 34: Static Left Side User Identity & Zero Confusing Link ---");
+
+it("Enforces Static Read-Only Sidebar User Card: Prevents Confusing Technician Login Popups When in Super Admin or Admin", () => {
+  // Sidebar user card behavior evaluation
+  const evaluateSidebarUserCard = (currentUser, isSessionLocked) => {
+    return {
+      isClickable: isSessionLocked,
+      cursor: isSessionLocked ? "pointer" : "default",
+      roleBadge: currentUser.role === "superadmin" ? "👑 Super Admin" : currentUser.role === "admin" ? "🛡️ Administrator" : "🔬 Technician",
+      roleSubtitle: isSessionLocked
+        ? "Click to Sign In ▾"
+        : currentUser.role === "superadmin"
+        ? "Platform Authority"
+        : currentUser.role === "admin"
+        ? "Hospital Authority"
+        : "Clinical Operator",
+      opensLoginModalOnCardClick: isSessionLocked,
+    };
+  };
+
+  // 1. Super Admin: Active session card MUST NOT be clickable and MUST NOT trigger modal
+  const superAdminCard = evaluateSidebarUserCard({ role: "superadmin", name: "Global Chief Administrator" }, false);
+  expect(superAdminCard.isClickable).toBe(false);
+  expect(superAdminCard.cursor).toBe("default");
+  expect(superAdminCard.roleSubtitle).toBe("Platform Authority");
+  expect(superAdminCard.opensLoginModalOnCardClick).toBe(false);
+
+  // 2. Hospital Admin: Active session card MUST NOT be clickable
+  const adminCard = evaluateSidebarUserCard({ role: "admin", name: "Dr. Specialist" }, false);
+  expect(adminCard.isClickable).toBe(false);
+  expect(adminCard.cursor).toBe("default");
+  expect(adminCard.roleSubtitle).toBe("Hospital Authority");
+  expect(adminCard.opensLoginModalOnCardClick).toBe(false);
+
+  // 3. Technician: Active session card MUST NOT be clickable
+  const techCard = evaluateSidebarUserCard({ role: "technician", name: "Tech. Specialist" }, false);
+  expect(techCard.isClickable).toBe(false);
+  expect(techCard.cursor).toBe("default");
+  expect(techCard.roleSubtitle).toBe("Clinical Operator");
+  expect(techCard.opensLoginModalOnCardClick).toBe(false);
+
+  // 4. Locked / Signed-out State: Standby mode CAN be clicked to sign in
+  const lockedCard = evaluateSidebarUserCard({ role: "technician", name: "Station Standby" }, true);
+  expect(lockedCard.isClickable).toBe(true);
+  expect(lockedCard.cursor).toBe("pointer");
+  expect(lockedCard.opensLoginModalOnCardClick).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
