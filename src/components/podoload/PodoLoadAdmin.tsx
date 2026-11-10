@@ -174,7 +174,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const [hubSelectedTechId, setHubSelectedTechId] = useState<string>(
-    techniciansList.length > 0 ? techniciansList[0].id : 'tech-user-01'
+    techniciansList.length > 0 ? techniciansList[0].id : ''
   );
 
   // Configurable Voucher Expiry & Rotation Policy State (Hours / Days / Minutes / Custom)
@@ -2009,7 +2009,18 @@ STEP 2: RETURNING STATION SESSIONS
                   </tr>
                 </thead>
                 <tbody>
-                  {techniciansList.map((tech) => (
+                  {techniciansList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                          <UserCheck className="w-8 h-8 text-gray-400" />
+                          <span style={{ fontWeight: 600, color: '#334155' }}>No Clinical Technicians Registered Yet</span>
+                          <span style={{ fontSize: '0.78rem' }}>Click "+ Add Clinical Technician" above to provision the first technician with an activation voucher.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    techniciansList.map((tech) => (
                     <tr key={tech.id}>
                       <td style={{ fontWeight: 700, color: '#0c2328' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -2174,7 +2185,7 @@ STEP 2: RETURNING STATION SESSIONS
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
               </div>

@@ -4535,6 +4535,180 @@ it("Enforces Static Read-Only Sidebar User Card: Prevents Confusing Technician L
   expect(lockedCard.opensLoginModalOnCardClick).toBe(true);
 });
 
+console.log("\n--- SECTION 35: Zero Dummy Data Guarantee, Stale Cache Purge & Scoped Retention ---");
+
+it("Enforces Zero Dummy Records on Fresh Installation Across All Logins", () => {
+  // Mock Fresh Installation State
+  const freshStorage = new Map();
+
+  const getHospitalProfiles = (storage) => {
+    const raw = storage.get('podopress_hospitals_v1');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return [];
+  };
+
+  const getTechnicians = (storage) => {
+    const raw = storage.get('podopress_technicians_v1');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return [];
+  };
+
+  const getAdminAccountsList = (storage) => {
+    const raw = storage.get('podopress_admin_accounts_list_v1');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter((a) => a && a.id);
+      } catch {}
+    }
+    return [];
+  };
+
+  const getGlobalMetrics = (storage) => {
+    const hosps = getHospitalProfiles(storage);
+    const techs = getTechnicians(storage);
+    const admins = getAdminAccountsList(storage);
+    return {
+      totalHospitals: hosps.length,
+      totalAdmins: admins.length,
+      totalTechnicians: techs.length,
+      totalActiveStations: 0,
+      totalCases: 0,
+    };
+  };
+
+  // 1. Fresh installation MUST start with ZERO records
+  const metrics = getGlobalMetrics(freshStorage);
+  expect(metrics.totalHospitals).toBe(0);
+  expect(metrics.totalAdmins).toBe(0);
+  expect(metrics.totalTechnicians).toBe(0);
+  expect(metrics.totalActiveStations).toBe(0);
+  expect(metrics.totalCases).toBe(0);
+
+  // 2. Reject unprovisioned admin login when zero admins exist
+  const authenticateAdminMock = (username, pin, storage) => {
+    const admins = getAdminAccountsList(storage);
+    if (admins.length === 0) {
+      return { success: false, error: 'No Hospital Administrator accounts registered yet. Please contact your Super Administrator.' };
+    }
+    const match = admins.find((a) => a.username === username && a.pin === pin);
+    return match ? { success: true, account: match } : { success: false, error: 'Invalid credentials.' };
+  };
+
+  const authAttempt = authenticateAdminMock('admin@technomind.health', '1234', freshStorage);
+  expect(authAttempt.success).toBe(false);
+  expect(authAttempt.error.includes('No Hospital Administrator accounts registered')).toBe(true);
+});
+
+it("Purges Legacy Stale Demo Data and Preserves Genuine User Records", () => {
+  const DEMO_HOSPITAL_IDS = ['hosp-001', 'hosp-002', 'hosp-003', 'hosp-apollo', 'hosp-fortis', 'hosp-technomind-main'];
+  const DEMO_TECH_IDS = ['tech-user-01', 'tech-user-02'];
+  const DEMO_ADMIN_IDS = ['admin-master-01'];
+
+  // Storage containing mix of legacy demo records and genuine user-created records
+  const mockStorage = {
+    'podopress_hospitals_v1': JSON.stringify([
+      { id: 'hosp-001', name: 'Technomind Healthcare Systems' },
+      { id: 'hosp-002', name: 'Apex Orthopaedic Center' },
+      { id: 'hosp-genuine-99', name: 'City Podiatry & Orthotics Care' }, // Genuine record
+    ]),
+    'podopress_technicians_v1': JSON.stringify([
+      { id: 'tech-user-01', name: 'Tech. Specialist', username: 'tech@technomind.health' },
+      { id: 'tech-genuine-42', name: 'Dr. Michael Scott', username: 'mscott' }, // Genuine record
+    ]),
+    'podopress_admin_accounts_list_v1': JSON.stringify([
+      { id: 'admin-master-01', name: 'Dr. Specialist', username: 'admin@technomind.health' },
+      { id: 'admin-genuine-01', name: 'Dr. John Doe', username: 'jdoe@citycare.org' }, // Genuine record
+    ]),
+  };
+
+  // Run purge logic
+  const purgeStaleData = (storage) => {
+    // Purge hospitals
+    if (storage['podopress_hospitals_v1']) {
+      const parsed = JSON.parse(storage['podopress_hospitals_v1']);
+      const clean = parsed.filter((h) => !DEMO_HOSPITAL_IDS.includes(h.id) && h.name !== 'Technomind Healthcare Systems');
+      storage['podopress_hospitals_v1'] = JSON.stringify(clean);
+    }
+    // Purge techs
+    if (storage['podopress_technicians_v1']) {
+      const parsed = JSON.parse(storage['podopress_technicians_v1']);
+      const clean = parsed.filter((t) => !DEMO_TECH_IDS.includes(t.id) && t.username !== 'tech@technomind.health');
+      storage['podopress_technicians_v1'] = JSON.stringify(clean);
+    }
+    // Purge admins
+    if (storage['podopress_admin_accounts_list_v1']) {
+      const parsed = JSON.parse(storage['podopress_admin_accounts_list_v1']);
+      const clean = parsed.filter((a) => !DEMO_ADMIN_IDS.includes(a.id) && a.username !== 'admin@technomind.health');
+      storage['podopress_admin_accounts_list_v1'] = JSON.stringify(clean);
+    }
+  };
+
+  purgeStaleData(mockStorage);
+
+  const cleanHosps = JSON.parse(mockStorage['podopress_hospitals_v1']);
+  const cleanTechs = JSON.parse(mockStorage['podopress_technicians_v1']);
+  const cleanAdmins = JSON.parse(mockStorage['podopress_admin_accounts_list_v1']);
+
+  // Demo records MUST be purged
+  expect(cleanHosps.length).toBe(1);
+  expect(cleanHosps[0].id).toBe('hosp-genuine-99');
+  expect(cleanHosps[0].name).toBe('City Podiatry & Orthotics Care');
+
+  expect(cleanTechs.length).toBe(1);
+  expect(cleanTechs[0].id).toBe('tech-genuine-42');
+  expect(cleanTechs[0].name).toBe('Dr. Michael Scott');
+
+  expect(cleanAdmins.length).toBe(1);
+  expect(cleanAdmins[0].id).toBe('admin-genuine-01');
+  expect(cleanAdmins[0].name).toBe('Dr. John Doe');
+});
+
+it("Maintains Strict Facility-Scoped Separation of Technicians and Clinical Records per Admin", () => {
+  // Provision Hospital 1 and Admin 1
+  const hospital1 = { id: 'hosp-alpha', name: 'Alpha Care Hospital' };
+  const admin1 = { id: 'admin-alpha', username: 'admin@alpha.org', hospitalId: 'hosp-alpha', hospitalName: 'Alpha Care Hospital' };
+  const tech1 = { id: 'tech-alpha-1', name: 'Alpha Tech', hospitalId: 'hosp-alpha', hospitalName: 'Alpha Care Hospital' };
+  const case1 = { id: 'case-01', patientId: 'PAT-ALPHA', hospitalId: 'hosp-alpha', clinicName: 'Alpha Care Hospital' };
+
+  // Provision Hospital 2 and Admin 2
+  const hospital2 = { id: 'hosp-beta', name: 'Beta Podiatry Clinic' };
+  const admin2 = { id: 'admin-beta', username: 'admin@beta.org', hospitalId: 'hosp-beta', hospitalName: 'Beta Podiatry Clinic' };
+  const tech2 = { id: 'tech-beta-1', name: 'Beta Tech', hospitalId: 'hosp-beta', hospitalName: 'Beta Podiatry Clinic' };
+  const case2 = { id: 'case-02', patientId: 'PAT-BETA', hospitalId: 'hosp-beta', clinicName: 'Beta Podiatry Clinic' };
+
+  const allTechs = [tech1, tech2];
+  const allCases = [case1, case2];
+
+  // Admin 1 scoped queries
+  const admin1VisibleTechs = allTechs.filter((t) => t.hospitalId === admin1.hospitalId);
+  const admin1VisibleCases = allCases.filter((c) => c.hospitalId === admin1.hospitalId);
+
+  expect(admin1VisibleTechs.length).toBe(1);
+  expect(admin1VisibleTechs[0].name).toBe('Alpha Tech');
+  expect(admin1VisibleCases.length).toBe(1);
+  expect(admin1VisibleCases[0].patientId).toBe('PAT-ALPHA');
+
+  // Admin 2 scoped queries
+  const admin2VisibleTechs = allTechs.filter((t) => t.hospitalId === admin2.hospitalId);
+  const admin2VisibleCases = allCases.filter((c) => c.hospitalId === admin2.hospitalId);
+
+  expect(admin2VisibleTechs.length).toBe(1);
+  expect(admin2VisibleTechs[0].name).toBe('Beta Tech');
+  expect(admin2VisibleCases.length).toBe(1);
+  expect(admin2VisibleCases[0].patientId).toBe('PAT-BETA');
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -456,8 +456,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
           <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0c2328', marginTop: '0.25rem' }}>
             {metrics.totalAdmins}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#16a34a', marginTop: '0.2rem' }}>
-            ✓ {metrics.totalHospitals} Distinct Hospital Profiles
+          <div style={{ fontSize: '0.7rem', color: metrics.totalHospitals > 0 ? '#16a34a' : '#64748b', marginTop: '0.2rem' }}>
+            {metrics.totalHospitals > 0 ? `✓ ${metrics.totalHospitals} Distinct Hospital Profiles` : '0 Registered Clinics (Add Hospital to begin)'}
           </div>
         </div>
 
@@ -486,8 +486,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
           <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0c2328', marginTop: '0.25rem' }}>
             {metrics.totalActiveStations}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#16a34a', marginTop: '0.2rem' }}>
-            ✓ Bound with Hardware Fingerprint & MAC
+          <div style={{ fontSize: '0.7rem', color: metrics.totalActiveStations > 0 ? '#16a34a' : '#64748b', marginTop: '0.2rem' }}>
+            {metrics.totalActiveStations > 0 ? '✓ Bound with Hardware Fingerprint & MAC' : '0 Bound Workstations'}
           </div>
         </div>
 
@@ -727,8 +727,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
 
           {/* Hospitals Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
-            {hospitalsList
-              .filter((h) => {
+            {(() => {
+              const filtered = hospitalsList.filter((h) => {
                 if (!hospSearchQuery.trim()) return true;
                 const q = hospSearchQuery.toLowerCase();
                 return (
@@ -738,8 +738,45 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                   (h.department && h.department.toLowerCase().includes(q)) ||
                   (h.address && h.address.toLowerCase().includes(q))
                 );
-              })
-              .map((hosp) => {
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div
+                    className="podoload-card"
+                    style={{
+                      gridColumn: '1 / -1',
+                      padding: '3rem 2rem',
+                      textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      backgroundColor: '#f8fafc',
+                      border: '1px dashed #cbd5e1',
+                    }}
+                  >
+                    <Building2 className="w-12 h-12 text-gray-400" />
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#334155' }}>
+                      No Hospitals or Clinics Registered Yet
+                    </div>
+                    <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '440px', margin: 0 }}>
+                      This is a fresh installation. Begin multi-tenant operations by registering your first hospital or clinic facility.
+                    </p>
+                    <button
+                      type="button"
+                      className="podoload-btn-primary"
+                      onClick={() => setIsRegisterHospModalOpen(true)}
+                      style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Register First Hospital & Clinic</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return filtered.map((hosp) => {
                 const tel = dbService.getHospitalTelemetry(hosp.id);
                 return (
                   <div
@@ -802,17 +839,15 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                             <Edit3 className="w-3 h-3 mr-1 inline" />
                             Edit
                           </button>
-                          {hospitalsList.length > 1 && (
-                            <button
-                              type="button"
-                              className="podoload-btn-xs"
-                              onClick={() => handleDeleteHospital(hosp)}
-                              title="Delete or Archive Hospital"
-                              style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="podoload-btn-xs"
+                            onClick={() => handleDeleteHospital(hosp)}
+                            title="Delete or Archive Hospital"
+                            style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
 
@@ -945,7 +980,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              });
+            })()}
           </div>
         </div>
       )}
@@ -1000,7 +1036,18 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {adminsList.map((adm) => (
+                {adminsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                        <Users className="w-8 h-8 text-gray-400" />
+                        <span style={{ fontWeight: 600, color: '#334155' }}>No Hospital Administrators Provisioned Yet</span>
+                        <span style={{ fontSize: '0.78rem' }}>Create an administrator to manage clinical staff for a registered facility.</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  adminsList.map((adm) => (
                   <tr key={adm.id}>
                     <td>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{adm.name}</div>
@@ -1059,7 +1106,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -1094,74 +1141,86 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {telemetryList.map((item, idx) => (
-                  <tr key={`${item.deviceId}-${idx}`}>
-                    <td>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.deviceId}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#0891b2', fontFamily: 'monospace' }}>
-                        MAC: {item.macAddress}
+                {telemetryList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                        <Laptop className="w-8 h-8 text-gray-400" />
+                        <span style={{ fontWeight: 600, color: '#334155' }}>No Bound Workstations Activated Yet</span>
+                        <span style={{ fontSize: '0.78rem' }}>When clinical technicians activate physical stations via vouchers, hardware telemetry appears here.</span>
                       </div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#0c2328' }}>{item.hospitalName}</div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{item.technicianName}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>User ID: {item.technicianUsername}</div>
-                    </td>
-                    <td>
-                      <code style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontSize: '0.76rem' }}>
-                        {item.activationCodeUsed}
-                      </code>
-                      <div style={{ fontSize: '0.65rem', color: item.isBurned ? '#b91c1c' : '#16a34a', marginTop: '2px' }}>
-                        {item.isBurned ? '🔴 Consumed (Burned)' : '🟢 Ready'}
-                      </div>
-                    </td>
-                    <td>
-                      {item.permitExpiresAt ? (
-                        <div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: item.isExpired ? '#dc2626' : '#16a34a' }}>
-                            {item.isExpired ? 'Permit Expired' : 'Active Permit'}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                            Expires: {new Date(item.permitExpiresAt).toLocaleString()}
-                          </div>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Standard Term</span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`podo-badge ${
-                          item.status === 'active'
-                            ? 'podo-badge-green'
-                            : item.status === 'revoked'
-                            ? 'podo-badge-neutral'
-                            : 'podo-badge-neutral'
-                        }`}
-                        style={{ fontSize: '0.68rem' }}
-                      >
-                        {item.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {item.status !== 'revoked' ? (
-                        <button
-                          type="button"
-                          className="podoload-btn-danger podoload-btn-xs"
-                          onClick={() => handleRevokeDevice(item.deviceId, item.technicianName)}
-                        >
-                          Revoke Station
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600 }}>
-                          Revoked
-                        </span>
-                      )}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  telemetryList.map((item, idx) => (
+                    <tr key={`${item.deviceId}-${idx}`}>
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.deviceId}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#0891b2', fontFamily: 'monospace' }}>
+                          MAC: {item.macAddress}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: '#0c2328' }}>{item.hospitalName}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{item.technicianName}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>User ID: {item.technicianUsername}</div>
+                      </td>
+                      <td>
+                        <code style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontSize: '0.76rem' }}>
+                          {item.activationCodeUsed}
+                        </code>
+                        <div style={{ fontSize: '0.65rem', color: item.isBurned ? '#b91c1c' : '#16a34a', marginTop: '2px' }}>
+                          {item.isBurned ? '🔴 Consumed (Burned)' : '🟢 Ready'}
+                        </div>
+                      </td>
+                      <td>
+                        {item.permitExpiresAt ? (
+                          <div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: item.isExpired ? '#dc2626' : '#16a34a' }}>
+                              {item.isExpired ? 'Permit Expired' : 'Active Permit'}
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              Expires: {new Date(item.permitExpiresAt).toLocaleString()}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Standard Term</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`podo-badge ${
+                            item.status === 'active'
+                              ? 'podo-badge-green'
+                              : item.status === 'revoked'
+                              ? 'podo-badge-neutral'
+                              : 'podo-badge-neutral'
+                          }`}
+                          style={{ fontSize: '0.68rem' }}
+                        >
+                          {item.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {item.status !== 'revoked' ? (
+                          <button
+                            type="button"
+                            className="podoload-btn-danger podoload-btn-xs"
+                            onClick={() => handleRevokeDevice(item.deviceId, item.technicianName)}
+                          >
+                            Revoke Station
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600 }}>
+                            Revoked
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1219,8 +1278,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {casesList
-                  .filter((c) => {
+                {(() => {
+                  const filtered = casesList.filter((c) => {
                     if (!searchQuery) return true;
                     const q = searchQuery.toLowerCase();
                     return (
@@ -1228,8 +1287,23 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                       c.patientId.toLowerCase().includes(q) ||
                       (c.clinicName && c.clinicName.toLowerCase().includes(q))
                     );
-                  })
-                  .map((c) => (
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileText className="w-8 h-8 text-gray-400" />
+                            <span style={{ fontWeight: 600, color: '#334155' }}>No Clinical Cases or Reports Logged Yet</span>
+                            <span style={{ fontSize: '0.78rem' }}>When technicians complete and save plantar pressure exams, global records appear here.</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((c) => (
                     <tr key={c.id}>
                       <td>
                         <span style={{ fontWeight: 700, color: '#0f766e' }}>{c.caseNumber}</span>
@@ -1241,7 +1315,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{c.clinicName || 'Technomind Healthcare'}</div>
+                        <div style={{ fontWeight: 600 }}>{c.clinicName || 'Clinic'}</div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Op: {c.operatorName || 'Clinical Tech'}</div>
                       </td>
                       <td style={{ fontSize: '0.74rem', color: '#334155' }}>
@@ -1279,7 +1353,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                         )}
                       </td>
                     </tr>
-                  ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

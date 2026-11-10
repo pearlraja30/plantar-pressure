@@ -1397,5 +1397,62 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.66`.
 
+---
+
+## 42. Zero Dummy Data Guarantee, Stale Cache Purge & Strict Facility-Scoped Retention (v1.0.67)
+
+### 42.1 Zero Dummy / Stale Data Guarantee on Fresh Installation
+- **Problem & Root Cause**:
+  - Fresh application installations and master consoles previously displayed pre-seeded mock clinic entities (`Technomind Healthcare Systems`, `Apex Orthopaedic`, `Metro Diabetes`, `Apollo`, `Fortis`), mock technicians (`Tech. Specialist` / `tech-user-01`), and mock administrators (`Dr. Specialist` / `admin-master-01`).
+  - The user explicitly requested: *"also remove all the dummy data for any logins superadmin/admin/technician, we need to keep only original data only not any stale data. fresh installation should have zero records. after login created keeps those respective records on the login which created followed by the admin and superadmin. maintain each admin wise accordingly"*.
+- **Implementation & Architecture**:
+  - `src/services/dbService.ts`:
+    - Set `export const DEFAULT_HOSPITALS: HospitalProfile[] = [];` (0 default hospitals).
+    - Set `export const DEFAULT_TECHNICIANS: TechnicianUser[] = [];` (0 default technicians).
+    - Initialized `EMPTY_HOSPITAL_PROFILE` safe fallback object to eliminate runtime `undefined` property crashes when 0 clinics are registered.
+    - Emptied all mock strings in `DEFAULT_SETTINGS.clinical`: `clinicName: ''`, `clinicAddress: ''`, `clinicContact: ''`, `clinicRegistrationNo: ''`, `clinicFooterText: ''`, `defaultDoctor: ''`, `defaultTechnician: ''`, `hospitalId: ''`.
+    - Cleaned `SYSTEM_ACCOUNTS` template sessions for `admin` and `technician`: fallback names set to generic role labels (`Hospital Administrator`, `Clinical Technician`) with empty `hospitalId` and `hospitalName`.
+    - Added automated cache purge logic (`purgeStaleDemoData()`) invoked upon `PodoPressDatabase` initialization:
+      - Strips legacy mock IDs (`hosp-001`, `hosp-002`, `hosp-003`, `hosp-apollo`, `hosp-fortis`, `hosp-technomind-main`, `tech-user-01`, `tech-user-02`, `admin-master-01`) from browser `localStorage`.
+      - Preserves genuine user-created hospitals, admins, and technicians without data loss.
+    - Updated `getActiveHospitalSync()` to safely return `EMPTY_HOSPITAL_PROFILE` when `hospitals.length === 0`.
+    - Updated `authenticateAdmin()`: completely eliminated hardcoded demo fallback (`admin@technomind.health` / `1234`). When 0 administrator accounts exist, returns clear guidance instructing the user to contact the Super Administrator.
+    - Updated `deleteHospital()`: removed artificial restriction `hospitals.length <= 1`, allowing full deletion of any registered hospital and resetting active hospital pointers cleanly.
+    - Updated `getSuperAdminGlobalMetrics()`: returns exact `hospitals.length` rather than artificially maxing with administrators.
+  - `src/components/podoload/PodoLoadSuperAdmin.tsx`:
+    - Implemented clean empty-state UI blocks for:
+      - **Tab 0 (Hospitals)**: Shows friendly dashed card with Building icon, empty state explanation, and `[+ Register First Hospital & Clinic]` button.
+      - **Tab 1 (Admins)**: Shows informative empty table row when 0 hospital administrators are provisioned.
+      - **Tab 2 (Workstation Telemetry)**: Shows clean empty row when 0 stations are activated.
+      - **Tab 3 (Global Clinical Reports)**: Shows clean empty row when 0 patient cases/reports exist.
+    - Updated KPI cards:
+      - Distinct Hospital Profiles badge displays `0 Registered Clinics (Add Hospital to begin)` when 0 clinics exist.
+      - Active Workstations badge displays `0 Bound Workstations` when 0 hardware bindings exist.
+    - Removed `{hospitalsList.length > 1 && (` constraint from hospital delete button, enabling removal of any hospital.
+  - `src/components/podoload/PodoLoadAdmin.tsx`:
+    - Updated Registered Technicians table to display clean empty state row when `techniciansList.length === 0`.
+    - Scoped technician default selector to fallback to `''` instead of `'tech-user-01'`.
+  - `src/components/podoload/PodoLoadHeader.tsx`:
+    - Set default prop fallbacks `doctorName = ''` and `clinicName = ''` (eliminating fallback to `Technomind Healthcare Systems` or `Dr. Specialist`).
+  - `src/components/podoload/PodoLoadRegistration.tsx`:
+    - Updated Referring Doctor placeholder from `Dr. Specialist / Clinic` to `Attending Physician / Clinic`.
+
+### 42.2 Strict Facility-Scoped Data Retention
+- Super Administrator (`superadmin@technomind.health` / `superadmin@123`) serves as the sole initial entry point.
+- Super Administrator registers genuine hospitals and provisions Hospital Administrators.
+- Each Hospital Administrator logs in and only has access to their facility's staff, workstations, patients, and reports.
+- Technicians activated under an administrator's hospital are bound strictly to that facility, ensuring complete multi-tenant clinical segregation.
+
+### 42.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **92/92** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 35 verifying:
+    1. Zero dummy records on fresh installation across all logins.
+    2. Stale cache purge logic (`purgeStaleDemoData`) stripping legacy demo IDs and preserving genuine user records.
+    3. Strict facility-scoped separation of technicians and clinical records per administrator.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 288ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.67`.
+
 
 

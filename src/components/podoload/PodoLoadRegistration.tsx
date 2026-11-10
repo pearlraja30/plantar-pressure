@@ -636,7 +636,7 @@ export const PodoLoadRegistration: React.FC<PodoLoadRegistrationProps> = ({
               <input
                 type="text"
                 className="podoload-input"
-                placeholder="Dr. Specialist / Clinic"
+                placeholder="Attending Physician / Clinic"
                 value={referringDoctor}
                 onChange={(e) => setReferringDoctor(e.target.value)}
               />

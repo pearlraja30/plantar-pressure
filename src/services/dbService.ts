@@ -127,16 +127,16 @@ export const DEFAULT_SETTINGS: SystemSettings = {
     account: 'clinic-admin@technomind.health',
   },
   clinical: {
-    clinicName: 'Technomind Healthcare Systems',
+    clinicName: '',
     clinicLogoUrl: '',
     logoPosition: 'Left',
-    clinicAddress: '100 Medical Center Blvd, Suite 400',
-    clinicContact: '+1 (800) 555-PODO · contact@technomind.health',
-    clinicRegistrationNo: 'NABH-CLINIC-2026-88',
-    clinicFooterText: 'Affiliated with National Institute of Podiatry · ISO 13485 Certified',
-    defaultDoctor: 'Dr. Specialist',
-    defaultTechnician: 'Tech. Specialist',
-    hospitalId: 'hosp-001',
+    clinicAddress: '',
+    clinicContact: '',
+    clinicRegistrationNo: '',
+    clinicFooterText: '',
+    defaultDoctor: '',
+    defaultTechnician: '',
+    hospitalId: '',
     role: 'admin',
   },
   stationSecurity: {
@@ -144,126 +144,26 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   },
 };
 
-export const DEFAULT_HOSPITALS: HospitalProfile[] = [
-  {
-    id: 'hosp-001',
-    name: 'Technomind Healthcare Systems',
-    code: 'TMH-CENTRAL',
-    logoUrl: '',
-    logoPosition: 'Left',
-    address: '100 Medical Center Blvd, Suite 400',
-    contact: '+1 (800) 555-PODO · www.technomind.health',
-    email: 'contact@technomind.health',
-    website: 'https://technomind.health',
-    registrationNo: 'NABH-CLINIC-2026-88',
-    department: 'Department of Podiatry & Lower Limb Biomechanics',
-    defaultDoctor: 'Dr. Specialist',
-    defaultTechnician: 'Tech. Specialist',
-    footerText: 'Affiliated with National Institute of Podiatry · ISO 13485 Certified',
-    doctors: [
-      { id: 'doc-01', name: 'Dr. Specialist', specialization: 'Consultant Podiatric Surgeon', licenseNo: 'MED-REG-8492' },
-      { id: 'doc-02', name: 'Dr. Sarah Jenkins', specialization: 'Diabetic Foot Care Specialist', licenseNo: 'MED-REG-9912' },
-    ],
-    technicians: [
-      { id: 'tech-01', name: 'Tech. Specialist', staffId: 'TECH-101' },
-      { id: 'tech-02', name: 'Alex Rivera', staffId: 'TECH-104' },
-    ],
-    activeUser: {
-      username: 'admin@technomind.health',
-      name: 'Dr. Specialist (Admin)',
-      role: 'admin',
-      loginTime: new Date().toISOString(),
-    },
-  },
-  {
-    id: 'hosp-002',
-    name: 'Apex Orthopaedic & Podiatry Center',
-    code: 'APEX-ORTHO',
-    logoUrl: '',
-    logoPosition: 'Centre',
-    address: '450 Northway Expressway, Sector 12',
-    contact: '+1 (888) 420-APEX · clinic@apexortho.clinic',
-    email: 'clinic@apexortho.clinic',
-    website: 'https://technomind.health',
-    registrationNo: 'JCI-APEX-2025-104',
-    department: 'Center for Foot & Ankle Reconstruction',
-    defaultDoctor: 'Dr. Marcus Vance',
-    defaultTechnician: 'Robert Chen',
-    footerText: 'JCI Accredited Center of Excellence in Orthopaedic Sports Medicine',
-    doctors: [
-      { id: 'doc-03', name: 'Dr. Marcus Vance', specialization: 'Senior Orthopaedic Podiatrist', licenseNo: 'APEX-DOC-012' },
-    ],
-    technicians: [
-      { id: 'tech-03', name: 'Robert Chen', staffId: 'TECH-APEX-01' },
-    ],
-  },
-  {
-    id: 'hosp-003',
-    name: 'Metro Diabetes & Preventive Foot Care',
-    code: 'METRO-FOOT',
-    logoUrl: '',
-    logoPosition: 'Left',
-    address: '78 Metro Boulevard, Floor 2',
-    contact: '+1 (800) 902-METRO · support@metrofoot.clinic',
-    email: 'support@metrofoot.clinic',
-    website: 'https://technomind.health',
-    registrationNo: 'STATE-LIC-9941-DF',
-    department: 'Preventive Diabetic Footwear & Biomechanics Lab',
-    defaultDoctor: 'Dr. Priya Sharma',
-    defaultTechnician: 'Kavita Rao',
-    footerText: 'Dedicated to Diabetic Wound Offloading & Preventive Podiatric Care',
-    doctors: [
-      { id: 'doc-04', name: 'Dr. Priya Sharma', specialization: 'Endocrine & Podiatric Clinician', licenseNo: 'METRO-DOC-08' },
-    ],
-    technicians: [
-      { id: 'tech-04', name: 'Kavita Rao', staffId: 'TECH-METRO-05' },
-    ],
-  },
-  {
-    id: 'hosp-apollo',
-    name: 'Apollo Hospitals Speciality Centre',
-    code: 'APOLLO',
-    logoUrl: '',
-    logoPosition: 'Left',
-    address: '154/11 Bannerghatta Road, Opposite IIM-B',
-    contact: '+91 (80) 2630-4050 · podiatry@apollohospitals.com',
-    email: 'podiatry@apollohospitals.com',
-    website: 'https://apollohospitals.com',
-    registrationNo: 'NABH-2026-APL-01',
-    department: 'Department of Diabetic Foot Surgery & Plantar Biomechanics',
-    defaultDoctor: 'Dr. Suresh Sundaram',
-    defaultTechnician: 'Ananya Sharma',
-    footerText: 'NABH Accredited Comprehensive Podiatric & Diabetic Limb Salvage Centre',
-    doctors: [
-      { id: 'doc-05', name: 'Dr. Suresh Sundaram', specialization: 'Senior Consultant Podiatrist', licenseNo: 'KMC-DOC-44821' },
-    ],
-    technicians: [
-      { id: 'tech-05', name: 'Ananya Sharma', staffId: 'TECH-APL-02' },
-    ],
-  },
-  {
-    id: 'hosp-fortis',
-    name: 'Fortis Healthcare & Podiatry Care',
-    code: 'FORTIS',
-    logoUrl: '',
-    logoPosition: 'Left',
-    address: 'Cunningham Road, Vasanth Nagar',
-    contact: '+91 (80) 4199-4444 · limbcare@fortishealthcare.com',
-    email: 'limbcare@fortishealthcare.com',
-    website: 'https://fortishealthcare.com',
-    registrationNo: 'JCI-NABH-FTS-2026',
-    department: 'Centre for Orthotics, Prosthetics & Foot Biomechanics',
-    defaultDoctor: 'Dr. Meenakshi Iyer',
-    defaultTechnician: 'Vikram Joshi',
-    footerText: 'JCI & NABH Accredited Multi-Speciality Foot & Ankle Institute',
-    doctors: [
-      { id: 'doc-06', name: 'Dr. Meenakshi Iyer', specialization: 'Consultant Orthopaedic Surgeon', licenseNo: 'FTS-DOC-1102' },
-    ],
-    technicians: [
-      { id: 'tech-06', name: 'Vikram Joshi', staffId: 'TECH-FTS-08' },
-    ],
-  },
-];
+export const EMPTY_HOSPITAL_PROFILE: HospitalProfile = {
+  id: '',
+  name: '',
+  code: '',
+  logoUrl: '',
+  logoPosition: 'Left',
+  address: '',
+  contact: '',
+  email: '',
+  website: '',
+  registrationNo: '',
+  department: '',
+  defaultDoctor: '',
+  defaultTechnician: '',
+  footerText: '',
+  doctors: [],
+  technicians: [],
+};
+
+export const DEFAULT_HOSPITALS: HospitalProfile[] = [];
 
 // Storage keys for local mirroring and instant synchronous hydration
 const LS_KEYS = {
@@ -310,59 +210,24 @@ export const DEFAULT_SUPER_ADMIN_ACCOUNT: SuperAdminAccount = {
 };
 
 export const DEFAULT_ADMIN_ACCOUNT: AdminAccount = {
-  id: 'admin-master-01',
-  name: 'Dr. Specialist',
-  username: 'admin@technomind.health',
-  pin: '1234',
-  hospitalId: 'hosp-technomind-main',
-  hospitalName: 'Technomind Healthcare Systems',
+  id: '',
+  name: 'Hospital Administrator',
+  username: '',
+  pin: '',
+  hospitalId: '',
+  hospitalName: '',
   role: 'admin',
-  phone: '+1 (800) 555-PODO',
-  email: 'admin@technomind.health',
+  phone: '',
+  email: '',
   createdAt: '2026-01-01T00:00:00.000Z',
   status: 'active',
-  recoveryKey: 'REC-TMH-9901',
-  isInitialSetupCompleted: true,
+  recoveryKey: '',
+  isInitialSetupCompleted: false,
   createdBy: 'superadmin',
   maxStationsAllowed: 10,
 };
 
-export const DEFAULT_TECHNICIANS: TechnicianUser[] = [
-  {
-    id: 'tech-user-01',
-    name: 'Tech. Specialist',
-    username: 'tech@technomind.health',
-    pin: '1234',
-    hospitalId: 'hosp-001',
-    hospitalName: 'Technomind Healthcare Systems',
-    role: 'technician',
-    status: 'active',
-    createdAt: '2026-01-15T08:00:00.000Z',
-    phone: '+1 (800) 555-PODO',
-    email: 'tech@technomind.health',
-    notes: 'Primary Clinical Lab Technician',
-    recoveryKey: 'REC-TECH-1001',
-    activationCode: 'TMH-TECH-1001',
-    isRegisteredOnDevice: true,
-  },
-  {
-    id: 'tech-user-02',
-    name: 'Kavita Rao',
-    username: 'kavita.rao',
-    pin: '1234',
-    hospitalId: 'hosp-003',
-    hospitalName: 'Metro Diabetes & Preventive Foot Care',
-    role: 'technician',
-    status: 'active',
-    createdAt: '2026-02-01T09:30:00.000Z',
-    phone: '+1 (800) 555-METRO',
-    email: 'kavita@metropodiatry.com',
-    notes: 'Outpatient Biomechanics Technician',
-    recoveryKey: 'REC-TECH-1002',
-    activationCode: 'METRO-TECH-2002',
-    isRegisteredOnDevice: false,
-  },
-];
+export const DEFAULT_TECHNICIANS: TechnicianUser[] = [];
 
 export interface SystemUserSession {
   username: string;
@@ -386,24 +251,24 @@ export const SYSTEM_ACCOUNTS: Record<'superadmin' | 'admin' | 'technician', Syst
     loginTime: new Date().toISOString(),
   },
   admin: {
-    username: 'admin@technomind.health',
-    name: 'Dr. Specialist',
+    username: '',
+    name: 'Hospital Administrator',
     role: 'admin',
     title: 'Hospital Administrator',
     badge: 'Administrator (Hospital Access)',
-    hospitalId: 'hosp-technomind-main',
-    hospitalName: 'Technomind Healthcare Systems',
+    hospitalId: '',
+    hospitalName: '',
     loginTime: new Date().toISOString(),
   },
   technician: {
-    username: 'tech@technomind.health',
-    name: 'Tech. Specialist',
+    username: '',
+    name: 'Clinical Technician',
     role: 'technician',
     title: 'Clinical Technician',
     badge: 'Clinical Operator (Reports)',
-    hospitalId: 'hosp-technomind-main',
-    hospitalName: 'Technomind Healthcare Systems',
-    technicianId: 'tech-user-01',
+    hospitalId: '',
+    hospitalName: '',
+    technicianId: '',
     loginTime: new Date().toISOString(),
   },
 };
@@ -412,7 +277,142 @@ class PodoPressDatabase {
   private dbPromise: Promise<IDBDatabase | null> | null = null;
 
   constructor() {
+    this.purgeStaleDemoData();
     this.initDatabase();
+  }
+
+  /**
+   * Zero Stale Data Guarantee:
+   * Strips all hardcoded legacy demo IDs and clinic profiles from browser storage.
+   * Ensures clean Day-1 installation state with 0 records until explicitly registered.
+   */
+  public purgeStaleDemoData(): void {
+    try {
+      const DEMO_HOSPITAL_IDS = [
+        'hosp-001',
+        'hosp-002',
+        'hosp-003',
+        'hosp-apollo',
+        'hosp-fortis',
+        'hosp-technomind-main',
+      ];
+      const DEMO_TECH_IDS = ['tech-user-01', 'tech-user-02'];
+      const DEMO_ADMIN_IDS = ['admin-master-01'];
+
+      // 1. Purge demo hospitals from localStorage
+      const rawHosps = localStorage.getItem(LS_KEYS.HOSPITALS);
+      if (rawHosps) {
+        try {
+          const parsedHosps = JSON.parse(rawHosps);
+          if (Array.isArray(parsedHosps)) {
+            const cleanHosps = parsedHosps.filter(
+              (h: any) => h && !DEMO_HOSPITAL_IDS.includes(h.id) && h.name !== 'Technomind Healthcare Systems'
+            );
+            localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(cleanHosps));
+          }
+        } catch {}
+      }
+
+      // 2. Purge demo technicians from localStorage
+      const rawTechs = localStorage.getItem(LS_KEYS.TECHNICIANS);
+      if (rawTechs) {
+        try {
+          const parsedTechs = JSON.parse(rawTechs);
+          if (Array.isArray(parsedTechs)) {
+            const cleanTechs = parsedTechs.filter(
+              (t: any) =>
+                t &&
+                !DEMO_TECH_IDS.includes(t.id) &&
+                t.username !== 'tech@technomind.health' &&
+                t.name !== 'Tech. Specialist'
+            );
+            localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(cleanTechs));
+          }
+        } catch {}
+      }
+
+      // 3. Purge demo admins from localStorage
+      const rawAdmins = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNTS_LIST);
+      if (rawAdmins) {
+        try {
+          const parsedAdmins = JSON.parse(rawAdmins);
+          if (Array.isArray(parsedAdmins)) {
+            const cleanAdmins = parsedAdmins.filter(
+              (a: any) =>
+                a &&
+                !DEMO_ADMIN_IDS.includes(a.id) &&
+                a.username !== 'admin@technomind.health' &&
+                a.name !== 'Dr. Specialist'
+            );
+            localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(cleanAdmins));
+          }
+        } catch {}
+      }
+
+      // 4. Purge demo single admin if it's the demo account
+      const rawSingleAdmin = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT);
+      if (rawSingleAdmin) {
+        try {
+          const single = JSON.parse(rawSingleAdmin);
+          if (
+            single &&
+            (DEMO_ADMIN_IDS.includes(single.id) ||
+              single.username === 'admin@technomind.health' ||
+              single.name === 'Dr. Specialist')
+          ) {
+            localStorage.removeItem(LS_KEYS.ADMIN_ACCOUNT);
+          }
+        } catch {}
+      }
+
+      // 5. Clean active hospital ID if it was demo
+      const activeHospId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID);
+      if (activeHospId && DEMO_HOSPITAL_IDS.includes(activeHospId)) {
+        localStorage.removeItem(LS_KEYS.ACTIVE_HOSPITAL_ID);
+      }
+
+      // 6. Clean active user if it was demo tech or demo admin
+      const rawUser = localStorage.getItem(LS_KEYS.ACTIVE_USER);
+      if (rawUser) {
+        try {
+          const u = JSON.parse(rawUser);
+          if (
+            u &&
+            (u.username === 'tech@technomind.health' ||
+              u.name === 'Tech. Specialist' ||
+              (u.role === 'admin' && u.name === 'Dr. Specialist'))
+          ) {
+            localStorage.removeItem(LS_KEYS.ACTIVE_USER);
+          }
+        } catch {}
+      }
+
+      // 7. Clean clinical settings if it was demo
+      const rawSettings = localStorage.getItem(LS_KEYS.SETTINGS);
+      if (rawSettings) {
+        try {
+          const s = JSON.parse(rawSettings);
+          if (
+            s &&
+            s.clinical &&
+            (s.clinical.clinicName === 'Technomind Healthcare Systems' ||
+              DEMO_HOSPITAL_IDS.includes(s.clinical.hospitalId))
+          ) {
+            s.clinical.clinicName = '';
+            s.clinical.clinicAddress = '';
+            s.clinical.clinicContact = '';
+            s.clinical.clinicRegistrationNo = '';
+            s.clinical.clinicFooterText = '';
+            s.clinical.defaultDoctor = '';
+            s.clinical.defaultTechnician = '';
+            s.clinical.hospitalId = '';
+            localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(s));
+          }
+        } catch {}
+      }
+    } catch {
+      // Safe guard
+    }
   }
 
   private initDatabase(): Promise<IDBDatabase | null> {
@@ -1180,7 +1180,7 @@ class PodoPressDatabase {
       const raw = localStorage.getItem(LS_KEYS.HOSPITALS);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {
       // Fallback
@@ -1194,6 +1194,9 @@ class PodoPressDatabase {
 
   public getActiveHospitalSync(): HospitalProfile {
     const list = this.getHospitalProfilesSync();
+    if (list.length === 0) {
+      return EMPTY_HOSPITAL_PROFILE;
+    }
     try {
       const activeUser = this.getActiveUserSync();
       if (activeUser && activeUser.role === 'admin' && activeUser.hospitalId) {
@@ -1206,8 +1209,8 @@ class PodoPressDatabase {
       }
     } catch {}
 
-    const activeId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) || (list[0] ? list[0].id : 'hosp-001');
-    return list.find((h) => h.id === activeId) || list[0];
+    const activeId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) || list[0].id;
+    return list.find((h) => h.id === activeId) || list[0] || EMPTY_HOSPITAL_PROFILE;
   }
 
   public async saveHospitalProfile(profile: HospitalProfile): Promise<void> {
@@ -1239,7 +1242,7 @@ class PodoPressDatabase {
         clinicContact: profile.contact || '',
         clinicRegistrationNo: profile.registrationNo || '',
         clinicFooterText: profile.footerText || '',
-        defaultDoctor: profile.defaultDoctor || 'Dr. Specialist',
+        defaultDoctor: profile.defaultDoctor || '',
         defaultTechnician: profile.defaultTechnician || '',
         hospitalId: profile.id,
       };
@@ -1252,6 +1255,9 @@ class PodoPressDatabase {
     userRole: 'admin' | 'doctor' | 'technician' = 'admin'
   ): Promise<HospitalProfile> {
     const list = this.getHospitalProfilesSync();
+    if (list.length === 0) {
+      return EMPTY_HOSPITAL_PROFILE;
+    }
     const target = list.find((h) => h.id === hospitalId) || list[0];
     try {
       localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, target.id);
@@ -1270,7 +1276,7 @@ class PodoPressDatabase {
       clinicContact: target.contact || '',
       clinicRegistrationNo: target.registrationNo || '',
       clinicFooterText: target.footerText || '',
-      defaultDoctor: target.defaultDoctor || 'Dr. Specialist',
+      defaultDoctor: target.defaultDoctor || '',
       defaultTechnician: target.defaultTechnician || '',
       hospitalId: target.id,
       role: userRole,
@@ -1279,7 +1285,7 @@ class PodoPressDatabase {
 
     target.activeUser = {
       username: `${userRole}@${target.code.toLowerCase()}.health`,
-      name: `${target.defaultDoctor} (${userRole.toUpperCase()})`,
+      name: `${target.defaultDoctor || 'Staff'} (${userRole.toUpperCase()})`,
       role: userRole,
       loginTime: new Date().toISOString(),
     };
@@ -1299,6 +1305,9 @@ class PodoPressDatabase {
 
   public setActiveHospitalIdSync(hospitalId: string): HospitalProfile {
     const list = this.getHospitalProfilesSync();
+    if (list.length === 0) {
+      return EMPTY_HOSPITAL_PROFILE;
+    }
     const target = list.find((h) => h.id === hospitalId) || list[0];
     try {
       localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, target.id);
@@ -1317,7 +1326,7 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.TECHNICIANS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           let updated = false;
           for (const t of parsed) {
             if (!t.activationCode) {
@@ -1336,10 +1345,9 @@ class PodoPressDatabase {
           return parsed;
         }
       }
-      localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(DEFAULT_TECHNICIANS));
-      return DEFAULT_TECHNICIANS;
+      return [];
     } catch {
-      return DEFAULT_TECHNICIANS;
+      return [];
     }
   }
 
@@ -2601,13 +2609,15 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNTS_LIST);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((a) => a && a.id);
+        }
       }
     } catch {
       // Fallback
     }
     const single = this.getAdminAccountSync();
-    return single ? [single] : [];
+    return single && single.id ? [single] : [];
   }
 
   public authenticateAdmin(
@@ -2712,25 +2722,10 @@ class PodoPressDatabase {
       return { success: false, error: 'Invalid Administrator User ID or Master Password.' };
     }
 
-    // Fallback if no admin account created yet: allow default credentials once for first-time onboarding
-    if ((cleanUser === 'admin@technomind.health' || cleanUser === 'admin' || !cleanUser) && (cleanPin === '1234' || cleanPin === 'admin')) {
-      clearLockout();
-      this.authorizeStationForAdmin(DEFAULT_ADMIN_ACCOUNT);
-      logAuditEvent(
-        'ADMIN_LOGIN_SUCCESS',
-        `Administrator ${DEFAULT_ADMIN_ACCOUNT.name} (User ID: ${DEFAULT_ADMIN_ACCOUNT.username}) successfully authenticated with initial credentials.`,
-        DEFAULT_ADMIN_ACCOUNT.username,
-        undefined,
-        'info',
-        'admin'
-      );
-      return { success: true, account: DEFAULT_ADMIN_ACCOUNT };
-    }
-
     recordFailedAttempt();
     logAuditEvent(
       'ADMIN_LOGIN_FAILED',
-      `Failed Administrator login attempt for User ID "${usernameOrEmail}". No account registered.`,
+      `Failed Administrator login attempt for User ID "${usernameOrEmail}". No Hospital Administrator accounts registered.`,
       usernameOrEmail,
       undefined,
       'security',
@@ -2739,7 +2734,7 @@ class PodoPressDatabase {
     if (lockoutState.failedAttempts >= 5) {
       return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please try again later.' };
     }
-    return { success: false, error: 'No administration account registered yet. Please create an administrator account first.' };
+    return { success: false, error: 'No Hospital Administrator accounts registered yet. Please contact your Super Administrator to register your hospital and provision your administrator account.' };
   }
 
   public updateAdminProfile(params: {
@@ -3067,14 +3062,14 @@ class PodoPressDatabase {
       address: hospitalData.address?.trim() || 'Clinical Center',
       department: hospitalData.department?.trim() || 'Department of Podiatry & Biomechanics',
       website: hospitalData.website?.trim() || 'https://technomind.health',
-      defaultDoctor: hospitalData.defaultDoctor?.trim() || 'Dr. Specialist',
+      defaultDoctor: hospitalData.defaultDoctor?.trim() || 'Attending Physician',
       defaultTechnician: hospitalData.defaultTechnician?.trim() || '',
       footerText: hospitalData.footerText?.trim() || 'Accredited Clinical Foot Care & Plantar Pressure Diagnostics',
       logoPosition: 'Left',
       doctors: [
         {
           id: 'doc-' + Math.random().toString(36).slice(2, 7),
-          name: hospitalData.defaultDoctor?.trim() || 'Dr. Specialist',
+          name: hospitalData.defaultDoctor?.trim() || 'Attending Physician',
           specialization: 'Consultant Podiatric Specialist',
           licenseNo: `MED-${cleanCode}-01`,
         },
@@ -3183,10 +3178,6 @@ class PodoPressDatabase {
    */
   public deleteHospital(hospitalId: string): { success: boolean; error?: string } {
     const hospitals = this.getHospitalProfilesSync();
-    if (hospitals.length <= 1) {
-      return { success: false, error: 'Cannot delete the only registered hospital.' };
-    }
-
     const target = hospitals.find((h) => h.id === hospitalId);
     if (!target) return { success: false, error: 'Hospital not found.' };
 
@@ -3194,7 +3185,11 @@ class PodoPressDatabase {
     try {
       localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(filtered));
       if (localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) === hospitalId) {
-        localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, filtered[0].id);
+        if (filtered.length > 0) {
+          localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, filtered[0].id);
+        } else {
+          localStorage.removeItem(LS_KEYS.ACTIVE_HOSPITAL_ID);
+        }
       }
     } catch {}
 
@@ -3358,7 +3353,7 @@ class PodoPressDatabase {
 
     return {
       totalAdmins: admins.length,
-      totalHospitals: Math.max(admins.length, hospitals.length),
+      totalHospitals: hospitals.length,
       totalTechnicians: technicians.length,
       totalActiveStations: activations.filter((a) => a.status === 'active').length,
       totalBoundDevices: activations.length,
