@@ -1194,3 +1194,75 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 316ms with 0 errors.
 - **Version Bump**: Bumped to `v1.0.62` across `package.json`, `package-lock.json`, and `dbService.ts`.
 - **CI/CD Build**: Pushed commit and tag `v1.0.62` to remote GitHub repository (`origin main --tags`).
+
+---
+
+## 38. Multi-Hospital Network Governance, Hospital Domain Administration & Strict Technician-Only Examination Separation (v1.0.63)
+
+### 38.1 Strict Role Separation: Examination Workflow vs Management & Governance
+- **Clinical Governance Requirement**:
+  - All patient examination and scanning processes (Registration → Foot Scanning / Optical Ingestion → Biomechanical Processing → Results Analysis) must be conducted **strictly by Clinical Technician accounts** (`technician` login).
+  - Hospital Administrators (`admin`) and Super Administrators (`superadmin`) do **NOT** conduct foot scans or patient examinations. Their roles are strictly **Account Management, Facility Administration & Multi-Clinic Governance**.
+  - When `admin` logs in, they land directly in the **Hospital Administration Console** (`admin`).
+  - When `superadmin` logs in, they land directly in the **Super Admin Governance Console** (`superadmin`).
+  - When `technician` logs in, they land directly in **New Exam: Registration** (`registration`).
+- **Clinical Technician Examination Notice Card (`PodoLoadApp.tsx`)**:
+  - If an `admin` or `superadmin` opens or attempts to access `registration`, `capture`, `process`, or `results`, the application blocks foot scanning and presents the dedicated **Clinical Technician Examination Notice** card:
+    - Explains that examination workflows are strictly restricted to Clinical Technicians.
+    - Displays active authenticated identity (e.g. `Dr. Specialist` - `Hospital Administrator`).
+    - Provides quick action: `[🔬 Switch to Clinical Technician Login]` to open the role modal.
+    - Provides quick action: `[🏛️ Return to Management Console]` to return to Hospital Management or Super Admin Console.
+- **Sidebar Role-Aware Dynamic Reorganization (`PodoLoadSidebar.tsx`)**:
+  - For `admin`:
+    - Top Section: `HOSPITAL MANAGEMENT` (Hospital & Profile, Database records, Settings & Hardware, Reports and cloud, Patient search).
+    - Secondary Section: `NEW EXAM` items marked with `🔒 Tech Only` badge. Clicking prompts user to switch to a Technician account.
+  - For `superadmin`:
+    - Top Section: `SUPER ADMIN` (Super Admin Console, Global Reports Audit, Platform Settings).
+    - Secondary Section: `NEW EXAM` marked with `🔒 Tech Only` badge.
+  - For `technician`:
+    - Top Section: `NEW EXAM` (Registration, Scan and process, Results, Report).
+    - Secondary Section: `RECORDS` (Patient search, Reports and cloud).
+    - Third Section: `ADMIN & SYSTEM` marked with `🔒 Admin` lock badge.
+
+### 38.2 Multi-Hospital Network Registration & Platform Governance (`PodoLoadSuperAdmin.tsx`)
+- **Multi-Hospital Network Tab (`Registered Hospitals & Clinics`)**:
+  - Added dedicated Tab 0 to Super Admin Console: `🏥 Registered Hospitals & Clinics ({hospitalsList.length})`.
+  - Filter and search bar by hospital name, code, city, and registration number.
+  - Live facility directory grid displaying:
+    - Hospital title, code badge (e.g. `TMH-CENTRAL`, `APEX-ORTHO`, `APOLLO`, `FORTIS`), NABH/accreditation number.
+    - Physical address, contact phone, contact email, and department.
+    - Assigned Administrators badge list with usernames.
+    - Real-time telemetry badges: Technicians count, Active Workstations count, and Patient Cases logged.
+    - Action buttons: `[✏️ Edit Profile]`, `[+ Add Admin]`, `[📋 Inspect Reports]`, and `[🗑️ Archive/Delete]`.
+- **Register New Hospital Modal**:
+  - Fields for Hospital Full Name, Code Prefix, NABH Registration No, Medical Department, Address, Contact Phone, Email, Website, Default Doctor, Default Technician, and Station License Quota.
+  - Inline Admin Provisioning option: allows Super Admin to simultaneously create the primary Hospital Administrator account for the new hospital.
+- **Edit Hospital Profile Modal**:
+  - Full modal allowing Super Admin to edit hospital details and cascaded updates.
+- **Admin Domain Scoping**:
+  - In "Provision Hospital Administrator" modal, hospital selection is now a dropdown of all registered hospitals (plus "+ Register a New Hospital..."), ensuring every admin is bound to a valid hospital entity.
+
+### 38.3 Multi-Hospital Data Engine & Cascading Updates (`src/services/dbService.ts`)
+- **Default Multi-Hospital Network**:
+  - Initialized with 5 realistic clinical hospitals:
+    1. `Technomind Healthcare Systems` (`TMH-CENTRAL`)
+    2. `Apex Orthopaedic & Podiatry Center` (`APEX-ORTHO`)
+    3. `Metro Diabetes & Preventive Foot Care` (`METRO-FOOT`)
+    4. `Apollo Hospitals Speciality Centre` (`APOLLO`)
+    5. `Fortis Healthcare & Podiatry Care` (`FORTIS`)
+- **`DatabaseService` Methods**:
+  - `registerHospital(data)`: Validates unique hospital name and code, persists profile to storage, and generates 21 CFR Part 11 audit event `SUPERADMIN_REGISTER_HOSPITAL`.
+  - `updateHospital(hospitalId, updates)`: Updates profile and cascades hospital name changes to all associated `AdminAccount` and `TechnicianUser` records.
+  - `deleteHospital(hospitalId)`: Safely archives hospital with validation preventing deletion of the sole remaining hospital.
+  - `getHospitalTelemetry(hospitalId)`: Calculates active admins, technicians, active workstations (via hardware telemetry matching), and patient cases.
+  - `getActiveHospitalSync()`: Dynamically matches the active admin's `hospitalId` / `hospitalName` to guarantee the admin manages their entire hospital domain.
+
+### 38.4 Quality Verification & Release Conformance
+- **Unit Test Battery**: Expanded to **85/85** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 31 verifying multi-hospital registration, cascade updating, and telemetry aggregation.
+  - Added Section 31 verifying admin domain binding and automated technician scoping.
+  - Added Section 31 verifying strict separation of clinical examination workflow vs administration.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 256ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.63`.

@@ -23,6 +23,13 @@ import {
   ShieldAlert,
   Server,
   Lock,
+  Edit3,
+  Phone,
+  Mail,
+  MapPin,
+  Activity,
+  Globe,
+  Stethoscope,
 } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
@@ -40,7 +47,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
   onSwitchRole,
   onOpenCase,
 }) => {
-  const [activeTab, setActiveTab] = useState<'admins' | 'activations' | 'reports' | 'audit' | 'export'>('admins');
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'admins' | 'activations' | 'reports' | 'audit' | 'export'>('hospitals');
+  const [hospitalsList, setHospitalsList] = useState<HospitalProfile[]>(() => dbService.getHospitalProfilesSync());
   const [adminsList, setAdminsList] = useState<AdminAccount[]>(() => dbService.getAdminAccountsListSync());
   const [telemetryList, setTelemetryList] = useState(() => dbService.getAllActivationsTelemetry());
   const [casesList, setCasesList] = useState<AnalysisCase[]>(() => dbService.getCasesSync());
@@ -49,7 +57,45 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
+  const [hospSearchQuery, setHospSearchQuery] = useState('');
   const [selectedHospitalFilter, setSelectedHospitalFilter] = useState('all');
+
+  // Register Hospital Modal state
+  const [isRegisterHospModalOpen, setIsRegisterHospModalOpen] = useState(false);
+  const [hospNameInput, setHospNameInput] = useState('');
+  const [hospCodeInput, setHospCodeInput] = useState('');
+  const [hospRegNoInput, setHospRegNoInput] = useState('');
+  const [hospDeptInput, setHospDeptInput] = useState('Department of Podiatry & Plantar Biomechanics');
+  const [hospAddressInput, setHospAddressInput] = useState('');
+  const [hospContactInput, setHospContactInput] = useState('');
+  const [hospEmailInput, setHospEmailInput] = useState('');
+  const [hospWebsiteInput, setHospWebsiteInput] = useState('');
+  const [hospDoctorInput, setHospDoctorInput] = useState('');
+  const [hospTechInput, setHospTechInput] = useState('');
+  const [hospQuotaInput, setHospQuotaInput] = useState('10');
+  const [hospAlsoCreateAdmin, setHospAlsoCreateAdmin] = useState(true);
+  const [hospAdminNameInput, setHospAdminNameInput] = useState('');
+  const [hospAdminUsernameInput, setHospAdminUsernameInput] = useState('');
+  const [hospAdminPinInput, setHospAdminPinInput] = useState('');
+  const [showHospAdminPin, setShowHospAdminPin] = useState(false);
+  const [registerHospError, setRegisterHospError] = useState<string | null>(null);
+  const [registerHospSuccess, setRegisterHospSuccess] = useState<string | null>(null);
+
+  // Edit Hospital Modal state
+  const [editingHospital, setEditingHospital] = useState<HospitalProfile | null>(null);
+  const [editHospName, setEditHospName] = useState('');
+  const [editHospCode, setEditHospCode] = useState('');
+  const [editHospRegNo, setEditHospRegNo] = useState('');
+  const [editHospDept, setEditHospDept] = useState('');
+  const [editHospAddress, setEditHospAddress] = useState('');
+  const [editHospContact, setEditHospContact] = useState('');
+  const [editHospEmail, setEditHospEmail] = useState('');
+  const [editHospWebsite, setEditHospWebsite] = useState('');
+  const [editHospDoctor, setEditHospDoctor] = useState('');
+  const [editHospTech, setEditHospTech] = useState('');
+  const [editHospFooter, setEditHospFooter] = useState('');
+  const [editHospError, setEditHospError] = useState<string | null>(null);
+  const [editHospSuccess, setEditHospSuccess] = useState<string | null>(null);
 
   // Create Admin Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -71,6 +117,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
   const [resetPinSuccess, setResetPinSuccess] = useState<string | null>(null);
 
   const refreshAllData = () => {
+    setHospitalsList(dbService.getHospitalProfilesSync());
     setAdminsList(dbService.getAdminAccountsListSync());
     setTelemetryList(dbService.getAllActivationsTelemetry());
     setCasesList(dbService.getCasesSync());
@@ -81,6 +128,132 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
   useEffect(() => {
     refreshAllData();
   }, []);
+
+  const handleRegisterHospitalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegisterHospError(null);
+    setRegisterHospSuccess(null);
+
+    if (!hospNameInput.trim()) {
+      setRegisterHospError('Hospital name is required.');
+      return;
+    }
+
+    const result = dbService.registerHospital({
+      name: hospNameInput.trim(),
+      code: hospCodeInput.trim(),
+      registrationNo: hospRegNoInput.trim(),
+      department: hospDeptInput.trim(),
+      address: hospAddressInput.trim(),
+      contact: hospContactInput.trim(),
+      email: hospEmailInput.trim(),
+      website: hospWebsiteInput.trim(),
+      defaultDoctor: hospDoctorInput.trim() || undefined,
+      defaultTechnician: hospTechInput.trim() || undefined,
+      maxStationsAllowed: Number(hospQuotaInput) || 10,
+    });
+
+    if (!result.success || !result.hospital) {
+      setRegisterHospError(result.error || 'Failed to register hospital.');
+      return;
+    }
+
+    // Optional: automatically provision primary admin for this hospital
+    if (hospAlsoCreateAdmin && hospAdminUsernameInput.trim() && hospAdminPinInput.trim()) {
+      dbService.createHospitalAdmin({
+        name: hospAdminNameInput.trim() || `Admin (${result.hospital.name})`,
+        username: hospAdminUsernameInput.trim(),
+        pin: hospAdminPinInput.trim(),
+        hospitalName: result.hospital.name,
+        hospitalCode: result.hospital.code,
+        phone: hospContactInput.trim(),
+        email: hospEmailInput.trim() || hospAdminUsernameInput.trim(),
+        maxStationsAllowed: Number(hospQuotaInput) || 10,
+      });
+    }
+
+    setRegisterHospSuccess(`Hospital "${result.hospital.name}" (${result.hospital.code}) registered successfully!`);
+    setTimeout(() => {
+      setIsRegisterHospModalOpen(false);
+      setHospNameInput('');
+      setHospCodeInput('');
+      setHospRegNoInput('');
+      setHospAddressInput('');
+      setHospContactInput('');
+      setHospEmailInput('');
+      setHospWebsiteInput('');
+      setHospDoctorInput('');
+      setHospTechInput('');
+      setHospAdminNameInput('');
+      setHospAdminUsernameInput('');
+      setHospAdminPinInput('');
+      setRegisterHospSuccess(null);
+      refreshAllData();
+    }, 1200);
+  };
+
+  const handleEditHospitalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHospital) return;
+    setEditHospError(null);
+    setEditHospSuccess(null);
+
+    const res = dbService.updateHospital(editingHospital.id, {
+      name: editHospName.trim(),
+      code: editHospCode.trim().toUpperCase(),
+      registrationNo: editHospRegNo.trim(),
+      department: editHospDept.trim(),
+      address: editHospAddress.trim(),
+      contact: editHospContact.trim(),
+      email: editHospEmail.trim(),
+      website: editHospWebsite.trim(),
+      defaultDoctor: editHospDoctor.trim() || undefined,
+      defaultTechnician: editHospTech.trim() || undefined,
+      footerText: editHospFooter.trim() || undefined,
+    });
+
+    if (!res.success) {
+      setEditHospError(res.error || 'Failed to update hospital.');
+      return;
+    }
+
+    setEditHospSuccess(`Hospital "${editHospName}" updated successfully.`);
+    setTimeout(() => {
+      setEditingHospital(null);
+      setEditHospSuccess(null);
+      refreshAllData();
+    }, 1000);
+  };
+
+  const handleDeleteHospital = (hosp: HospitalProfile) => {
+    const conf = confirm(
+      `Are you sure you want to delete / archive hospital "${hosp.name}" (${hosp.code})? This will unbind related records.`
+    );
+    if (!conf) return;
+    const res = dbService.deleteHospital(hosp.id);
+    if (!res.success) {
+      alert(res.error || 'Failed to delete hospital.');
+      return;
+    }
+    refreshAllData();
+  };
+
+  const openEditHospitalModal = (hosp: HospitalProfile) => {
+    setEditingHospital(hosp);
+    setEditHospName(hosp.name);
+    setEditHospCode(hosp.code);
+    setEditHospRegNo(hosp.registrationNo || '');
+    setEditHospDept(hosp.department || '');
+    setEditHospAddress(hosp.address || '');
+    setEditHospContact(hosp.contact || '');
+    setEditHospEmail(hosp.email || '');
+    setEditHospWebsite(hosp.website || '');
+    setEditHospDoctor(hosp.defaultDoctor || '');
+    setEditHospTech(hosp.defaultTechnician || '');
+    setEditHospFooter(hosp.footerText || '');
+    setEditHospError(null);
+    setEditHospSuccess(null);
+  };
 
   const handleCreateAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,6 +555,27 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
       >
         <button
           type="button"
+          onClick={() => setActiveTab('hospitals')}
+          style={{
+            padding: '0.65rem 1rem',
+            border: 'none',
+            borderBottom: activeTab === 'hospitals' ? '3px solid #0f766e' : '3px solid transparent',
+            backgroundColor: 'transparent',
+            fontWeight: activeTab === 'hospitals' ? 700 : 500,
+            color: activeTab === 'hospitals' ? '#0f766e' : '#64748b',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+          }}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Registered Hospitals & Clinics ({hospitalsList.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('admins')}
           style={{
             padding: '0.65rem 1rem',
@@ -397,8 +591,8 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
             gap: '0.4rem',
           }}
         >
-          <Building2 className="w-4 h-4" />
-          <span>Hospital Administrators & Clinics ({adminsList.length})</span>
+          <Users className="w-4 h-4" />
+          <span>Hospital Administrators ({adminsList.length})</span>
         </button>
 
         <button
@@ -485,6 +679,296 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
           <span>System Backup & Export</span>
         </button>
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 0: REGISTERED HOSPITALS & CLINICS                                     */}
+      {/* ========================================================================= */}
+      {activeTab === 'hospitals' && (
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1rem',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c2328' }}>
+                Registered Hospitals & Clinical Facilities ({hospitalsList.length})
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                Overall managed by Super Administrator. Each Hospital Administrator manages their assigned hospital domain, technicians, and workstations.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <Search className="w-4 h-4 text-gray-400" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  className="podoload-input"
+                  placeholder="Search hospital, code, city..."
+                  value={hospSearchQuery}
+                  onChange={(e) => setHospSearchQuery(e.target.value)}
+                  style={{ paddingLeft: '32px', width: '230px', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={() => {
+                  setHospNameInput('');
+                  setHospCodeInput('');
+                  setHospRegNoInput('');
+                  setHospAddressInput('');
+                  setHospContactInput('');
+                  setHospEmailInput('');
+                  setHospWebsiteInput('');
+                  setHospDoctorInput('');
+                  setHospTechInput('');
+                  setHospAdminNameInput('');
+                  setHospAdminUsernameInput('');
+                  setHospAdminPinInput('');
+                  setRegisterHospError(null);
+                  setRegisterHospSuccess(null);
+                  setIsRegisterHospModalOpen(true);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register New Hospital</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Hospitals Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
+            {hospitalsList
+              .filter((h) => {
+                if (!hospSearchQuery.trim()) return true;
+                const q = hospSearchQuery.toLowerCase();
+                return (
+                  h.name.toLowerCase().includes(q) ||
+                  h.code.toLowerCase().includes(q) ||
+                  (h.registrationNo && h.registrationNo.toLowerCase().includes(q)) ||
+                  (h.department && h.department.toLowerCase().includes(q)) ||
+                  (h.address && h.address.toLowerCase().includes(q))
+                );
+              })
+              .map((hosp) => {
+                const tel = dbService.getHospitalTelemetry(hosp.id);
+                return (
+                  <div
+                    key={hosp.id}
+                    className="podoload-card"
+                    style={{
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      border: '1px solid #e2e8f0',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div>
+                      {/* Header */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.65rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '8px',
+                              backgroundColor: '#f0fdfa',
+                              border: '1px solid #99f6e4',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#0f766e',
+                              fontWeight: 800,
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            {hosp.code.slice(0, 3)}
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                              {hosp.name}
+                            </h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
+                              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.65rem' }}>
+                                {hosp.code}
+                              </span>
+                              {hosp.registrationNo && (
+                                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                  Reg: {hosp.registrationNo}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <button
+                            type="button"
+                            className="podoload-btn-secondary podoload-btn-xs"
+                            onClick={() => openEditHospitalModal(hosp)}
+                            title="Edit Hospital Profile"
+                          >
+                            <Edit3 className="w-3 h-3 mr-1 inline" />
+                            Edit
+                          </button>
+                          {hospitalsList.length > 1 && (
+                            <button
+                              type="button"
+                              className="podoload-btn-xs"
+                              onClick={() => handleDeleteHospital(hosp)}
+                              title="Delete or Archive Hospital"
+                              style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Department & Address */}
+                      {hosp.department && (
+                        <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#0891b2', marginBottom: '0.35rem' }}>
+                          {hosp.department}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: '0.74rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '0.85rem' }}>
+                        {hosp.address && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hosp.address}</span>
+                          </div>
+                        )}
+                        {hosp.contact && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            <span>{hosp.contact}</span>
+                          </div>
+                        )}
+                        {hosp.email && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            <span>{hosp.email}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Administrators list */}
+                      <div style={{ padding: '0.55rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', marginBottom: '0.85rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                            Assigned Administrators ({tel.adminsCount})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewAdminHospitalName(hosp.name);
+                              setNewAdminHospitalCode(hosp.code);
+                              setNewAdminName('');
+                              setNewAdminUsername('');
+                              setNewAdminPin('');
+                              setCreateAdminError(null);
+                              setCreateAdminSuccess(null);
+                              setIsCreateModalOpen(true);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#0f766e',
+                              cursor: 'pointer',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Add Admin</span>
+                          </button>
+                        </div>
+
+                        {tel.admins.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                            {tel.admins.map((adm) => (
+                              <span
+                                key={adm.id}
+                                className="podo-badge podo-badge-neutral"
+                                style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                              >
+                                <ShieldCheck className="w-3 h-3 text-teal-600" />
+                                <strong>{adm.name}</strong> ({adm.username})
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontStyle: 'italic' }}>
+                            No administrator assigned yet. Click "Add Admin" to provision.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Telemetry KPI Strip + Quick Action */}
+                    <div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: '0.5rem',
+                          padding: '0.55rem 0.4rem',
+                          backgroundColor: '#f1f5f9',
+                          borderRadius: '6px',
+                          textAlign: 'center',
+                          marginBottom: '0.75rem',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Technicians</div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{tel.techniciansCount}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Active Stations</div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f766e' }}>{tel.activeWorkstationsCount}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Cases Logged</div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0891b2' }}>{tel.casesCount}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="podoload-btn-secondary podoload-btn-xs"
+                          onClick={() => {
+                            setSelectedHospitalFilter(hosp.name);
+                            setActiveTab('reports');
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                          <FileText className="w-3 h-3" />
+                          <span>Inspect Reports</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: HOSPITAL ADMINISTRATORS & CLINICS                                  */}
@@ -993,15 +1477,31 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
             <form onSubmit={handleCreateAdminSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label className="podoload-label">Hospital / Clinic Name *</label>
-                  <input
-                    type="text"
-                    required
-                    className="podoload-input"
-                    placeholder="e.g. Apollo Podiatry Institute"
+                  <label className="podoload-label">Assigned Hospital Domain *</label>
+                  <select
+                    className="podoload-select"
                     value={newAdminHospitalName}
-                    onChange={(e) => setNewAdminHospitalName(e.target.value)}
-                  />
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__NEW__') {
+                        setIsCreateModalOpen(false);
+                        setIsRegisterHospModalOpen(true);
+                      } else {
+                        const found = hospitalsList.find((h) => h.name === val);
+                        setNewAdminHospitalName(val);
+                        if (found) setNewAdminHospitalCode(found.code);
+                      }
+                    }}
+                    required
+                  >
+                    <option value="" disabled>Select registered hospital domain...</option>
+                    {hospitalsList.map((h) => (
+                      <option key={h.id} value={h.name}>
+                        {h.name} ({h.code})
+                      </option>
+                    ))}
+                    <option value="__NEW__">+ Register a New Hospital...</option>
+                  </select>
                 </div>
                 <div>
                   <label className="podoload-label">Hospital Code Prefix</label>
@@ -1120,6 +1620,467 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                 </button>
                 <button type="submit" className="podoload-btn-primary podoload-btn-sm">
                   Create Administrator Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: REGISTER NEW HOSPITAL                                              */}
+      {/* ========================================================================= */}
+      {isRegisterHospModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="podoload-modal-container"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '620px',
+              width: '100%',
+              padding: '1.5rem',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building2 className="w-5 h-5 text-teal-600" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  Register New Hospital or Healthcare System
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRegisterHospModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {registerHospError && (
+              <div style={{ padding: '0.65rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', fontSize: '0.78rem', marginBottom: '1rem' }}>
+                {registerHospError}
+              </div>
+            )}
+
+            {registerHospSuccess && (
+              <div style={{ padding: '0.65rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#166534', fontSize: '0.78rem', marginBottom: '1rem' }}>
+                {registerHospSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleRegisterHospitalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Hospital / Clinic Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="podoload-input"
+                    placeholder="e.g. Manipal Institute of Podiatry"
+                    value={hospNameInput}
+                    onChange={(e) => {
+                      setHospNameInput(e.target.value);
+                      if (!hospCodeInput) {
+                        const code = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase();
+                        setHospCodeInput(code);
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Hospital Code Prefix</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    placeholder="e.g. MANIPAL"
+                    value={hospCodeInput}
+                    onChange={(e) => setHospCodeInput(e.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">NABH / Accreditation Reg No</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    placeholder="e.g. NABH-2026-MED-49"
+                    value={hospRegNoInput}
+                    onChange={(e) => setHospRegNoInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Station License Quota</label>
+                  <select
+                    className="podoload-select"
+                    value={hospQuotaInput}
+                    onChange={(e) => setHospQuotaInput(e.target.value)}
+                  >
+                    <option value="3">3 Stations (Clinic)</option>
+                    <option value="5">5 Stations (Hospital)</option>
+                    <option value="10">10 Stations (Center)</option>
+                    <option value="25">25 Stations (Enterprise)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="podoload-label">Medical Department / Center</label>
+                <input
+                  type="text"
+                  className="podoload-input"
+                  placeholder="e.g. Department of Diabetic Foot Surgery & Plantar Biomechanics"
+                  value={hospDeptInput}
+                  onChange={(e) => setHospDeptInput(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="podoload-label">Physical Facility Address</label>
+                <input
+                  type="text"
+                  className="podoload-input"
+                  placeholder="e.g. 98/2 Health City Expressway, Sector 4"
+                  value={hospAddressInput}
+                  onChange={(e) => setHospAddressInput(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Contact Phone</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    placeholder="+91 (80) 4920-1000"
+                    value={hospContactInput}
+                    onChange={(e) => setHospContactInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Official Email</label>
+                  <input
+                    type="email"
+                    className="podoload-input"
+                    placeholder="podiatry@manipal.health"
+                    value={hospEmailInput}
+                    onChange={(e) => setHospEmailInput(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Head Podiatrist / Doctor</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    placeholder="e.g. Dr. Ramesh Gupta"
+                    value={hospDoctorInput}
+                    onChange={(e) => setHospDoctorInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Lead Clinical Technician</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    placeholder="e.g. Priya Sharma"
+                    value={hospTechInput}
+                    onChange={(e) => setHospTechInput(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Inline Admin Provisioning Box */}
+              <div
+                style={{
+                  padding: '0.85rem',
+                  backgroundColor: '#f0fdfa',
+                  border: '1px solid #99f6e4',
+                  borderRadius: '8px',
+                  marginTop: '0.35rem',
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, color: '#0f766e', fontSize: '0.82rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={hospAlsoCreateAdmin}
+                    onChange={(e) => setHospAlsoCreateAdmin(e.target.checked)}
+                    style={{ accentColor: '#0f766e' }}
+                  />
+                  <span>Provision Primary Hospital Administrator for this Hospital</span>
+                </label>
+
+                {hospAlsoCreateAdmin && (
+                  <div style={{ marginTop: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      <div>
+                        <label className="podoload-label">Admin Full Name</label>
+                        <input
+                          type="text"
+                          className="podoload-input"
+                          placeholder="e.g. Dr. Director"
+                          value={hospAdminNameInput}
+                          onChange={(e) => setHospAdminNameInput(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="podoload-label">Admin Username / Login ID *</label>
+                        <input
+                          type="text"
+                          className="podoload-input"
+                          placeholder="e.g. admin@manipal.health"
+                          value={hospAdminUsernameInput}
+                          onChange={(e) => setHospAdminUsernameInput(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="podoload-label">Master Password / PIN (Min 4 chars) *</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showHospAdminPin ? 'text' : 'password'}
+                          minLength={4}
+                          className="podoload-input"
+                          placeholder="Set administrator PIN"
+                          value={hospAdminPinInput}
+                          onChange={(e) => setHospAdminPinInput(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowHospAdminPin(!showHospAdminPin)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                          }}
+                        >
+                          {showHospAdminPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="podoload-btn-secondary podoload-btn-sm"
+                  onClick={() => setIsRegisterHospModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="podoload-btn-primary podoload-btn-sm">
+                  Register Hospital
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT HOSPITAL PROFILE                                              */}
+      {/* ========================================================================= */}
+      {editingHospital && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="podoload-modal-container"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '600px',
+              width: '100%',
+              padding: '1.5rem',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Edit3 className="w-5 h-5 text-teal-600" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  Edit Hospital Profile: {editingHospital.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingHospital(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {editHospError && (
+              <div style={{ padding: '0.65rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', fontSize: '0.78rem', marginBottom: '1rem' }}>
+                {editHospError}
+              </div>
+            )}
+
+            {editHospSuccess && (
+              <div style={{ padding: '0.65rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#166534', fontSize: '0.78rem', marginBottom: '1rem' }}>
+                {editHospSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleEditHospitalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Hospital Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="podoload-input"
+                    value={editHospName}
+                    onChange={(e) => setEditHospName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Hospital Code Prefix *</label>
+                  <input
+                    type="text"
+                    required
+                    className="podoload-input"
+                    value={editHospCode}
+                    onChange={(e) => setEditHospCode(e.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Registration / NABH Number</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={editHospRegNo}
+                    onChange={(e) => setEditHospRegNo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Medical Department</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={editHospDept}
+                    onChange={(e) => setEditHospDept(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="podoload-label">Address</label>
+                <input
+                  type="text"
+                  className="podoload-input"
+                  value={editHospAddress}
+                  onChange={(e) => setEditHospAddress(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Contact Phone</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={editHospContact}
+                    onChange={(e) => setEditHospContact(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Official Email</label>
+                  <input
+                    type="email"
+                    className="podoload-input"
+                    value={editHospEmail}
+                    onChange={(e) => setEditHospEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="podoload-label">Default Doctor</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={editHospDoctor}
+                    onChange={(e) => setEditHospDoctor(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="podoload-label">Default Technician</label>
+                  <input
+                    type="text"
+                    className="podoload-input"
+                    value={editHospTech}
+                    onChange={(e) => setEditHospTech(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="podoload-label">Clinical Report Footer Banner</label>
+                <input
+                  type="text"
+                  className="podoload-input"
+                  placeholder="e.g. NABH Accredited Comprehensive Podiatry & Plantar Pressure Centre"
+                  value={editHospFooter}
+                  onChange={(e) => setEditHospFooter(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="podoload-btn-secondary podoload-btn-sm"
+                  onClick={() => setEditingHospital(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="podoload-btn-primary podoload-btn-sm">
+                  Save Changes
                 </button>
               </div>
             </form>

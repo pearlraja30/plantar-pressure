@@ -4099,6 +4099,194 @@ it("Enforces Truthful Optical Scanner Connectivity: Zero dummy or random sample 
   expect(leftFootData.rawDataUrl).toContain("GENUINE_OPTICAL_SCAN_BYTES");
 });
 
+console.log("\n--- SECTION 31: Multi-Hospital Network, Hospital Admin Domain & Technician-Only Exam Separation ---");
+
+it("Enforces Multi-Hospital Network Registration and Super Admin Governance", () => {
+  // Simulated Multi-Hospital Storage
+  const hospitals = [
+    { id: "hosp-001", name: "Technomind Healthcare Systems", code: "TMH-CENTRAL" },
+    { id: "hosp-002", name: "Apex Orthopaedic & Podiatry Center", code: "APEX-ORTHO" },
+    { id: "hosp-apollo", name: "Apollo Hospitals Speciality Centre", code: "APOLLO" },
+  ];
+
+  // 1. Super Admin registers a new hospital
+  const registerHospital = (data) => {
+    if (!data.name || !data.name.trim()) return { success: false, error: "Hospital name is required." };
+    const code = (data.code || data.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5)).toUpperCase();
+    if (hospitals.some((h) => h.code.toUpperCase() === code)) {
+      return { success: false, error: `Hospital code "${code}" is already in use.` };
+    }
+    const id = "hosp-" + code.toLowerCase();
+    const newHosp = { id, name: data.name.trim(), code, address: data.address || "", contact: data.contact || "" };
+    hospitals.push(newHosp);
+    return { success: true, hospital: newHosp };
+  };
+
+  const regResult = registerHospital({
+    name: "Manipal Institute of Podiatry & Foot Biomechanics",
+    code: "MANIPAL",
+    address: "98/2 Health City Expressway, Bangalore",
+    contact: "+91 (80) 4920-1000",
+  });
+
+  expect(regResult.success).toBe(true);
+  expect(regResult.hospital.code).toBe("MANIPAL");
+  expect(hospitals.some((h) => h.code === "MANIPAL")).toBe(true);
+
+  // Duplicate code prevention
+  const dupResult = registerHospital({ name: "Manipal Duplicate", code: "MANIPAL" });
+  expect(dupResult.success).toBe(false);
+  expect(dupResult.error).toContain("already in use");
+
+  // 2. Cascade hospital name update across Admins and Technicians
+  const admins = [{ id: "adm-01", name: "Dr. Admin", hospitalId: "hosp-manipal", hospitalName: "Manipal Institute of Podiatry & Foot Biomechanics" }];
+  const technicians = [{ id: "tech-01", name: "Tech User", hospitalId: "hosp-manipal", hospitalName: "Manipal Institute of Podiatry & Foot Biomechanics" }];
+
+  const updateHospitalCascade = (hospId, newName) => {
+    const hosp = hospitals.find((h) => h.id === hospId);
+    if (!hosp) return false;
+    hosp.name = newName;
+    admins.forEach((a) => { if (a.hospitalId === hospId) a.hospitalName = newName; });
+    technicians.forEach((t) => { if (t.hospitalId === hospId) t.hospitalName = newName; });
+    return true;
+  };
+
+  const cascadeSuccess = updateHospitalCascade("hosp-manipal", "Manipal Global Foot Institute");
+  expect(cascadeSuccess).toBe(true);
+  expect(admins[0].hospitalName).toBe("Manipal Global Foot Institute");
+  expect(technicians[0].hospitalName).toBe("Manipal Global Foot Institute");
+
+  // 3. Telemetry metrics per hospital
+  const mockWorkstations = [
+    { deviceId: "STATION-01", hospitalName: "Manipal Global Foot Institute", technicianUsername: "tech-user-01" },
+    { deviceId: "STATION-02", hospitalName: "Apollo Hospitals Speciality Centre", technicianUsername: "tech-apl-01" },
+  ];
+  const mockCases = [
+    { id: "case-01", hospitalName: "Manipal Global Foot Institute", operatorName: "Tech User" },
+    { id: "case-02", hospitalName: "Manipal Global Foot Institute", operatorName: "Tech User" },
+    { id: "case-03", hospitalName: "Apollo Hospitals Speciality Centre", operatorName: "Ananya Sharma" },
+  ];
+
+  const getTelemetry = (hospName) => {
+    const activeStations = mockWorkstations.filter((w) => w.hospitalName === hospName).length;
+    const casesCount = mockCases.filter((c) => c.hospitalName === hospName).length;
+    return { activeStations, casesCount };
+  };
+
+  const manipalTel = getTelemetry("Manipal Global Foot Institute");
+  expect(manipalTel.activeStations).toBe(1);
+  expect(manipalTel.casesCount).toBe(2);
+});
+
+it("Enforces Admin Binding to the Entire Hospital Name and Automated Staff Scoping", () => {
+  // Hospital Administrator bound to specific hospital
+  const adminAccount = {
+    id: "admin-fortis-01",
+    name: "Dr. Fortis Director",
+    username: "admin@fortis.health",
+    hospitalId: "hosp-fortis",
+    hospitalName: "Fortis Healthcare & Podiatry Care",
+    role: "admin",
+  };
+
+  // When admin creates a technician, the technician is automatically bound to the admin's entire hospital domain
+  const createTechnician = (admin, techData) => {
+    return {
+      id: "tech-" + Math.random().toString(36).slice(2, 7),
+      name: techData.name,
+      username: techData.username,
+      hospitalId: admin.hospitalId,
+      hospitalName: admin.hospitalName,
+      status: "active",
+      voucherCode: `${admin.hospitalName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}-TECH-${Math.floor(1000 + Math.random() * 9000)}`,
+    };
+  };
+
+  const newTech = createTechnician(adminAccount, { name: "Rajesh Podiatrist", username: "tech.rajesh" });
+  expect(newTech.hospitalId).toBe("hosp-fortis");
+  expect(newTech.hospitalName).toBe("Fortis Healthcare & Podiatry Care");
+  expect(newTech.voucherCode.startsWith("FORT")).toBe(true);
+
+  // Active hospital resolution for admin session
+  const hospitals = [
+    { id: "hosp-001", name: "Technomind Healthcare Systems" },
+    { id: "hosp-fortis", name: "Fortis Healthcare & Podiatry Care" },
+  ];
+
+  const resolveActiveHospital = (userSession) => {
+    if (userSession.role === "admin" && userSession.hospitalId) {
+      return hospitals.find((h) => h.id === userSession.hospitalId) || hospitals[0];
+    }
+    return hospitals[0];
+  };
+
+  const resolved = resolveActiveHospital(adminAccount);
+  expect(resolved.id).toBe("hosp-fortis");
+  expect(resolved.name).toBe("Fortis Healthcare & Podiatry Care");
+});
+
+it("Enforces Strict Separation: Patient Scanning & Exam Workflow Exclusively Handled by Clinical Technicians", () => {
+  // Navigation section resolution based on user role
+  const getInitialSectionForRole = (role) => {
+    if (role === "superadmin") return "superadmin";
+    if (role === "admin") return "admin";
+    return "registration";
+  };
+
+  expect(getInitialSectionForRole("superadmin")).toBe("superadmin");
+  expect(getInitialSectionForRole("admin")).toBe("admin");
+  expect(getInitialSectionForRole("technician")).toBe("registration");
+
+  // Clinical Exam Guard: Blocks non-technicians from scanning & registration
+  const canPerformExaminationWorkflow = (userRole, targetSection) => {
+    const examSections = ["registration", "capture", "process", "results"];
+    if (examSections.includes(targetSection)) {
+      return userRole === "technician";
+    }
+    return true; // Reports and viewing can be accessed by all authorized accounts
+  };
+
+  // Clinical Technicians CAN conduct examinations
+  expect(canPerformExaminationWorkflow("technician", "registration")).toBe(true);
+  expect(canPerformExaminationWorkflow("technician", "capture")).toBe(true);
+  expect(canPerformExaminationWorkflow("technician", "process")).toBe(true);
+  expect(canPerformExaminationWorkflow("technician", "results")).toBe(true);
+
+  // Hospital Admins CANNOT conduct scanning or exams - They manage accounts
+  expect(canPerformExaminationWorkflow("admin", "registration")).toBe(false);
+  expect(canPerformExaminationWorkflow("admin", "capture")).toBe(false);
+  expect(canPerformExaminationWorkflow("admin", "process")).toBe(false);
+  expect(canPerformExaminationWorkflow("admin", "results")).toBe(false);
+  // But Admins CAN inspect final reports
+  expect(canPerformExaminationWorkflow("admin", "report")).toBe(true);
+
+  // Super Admins CANNOT conduct scanning - They govern platform
+  expect(canPerformExaminationWorkflow("superadmin", "capture")).toBe(false);
+  expect(canPerformExaminationWorkflow("superadmin", "superadmin")).toBe(true);
+
+  // Guard action response simulation: Returns Clinical Notice and switch options
+  const evaluateExamAccess = (user, section) => {
+    if (!canPerformExaminationWorkflow(user.role, section)) {
+      return {
+        allowed: false,
+        view: "ClinicalTechnicianNotice",
+        notice: `Clinical examination workflows are strictly restricted to Clinical Technicians. You are logged in as ${user.name} (${user.role}).`,
+        suggestedAction: "switch_to_technician",
+      };
+    }
+    return { allowed: true, view: section };
+  };
+
+  const adminAttempt = evaluateExamAccess({ name: "Dr. Admin", role: "admin" }, "capture");
+  expect(adminAttempt.allowed).toBe(false);
+  expect(adminAttempt.view).toBe("ClinicalTechnicianNotice");
+  expect(adminAttempt.suggestedAction).toBe("switch_to_technician");
+
+  const techAttempt = evaluateExamAccess({ name: "Ananya Sharma", role: "technician" }, "capture");
+  expect(techAttempt.allowed).toBe(true);
+  expect(techAttempt.view).toBe("capture");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.62';
+export const APP_CURRENT_VERSION = '1.0.63';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -217,6 +217,50 @@ export const DEFAULT_HOSPITALS: HospitalProfile[] = [
     ],
     technicians: [
       { id: 'tech-04', name: 'Kavita Rao', staffId: 'TECH-METRO-05' },
+    ],
+  },
+  {
+    id: 'hosp-apollo',
+    name: 'Apollo Hospitals Speciality Centre',
+    code: 'APOLLO',
+    logoUrl: '',
+    logoPosition: 'Left',
+    address: '154/11 Bannerghatta Road, Opposite IIM-B',
+    contact: '+91 (80) 2630-4050 · podiatry@apollohospitals.com',
+    email: 'podiatry@apollohospitals.com',
+    website: 'https://apollohospitals.com',
+    registrationNo: 'NABH-2026-APL-01',
+    department: 'Department of Diabetic Foot Surgery & Plantar Biomechanics',
+    defaultDoctor: 'Dr. Suresh Sundaram',
+    defaultTechnician: 'Ananya Sharma',
+    footerText: 'NABH Accredited Comprehensive Podiatric & Diabetic Limb Salvage Centre',
+    doctors: [
+      { id: 'doc-05', name: 'Dr. Suresh Sundaram', specialization: 'Senior Consultant Podiatrist', licenseNo: 'KMC-DOC-44821' },
+    ],
+    technicians: [
+      { id: 'tech-05', name: 'Ananya Sharma', staffId: 'TECH-APL-02' },
+    ],
+  },
+  {
+    id: 'hosp-fortis',
+    name: 'Fortis Healthcare & Podiatry Care',
+    code: 'FORTIS',
+    logoUrl: '',
+    logoPosition: 'Left',
+    address: 'Cunningham Road, Vasanth Nagar',
+    contact: '+91 (80) 4199-4444 · limbcare@fortishealthcare.com',
+    email: 'limbcare@fortishealthcare.com',
+    website: 'https://fortishealthcare.com',
+    registrationNo: 'JCI-NABH-FTS-2026',
+    department: 'Centre for Orthotics, Prosthetics & Foot Biomechanics',
+    defaultDoctor: 'Dr. Meenakshi Iyer',
+    defaultTechnician: 'Vikram Joshi',
+    footerText: 'JCI & NABH Accredited Multi-Speciality Foot & Ankle Institute',
+    doctors: [
+      { id: 'doc-06', name: 'Dr. Meenakshi Iyer', specialization: 'Consultant Orthopaedic Surgeon', licenseNo: 'FTS-DOC-1102' },
+    ],
+    technicians: [
+      { id: 'tech-06', name: 'Vikram Joshi', staffId: 'TECH-FTS-08' },
     ],
   },
 ];
@@ -1098,7 +1142,19 @@ class PodoPressDatabase {
 
   public getActiveHospitalSync(): HospitalProfile {
     const list = this.getHospitalProfilesSync();
-    const activeId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) || list[0].id;
+    try {
+      const activeUser = this.getActiveUserSync();
+      if (activeUser && activeUser.role === 'admin' && activeUser.hospitalId) {
+        const matched = list.find(
+          (h) =>
+            h.id === activeUser.hospitalId ||
+            (activeUser.hospitalName && h.name.toLowerCase() === activeUser.hospitalName.toLowerCase())
+        );
+        if (matched) return matched;
+      }
+    } catch {}
+
+    const activeId = localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) || (list[0] ? list[0].id : 'hosp-001');
     return list.find((h) => h.id === activeId) || list[0];
   }
 
@@ -2780,8 +2836,20 @@ class PodoPressDatabase {
       return { success: false, error: `An Administrator with User ID "${cleanUsername}" already exists.` };
     }
 
-    const hospCode = (adminData.hospitalCode || cleanUsername.replace(/[^a-z0-9]/gi, '').slice(0, 4) || 'CLINIC').toUpperCase();
-    const hospitalId = 'hosp-' + hospCode.toLowerCase();
+    const hospitals: HospitalProfile[] = this.getHospitalProfilesSync();
+    const existingHosp = hospitals.find(
+      (h) => (adminData.hospitalCode && h.code.toUpperCase() === adminData.hospitalCode.toUpperCase()) ||
+             h.name.toLowerCase() === adminData.hospitalName.trim().toLowerCase()
+    );
+
+    const hospCode = (
+      existingHosp?.code ||
+      adminData.hospitalCode ||
+      adminData.hospitalName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) ||
+      'CLINIC'
+    ).toUpperCase();
+    const hospitalId = existingHosp?.id || ('hosp-' + hospCode.toLowerCase());
+    const finalHospitalName = existingHosp?.name || adminData.hospitalName.trim();
 
     const newAdmin: AdminAccount = {
       id: 'admin-' + Math.random().toString(36).slice(2, 9),
@@ -2789,7 +2857,7 @@ class PodoPressDatabase {
       username: cleanUsername,
       pin: adminData.pin.trim(),
       hospitalId,
-      hospitalName: adminData.hospitalName.trim(),
+      hospitalName: finalHospitalName,
       role: 'admin',
       phone: adminData.phone?.trim() || '',
       email: adminData.email?.trim() || cleanUsername,
@@ -2807,8 +2875,7 @@ class PodoPressDatabase {
     } catch {}
 
     // Ensure matching HospitalProfile exists in hospitals list
-    const hospitals: HospitalProfile[] = this.getHospitalProfilesSync();
-    if (!hospitals.some((h: HospitalProfile) => h.id === hospitalId || h.name.toLowerCase() === newAdmin.hospitalName.toLowerCase())) {
+    if (!existingHosp) {
       const newHospital: HospitalProfile = {
         id: hospitalId,
         name: newAdmin.hospitalName,
@@ -2899,6 +2966,235 @@ class PodoPressDatabase {
     );
 
     return { success: true };
+  }
+
+  /**
+   * Super Administrator: Registers a new hospital into the multi-hospital network.
+   */
+  public registerHospital(hospitalData: {
+    name: string;
+    code?: string;
+    registrationNo?: string;
+    contact?: string;
+    email?: string;
+    address?: string;
+    department?: string;
+    website?: string;
+    defaultDoctor?: string;
+    defaultTechnician?: string;
+    footerText?: string;
+    maxStationsAllowed?: number;
+  }): { success: boolean; hospital?: HospitalProfile; error?: string } {
+    const cleanName = (hospitalData.name || '').trim();
+    if (!cleanName) return { success: false, error: 'Hospital Name is required.' };
+
+    const hospitals = this.getHospitalProfilesSync();
+    if (hospitals.some((h) => h.name.toLowerCase() === cleanName.toLowerCase())) {
+      return { success: false, error: `Hospital "${cleanName}" is already registered.` };
+    }
+
+    const cleanCode = (
+      hospitalData.code ||
+      cleanName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) ||
+      'HOSP'
+    ).toUpperCase();
+
+    if (hospitals.some((h) => h.code.toUpperCase() === cleanCode)) {
+      return { success: false, error: `Hospital Code "${cleanCode}" is already in use by another hospital.` };
+    }
+
+    const hospitalId = 'hosp-' + cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+    const newHospital: HospitalProfile = {
+      id: hospitalId,
+      name: cleanName,
+      code: cleanCode,
+      registrationNo: hospitalData.registrationNo?.trim() || `NABH-${cleanCode}-2026`,
+      contact: hospitalData.contact?.trim() || '+1 (800) 555-PODO',
+      email: hospitalData.email?.trim() || `info@${cleanCode.toLowerCase()}.health`,
+      address: hospitalData.address?.trim() || 'Clinical Center',
+      department: hospitalData.department?.trim() || 'Department of Podiatry & Biomechanics',
+      website: hospitalData.website?.trim() || 'https://technomind.health',
+      defaultDoctor: hospitalData.defaultDoctor?.trim() || 'Dr. Specialist',
+      defaultTechnician: hospitalData.defaultTechnician?.trim() || '',
+      footerText: hospitalData.footerText?.trim() || 'Accredited Clinical Foot Care & Plantar Pressure Diagnostics',
+      logoPosition: 'Left',
+      doctors: [
+        {
+          id: 'doc-' + Math.random().toString(36).slice(2, 7),
+          name: hospitalData.defaultDoctor?.trim() || 'Dr. Specialist',
+          specialization: 'Consultant Podiatric Specialist',
+          licenseNo: `MED-${cleanCode}-01`,
+        },
+      ],
+      technicians: [],
+    };
+
+    hospitals.push(newHospital);
+    try {
+      localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(hospitals));
+    } catch {}
+
+    logAuditEvent(
+      'SUPERADMIN_REGISTER_HOSPITAL',
+      `Super Administrator registered new hospital "${newHospital.name}" (Code: ${newHospital.code}, Reg: ${newHospital.registrationNo}).`,
+      'superadmin',
+      undefined,
+      'info',
+      'superadmin'
+    );
+
+    return { success: true, hospital: newHospital };
+  }
+
+  /**
+   * Super Administrator: Updates an existing hospital profile and cascades updates to linked accounts.
+   */
+  public updateHospital(
+    hospitalId: string,
+    updates: Partial<HospitalProfile>
+  ): { success: boolean; hospital?: HospitalProfile; error?: string } {
+    const hospitals = this.getHospitalProfilesSync();
+    const idx = hospitals.findIndex((h) => h.id === hospitalId);
+    if (idx < 0) return { success: false, error: 'Hospital not found.' };
+
+    const oldName = hospitals[idx].name;
+    const updated: HospitalProfile = {
+      ...hospitals[idx],
+      ...updates,
+      id: hospitalId,
+    };
+    hospitals[idx] = updated;
+
+    try {
+      localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(hospitals));
+    } catch {}
+
+    // Cascade hospital name change if updated
+    if (updates.name && updates.name.trim() !== oldName) {
+      const newName = updates.name.trim();
+
+      // Update Admins
+      const admins = this.getAdminAccountsListSync();
+      let adminsUpdated = false;
+      for (const a of admins) {
+        if (a.hospitalId === hospitalId || a.hospitalName === oldName) {
+          a.hospitalName = newName;
+          adminsUpdated = true;
+        }
+      }
+      if (adminsUpdated) {
+        try {
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(admins));
+        } catch {}
+      }
+
+      // Update Technicians
+      const techs = this.getTechniciansSync();
+      let techsUpdated = false;
+      for (const t of techs) {
+        if (t.hospitalId === hospitalId || t.hospitalName === oldName) {
+          t.hospitalName = newName;
+          techsUpdated = true;
+        }
+      }
+      if (techsUpdated) {
+        try {
+          localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(techs));
+        } catch {}
+      }
+
+      // Update active settings if this hospital is currently active
+      const activeHosp = this.getActiveHospitalSync();
+      if (activeHosp.id === hospitalId) {
+        const settings = this.getSettingsSync();
+        settings.clinical.clinicName = newName;
+        settings.clinical.hospitalId = hospitalId;
+        this.saveSettings(settings);
+      }
+    }
+
+    logAuditEvent(
+      'SUPERADMIN_UPDATE_HOSPITAL',
+      `Super Administrator updated hospital "${updated.name}" (${updated.code}).`,
+      'superadmin',
+      undefined,
+      'info',
+      'superadmin'
+    );
+
+    return { success: true, hospital: updated };
+  }
+
+  /**
+   * Super Administrator: Removes or archives a hospital.
+   */
+  public deleteHospital(hospitalId: string): { success: boolean; error?: string } {
+    const hospitals = this.getHospitalProfilesSync();
+    if (hospitals.length <= 1) {
+      return { success: false, error: 'Cannot delete the only registered hospital.' };
+    }
+
+    const target = hospitals.find((h) => h.id === hospitalId);
+    if (!target) return { success: false, error: 'Hospital not found.' };
+
+    const filtered = hospitals.filter((h) => h.id !== hospitalId);
+    try {
+      localStorage.setItem(LS_KEYS.HOSPITALS, JSON.stringify(filtered));
+      if (localStorage.getItem(LS_KEYS.ACTIVE_HOSPITAL_ID) === hospitalId) {
+        localStorage.setItem(LS_KEYS.ACTIVE_HOSPITAL_ID, filtered[0].id);
+      }
+    } catch {}
+
+    logAuditEvent(
+      'SUPERADMIN_DELETE_HOSPITAL',
+      `Super Administrator removed hospital "${target.name}" (${target.code}).`,
+      'superadmin',
+      undefined,
+      'warning',
+      'superadmin'
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Super Administrator: Aggregated telemetry for a specific hospital
+   */
+  public getHospitalTelemetry(hospitalId: string): {
+    adminsCount: number;
+    techniciansCount: number;
+    activeWorkstationsCount: number;
+    casesCount: number;
+    admins: AdminAccount[];
+  } {
+    const admins = this.getAdminAccountsListSync().filter((a) => a.hospitalId === hospitalId);
+    const technicians = this.getTechniciansSync().filter((t) => t.hospitalId === hospitalId);
+    const telemetry = this.getAllActivationsTelemetry();
+    const hosp = this.getHospitalProfilesSync().find((h) => h.id === hospitalId);
+    const hospName = hosp?.name || '';
+
+    const activeWorkstationsCount = telemetry.filter(
+      (t) => (t.hospitalName && t.hospitalName.toLowerCase() === hospName.toLowerCase()) ||
+             technicians.some((tech) => tech.username === t.technicianUsername)
+    ).length;
+
+    const cases = this.getCasesSync();
+    const casesCount = cases.filter(
+      (c) =>
+        (c.hospitalName && c.hospitalName.toLowerCase() === hospName.toLowerCase()) ||
+        (c.clinicName && c.clinicName.toLowerCase() === hospName.toLowerCase()) ||
+        (c.hospitalId && c.hospitalId === hospitalId) ||
+        technicians.some((tech) => tech.name === c.operatorName)
+    ).length;
+
+    return {
+      adminsCount: admins.length,
+      techniciansCount: technicians.length,
+      activeWorkstationsCount,
+      casesCount,
+      admins,
+    };
   }
 
   /**

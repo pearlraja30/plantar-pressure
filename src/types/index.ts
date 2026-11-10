@@ -124,6 +124,7 @@ export interface AnalysisCase {
   operatorName: string;
   clinicName: string;
   hospitalId?: string;
+  hospitalName?: string;
   
   // Imaging Data
   rawScanDataUrl: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ShieldAlert, KeyRound, Lock, ShieldCheck, UserCheck } from 'lucide-react';
+import { ShieldAlert, KeyRound, Lock, ShieldCheck, UserCheck, Users, Building2 } from 'lucide-react';
 import './podoload.css';
 import { PodoLoadSidebar, PodoLoadNavSection } from './PodoLoadSidebar';
 import { PodoLoadHeader } from './PodoLoadHeader';
@@ -56,8 +56,15 @@ export function PodoLoadApp() {
       (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
 
-  // Navigation & Step state
-  const [currentSection, setCurrentSection] = useState<PodoLoadNavSection>('registration');
+  // Navigation & Step state: Dynamically initialize based on logged-in user role
+  const [currentSection, setCurrentSection] = useState<PodoLoadNavSection>(() => {
+    try {
+      const activeUser = dbService.getActiveUserSync();
+      if (activeUser.role === 'superadmin') return 'superadmin';
+      if (activeUser.role === 'admin') return 'admin';
+    } catch {}
+    return 'registration';
+  });
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [globalSearch, setGlobalSearch] = useState('');
   const [isScannerWizardOpen, setIsScannerWizardOpen] = useState(false);
@@ -350,13 +357,9 @@ export function PodoLoadApp() {
       setCurrentSection('superadmin');
     } else if (role === 'admin') {
       dbService.authorizeStationForAdmin();
-      if (!isMobileDevice) {
-        setCurrentSection('admin');
-      }
+      setCurrentSection('admin');
     } else {
-      if (currentSection === 'admin' || currentSection === 'superadmin' || currentSection === 'settings') {
-        setCurrentSection('registration');
-      }
+      setCurrentSection('registration');
     }
     const updatedStatus = dbService.checkDeviceAuthorizationStatus();
     setDeviceAuthStatus(updatedStatus);
@@ -1377,8 +1380,84 @@ export function PodoLoadApp() {
 
         {/* Scrollable Main Content Area */}
         <main className="podoload-content-viewport">
+          {/* Strict Separation: Clinical Examination & Scanning Workflow strictly performed by Technician */}
+          {currentUser.role !== 'technician' &&
+            (currentSection === 'registration' ||
+              currentSection === 'capture' ||
+              currentSection === 'process' ||
+              currentSection === 'results') && (
+              <div
+                style={{
+                  maxWidth: '680px',
+                  margin: '3rem auto',
+                  padding: '2.5rem 2rem',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  border: '1.5px solid #ccfbf1',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f0fdfa',
+                    border: '2px solid #99f6e4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1.25rem',
+                    color: '#0f766e',
+                  }}
+                >
+                  <Users className="w-8 h-8" />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                    Clinical Technician Role Required
+                  </span>
+                </div>
+
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0c2328', margin: '0 0 0.75rem 0' }}>
+                  Clinical Technician Examination Notice
+                </h2>
+
+                <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, marginBottom: '1.75rem', maxWidth: '540px', margin: '0 auto 1.75rem' }}>
+                  All patient registrations, physical foot scanning, and biomechanical processing must be conducted under an active <strong>Clinical Technician</strong> account.
+                  <br /><br />
+                  You are currently authenticated as <strong>{currentUser.name}</strong> ({currentUser.role === 'superadmin' ? 'Super Administrator' : 'Hospital Administrator'}).
+                  Administrative accounts manage hospital entities, technician authorizations, workstation binding, and master audits.
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="podoload-btn-primary"
+                    onClick={() => setIsRoleModalOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', fontSize: '0.88rem' }}
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Switch to Clinical Technician Login</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary"
+                    onClick={() => setCurrentSection(currentUser.role === 'superadmin' ? 'superadmin' : 'admin')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem', fontSize: '0.88rem' }}
+                  >
+                    <Building2 className="w-4 h-4" />
+                    <span>Return to {currentUser.role === 'superadmin' ? 'Super Admin Console' : 'Hospital Management'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
           {/* SCREEN 1: Registration */}
-          {currentSection === 'registration' && (
+          {currentUser.role === 'technician' && currentSection === 'registration' && (
             <PodoLoadRegistration
               patients={patients}
               cases={cases}
@@ -1392,7 +1471,7 @@ export function PodoLoadApp() {
           )}
 
           {/* SCREEN 2: Capture */}
-          {currentSection === 'capture' && (
+          {currentUser.role === 'technician' && currentSection === 'capture' && (
             <PodoLoadCapture
               leftFoot={leftFoot}
               rightFoot={rightFoot}
@@ -1405,7 +1484,7 @@ export function PodoLoadApp() {
           )}
 
           {/* SCREEN 3: Process */}
-          {currentSection === 'process' && (
+          {currentUser.role === 'technician' && currentSection === 'process' && (
             <PodoLoadProcess
               leftFoot={leftFoot}
               rightFoot={rightFoot}
@@ -1418,7 +1497,7 @@ export function PodoLoadApp() {
           )}
 
           {/* SCREEN 4: Results */}
-          {currentSection === 'results' && (
+          {currentUser.role === 'technician' && currentSection === 'results' && (
             <PodoLoadResults
               leftFoot={leftFoot}
               rightFoot={rightFoot}
