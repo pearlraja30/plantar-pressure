@@ -111,6 +111,9 @@ export function PodoLoadApp() {
 
   // Hydrate patients and clinical cases from Inbuilt Database (IndexedDB)
   useEffect(() => {
+    // Send immediate first-launch / bootup device discovery beacon to Supabase Cloud
+    cloudSyncService.sendDeviceDiscoveryBeacon().catch(() => {});
+
     hardwareScannerService.enumerateAttachedScanners().then((list) => {
       setActiveScanners(list);
     });

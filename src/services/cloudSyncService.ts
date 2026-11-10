@@ -26,6 +26,7 @@ export interface RemoteStationRecord {
   pending_cases_count?: number;
   activated_at: string;
   last_seen_at: string;
+  metadata?: any;
 }
 
 export interface CloudSyncStatus {
@@ -260,6 +261,109 @@ export class CloudSyncService {
     } catch (err) {
       console.warn('PodoPress: Background station heartbeat sync skipped:', err);
       return false;
+    }
+  }
+
+  /**
+   * Broadcasts an immediate device discovery beacon to Supabase Cloud on application boot.
+   * Allows the Super Administrator to discover newly installed stations (Windows, Android, iOS)
+   * in real-time, even before the station is activated.
+   */
+  public async sendDeviceDiscoveryBeacon(): Promise<boolean> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) return false;
+
+    try {
+      const { deviceBindingService } = await import('./deviceBindingService');
+      const { dbService } = await import('./dbService');
+      const currentHardware = deviceBindingService.getCurrentDeviceInfo();
+      const existingAuth = dbService.getDeviceAuthorizationSync();
+
+      const payload = {
+        device_fingerprint: currentHardware.id,
+        device_name: currentHardware.name || 'Diagnostic Station',
+        os_platform: typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
+          ? 'Windows (win32)'
+          : (typeof navigator !== 'undefined' && navigator.userAgent.includes('Android')
+            ? 'Google Android'
+            : (typeof navigator !== 'undefined' && /iPhone|iPad/i.test(navigator.userAgent)
+              ? 'Apple iOS'
+              : (typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) : 'Windows'))),
+        app_version: existingAuth?.appVersion || '1.0.69',
+        hospital_code: existingAuth?.hospitalCode || 'PENDING',
+        hospital_name: existingAuth?.hospitalName || 'Awaiting Station Enrollment',
+        technician_id: existingAuth?.technicianId || 'unassigned',
+        technician_name: existingAuth?.technicianName || 'Pending Technician Assignment',
+        technician_email: existingAuth?.technicianUsername || null,
+        status: existingAuth ? existingAuth.status : 'pending_enrollment',
+        pending_cases_count: this.getQueue().length,
+        activated_at: existingAuth?.authorizedAt || new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        metadata: {
+          mac_address: currentHardware.macAddress,
+          platform_raw: currentHardware.platform,
+          is_fresh_install: !existingAuth,
+        },
+      };
+
+      const res = await fetch(`${config.url}/rest/v1/station_activations`, {
+        method: 'POST',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if an administrator has pre-authorized or assigned this device in Supabase.
+   * If found, automatically provisions the station token and clinic locally.
+   */
+  public async pullRemoteStationAuthorization(deviceId: string): Promise<{
+    found: boolean;
+    hospitalCode?: string;
+    hospitalName?: string;
+    technicianUsername?: string;
+    activationCode?: string;
+  }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) return { found: false };
+
+    try {
+      const endpoint = `${config.url}/rest/v1/station_activations?device_fingerprint=eq.${encodeURIComponent(deviceId)}&select=*`;
+      const res = await fetch(endpoint, {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+        },
+      });
+
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const row = rows[0];
+          if (row.status === 'authorized' && row.hospital_code && row.hospital_code !== 'PENDING') {
+            return {
+              found: true,
+              hospitalCode: row.hospital_code,
+              hospitalName: row.hospital_name,
+              technicianUsername: row.technician_email,
+              activationCode: row.metadata?.activation_code,
+            };
+          }
+        }
+      }
+      return { found: false };
+    } catch {
+      return { found: false };
     }
   }
 

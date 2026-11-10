@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
+import { cloudSyncService } from '../../services/cloudSyncService';
 import { getAuditEvents } from '../../services/auditService';
 import { AdminAccount, AnalysisCase, AuditEvent, HospitalProfile, TechnicianUser } from '../../types';
 
@@ -127,10 +128,43 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
     }
   };
 
-  const refreshAllData = () => {
+  const refreshAllData = async () => {
     setHospitalsList(dbService.getHospitalProfilesSync());
     setAdminsList(dbService.getAdminAccountsListSync());
-    setTelemetryList(dbService.getAllActivationsTelemetry());
+
+    const localTelemetry = dbService.getAllActivationsTelemetry();
+    setTelemetryList(localTelemetry);
+
+    // Fetch and merge remote cloud stations discovered in Supabase
+    try {
+      const remoteStations = await cloudSyncService.fetchRemoteStations();
+      if (remoteStations && remoteStations.length > 0) {
+        const merged = [...localTelemetry];
+        for (const r of remoteStations) {
+          if (!merged.some((m) => m.deviceId === r.device_fingerprint)) {
+            merged.push({
+              deviceId: r.device_fingerprint,
+              macAddress: r.metadata?.mac_address || 'Cloud MAC',
+              platform: r.os_platform || 'Remote Station',
+              technicianName: r.technician_name || 'Pending Enrollment',
+              technicianUsername: r.technician_email || 'unassigned',
+              hospitalName: r.hospital_name || (r.hospital_code === 'PENDING' ? 'Awaiting Allocation' : r.hospital_code),
+              activationCodeUsed: r.metadata?.activation_code || 'CLOUD-DISCOVERY',
+              isBurned: r.status === 'authorized',
+              permitExpiresAt: '',
+              isExpired: false,
+              boundAt: r.activated_at || r.last_seen_at,
+              lastActiveAt: r.last_seen_at,
+              status: r.status === 'pending_enrollment' ? 'pending' : (r.status === 'revoked' ? 'revoked' : 'active'),
+            } as any);
+          }
+        }
+        setTelemetryList(merged);
+      }
+    } catch {
+      // Offline fallback
+    }
+
     setCasesList(dbService.getCasesSync());
     setAuditLogs(getAuditEvents());
     setMetrics(dbService.getSuperAdminGlobalMetrics());

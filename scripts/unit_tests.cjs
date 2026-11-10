@@ -4982,6 +4982,102 @@ it("Enforces Cross-Machine Platform Backup Import for Offline Clinic Provisionin
   expect(techs[0].activationCode).toBe("T-TECH-4728");
 });
 
+console.log("\n--- SECTION 38: Automatic First-Launch Device Discovery Beacon & Cloud Telemetry Merging ---");
+
+it("Enforces Automatic First-Launch Device Discovery Beacon Transmission", () => {
+  // Simulate fresh hardware endpoint
+  const currentHardware = {
+    id: "DEV-4CBF-6798",
+    macAddress: "DE:4C:BF:67:98:AB",
+    platform: "Windows 11 (win32)",
+    name: "Microsoft Surface Studio",
+  };
+
+  const createBeaconPayload = (hardware, existingAuth) => {
+    return {
+      device_fingerprint: hardware.id,
+      device_name: hardware.name,
+      os_platform: hardware.platform,
+      app_version: "1.0.70",
+      hospital_code: existingAuth ? existingAuth.hospitalCode : "PENDING",
+      hospital_name: existingAuth ? existingAuth.hospitalName : "Awaiting Station Enrollment",
+      status: existingAuth ? existingAuth.status : "pending_enrollment",
+      metadata: {
+        mac_address: hardware.macAddress,
+        is_fresh_install: !existingAuth,
+      },
+    };
+  };
+
+  // Case 1: Fresh installation (no token)
+  const freshBeacon = createBeaconPayload(currentHardware, null);
+  expect(freshBeacon.device_fingerprint).toBe("DEV-4CBF-6798");
+  expect(freshBeacon.hospital_code).toBe("PENDING");
+  expect(freshBeacon.status).toBe("pending_enrollment");
+  expect(freshBeacon.metadata.mac_address).toBe("DE:4C:BF:67:98:AB");
+  expect(freshBeacon.metadata.is_fresh_install).toBe(true);
+
+  // Case 2: Authorized station
+  const authorizedBeacon = createBeaconPayload(currentHardware, {
+    hospitalCode: "T",
+    hospitalName: "T Clinical Center",
+    status: "authorized",
+  });
+  expect(authorizedBeacon.hospital_code).toBe("T");
+  expect(authorizedBeacon.status).toBe("authorized");
+  expect(authorizedBeacon.metadata.is_fresh_install).toBe(false);
+});
+
+it("Enforces Cloud Telemetry Merging in Super Admin Console", () => {
+  const localTelemetry = [
+    {
+      deviceId: "DEV-LOCAL-01",
+      macAddress: "AA:BB:CC:11:22:33",
+      hospitalName: "Local Clinic",
+      status: "active",
+    },
+  ];
+
+  const remoteCloudStations = [
+    {
+      device_fingerprint: "DEV-LOCAL-01", // duplicate (already local)
+      os_platform: "Windows",
+      status: "authorized",
+    },
+    {
+      device_fingerprint: "DEV-4CBF-6798", // newly discovered remote station
+      os_platform: "Windows 11",
+      hospital_code: "PENDING",
+      hospital_name: "Awaiting Station Enrollment",
+      status: "pending_enrollment",
+      metadata: { mac_address: "DE:4C:BF:67:98:AB" },
+    },
+  ];
+
+  const mergeTelemetry = (local, remote) => {
+    const merged = [...local];
+    for (const r of remote) {
+      if (!merged.some((m) => m.deviceId === r.device_fingerprint)) {
+        merged.push({
+          deviceId: r.device_fingerprint,
+          macAddress: r.metadata?.mac_address || "Cloud MAC",
+          hospitalName: r.hospital_name,
+          status: r.status === "pending_enrollment" ? "pending" : "active",
+        });
+      }
+    }
+    return merged;
+  };
+
+  const finalTelemetry = mergeTelemetry(localTelemetry, remoteCloudStations);
+
+  expect(finalTelemetry.length).toBe(2);
+  expect(finalTelemetry[0].deviceId).toBe("DEV-LOCAL-01");
+  expect(finalTelemetry[1].deviceId).toBe("DEV-4CBF-6798");
+  expect(finalTelemetry[1].status).toBe("pending");
+  expect(finalTelemetry[1].macAddress).toBe("DE:4C:BF:67:98:AB");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -1595,6 +1595,51 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.69`.
 
+---
+
+## SECTION 45: First-Launch Device Discovery Beacon & Unified Cloud Telemetry Sync (v1.0.70)
+- **Date**: 2026-11-10
+- **Version**: `1.0.70`
+- **Scope**: First-launch device discovery beacon, Supabase cloud station registration, cross-device cloud telemetry merging in Super Admin, and report synchronization.
+
+### 45.1 Automatic Device Discovery on Installation (Windows, Android, iOS)
+- **Problem**: When a user installs the `.exe` or mobile app on an outside computer, the vendor has no visibility of the remote workstation identifier (`device_fingerprint`), MAC address, or operating system until activation occurs.
+- **Solution**:
+  - In `src/services/cloudSyncService.ts`, implemented `sendDeviceDiscoveryBeacon()`.
+  - In `src/components/podoload/PodoLoadApp.tsx`, called `sendDeviceDiscoveryBeacon()` on initial component mount.
+  - As soon as PodoPress boots on any machine connected to the internet, it broadcasts its hardware fingerprint (e.g. `DEV-4CBF-6798`), MAC address, OS platform (`Windows`, `Android`, `iOS`), app version (`1.0.70`), and status (`pending_enrollment` or `authorized`) to Supabase `station_activations`.
+  - In `src/components/podoload/PodoLoadSuperAdmin.tsx`, updated `refreshAllData()`:
+    - Fetches remote stations via `cloudSyncService.fetchRemoteStations()` and merges them into the local hardware binding table.
+    - Super Administrators can immediately see newly discovered endpoints across the globe in real-time, even before voucher activation.
+
+### 45.2 End-to-End Login & Synchronization Paradigm
+1. **Clinical Technician Login**:
+   - Client enters Clinic Code (e.g. `T`), Username (`tech@technomind.health`), and Activation Voucher (`T-TECH-4728`).
+   - If offline: Autonomous auto-provisioning (v1.0.69) creates the clinic and technician locally.
+   - If online: The device discovery beacon connects to Supabase and updates station telemetry.
+   - Once authorized, all future logins require only User ID & Password.
+2. **Hospital Administrator Login**:
+   - Shortcut `Ctrl+Shift+A` or Admin Login option.
+   - Credentials provisioned locally or via snapshot import.
+3. **Super Administrator Login**:
+   - Shortcut `Ctrl+Shift+S` or Super Admin option.
+   - Vendor master credentials: `superadmin@technomind.health` / `superadmin@123`.
+4. **Clinical Examination Reports Sync**:
+   - Examinations saved by technicians execute 100% offline in IndexedDB.
+   - The background queue uploads completed reports to Supabase `clinical_reports` when internet is available.
+   - Super Administrators and Administrators can view aggregated global reports across all stations.
+
+### 45.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **99/99** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 38 verifying:
+    1. `Enforces Automatic First-Launch Device Discovery Beacon Transmission`: Correct payload construction and status handling for fresh vs authorized stations.
+    2. `Enforces Cloud Telemetry Merging in Super Admin Console`: Real-time merging of local and cloud-discovered endpoints.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 388ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.70`.
+
+
 
 
 
