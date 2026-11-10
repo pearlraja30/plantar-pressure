@@ -14,6 +14,7 @@ import {
   XCircle,
   Eye,
   EyeOff,
+  Copy,
   RefreshCw,
   LogOut,
   ChevronRight,
@@ -115,6 +116,16 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
   const [selectedAdminForAction, setSelectedAdminForAction] = useState<AdminAccount | null>(null);
   const [resetPinInput, setResetPinInput] = useState('');
   const [resetPinSuccess, setResetPinSuccess] = useState<string | null>(null);
+  const [visibleAdminPins, setVisibleAdminPins] = useState<Record<string, boolean>>({});
+  const [copiedPinAdminId, setCopiedPinAdminId] = useState<string | null>(null);
+
+  const handleCopyAdminPin = (pin: string, adminId: string) => {
+    if (navigator.clipboard && pin) {
+      navigator.clipboard.writeText(pin);
+      setCopiedPinAdminId(adminId);
+      setTimeout(() => setCopiedPinAdminId(null), 2500);
+    }
+  };
 
   const refreshAllData = () => {
     setHospitalsList(dbService.getHospitalProfilesSync());
@@ -1029,6 +1040,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                   <th>ADMINISTRATOR</th>
                   <th>HOSPITAL / CLINIC</th>
                   <th>LOGIN USERNAME</th>
+                  <th>PASSWORD & CREDENTIALS</th>
                   <th>STATUS</th>
                   <th>STATION QUOTA</th>
                   <th>CREATED AT</th>
@@ -1038,7 +1050,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
               <tbody>
                 {adminsList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                         <Users className="w-8 h-8 text-gray-400" />
                         <span style={{ fontWeight: 600, color: '#334155' }}>No Hospital Administrators Provisioned Yet</span>
@@ -1063,6 +1075,42 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                       <code style={{ backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '0.76rem', color: '#0f766e' }}>
                         {adm.username}
                       </code>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <code
+                          style={{
+                            fontSize: '0.74rem',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            letterSpacing: visibleAdminPins[adm.id] ? 'normal' : '0.12em',
+                            color: visibleAdminPins[adm.id] ? '#0f766e' : '#64748b',
+                            fontWeight: visibleAdminPins[adm.id] ? 700 : 500,
+                          }}
+                        >
+                          {visibleAdminPins[adm.id] ? (adm.pin || '••••••••') : '••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+                          onClick={() => setVisibleAdminPins((prev) => ({ ...prev, [adm.id]: !prev[adm.id] }))}
+                          title={visibleAdminPins[adm.id] ? 'Hide password' : 'View admin password'}
+                        >
+                          {visibleAdminPins[adm.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          className="podoload-btn-secondary"
+                          style={{ fontSize: '0.62rem', padding: '0.15rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          onClick={() => handleCopyAdminPin(adm.pin, adm.id)}
+                          title="Copy password to clipboard"
+                        >
+                          <Copy className="w-3 h-3 text-teal-600" />
+                          <span>{copiedPinAdminId === adm.id ? '✓ Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
                     </td>
                     <td>
                       <span
