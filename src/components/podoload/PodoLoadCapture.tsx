@@ -351,9 +351,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
 
       if (!result.success || !result.dataUrl) {
         // Physical scanner is offline, disconnected, or unpowered - ZERO DUMMY DATA
-        const errorMsg =
+        let errorMsg =
           result.error ||
           `Scanner "${deviceName}" is offline or disconnected. Please connect the USB/Wi-Fi cable and turn ON the scanner.`;
+        if (errorMsg.includes('Command failed:') || errorMsg.includes('-EncodedCommand') || errorMsg.includes('The command line is too long')) {
+          errorMsg = `Scanner "${deviceName}" is offline or busy. Please check the USB/Wi-Fi cable, verify power is ON, and ensure scanner lid is closed.`;
+        }
         if (side === 'Left') setScannerErrorLeft(errorMsg);
         else setScannerErrorRight(errorMsg);
         return;
@@ -367,9 +370,12 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
       await processIngestedScan(side, result.dataUrl, deviceName);
     } catch (err: any) {
       console.warn('[DirectScan] Acquisition error:', err);
-      const errorMsg =
+      let errorMsg =
         err?.message ||
         `Scanner "${deviceName}" failed to communicate. Please ensure hardware is powered on and connected.`;
+      if (errorMsg.includes('Command failed:') || errorMsg.includes('-EncodedCommand') || errorMsg.includes('The command line is too long')) {
+        errorMsg = `Scanner "${deviceName}" failed to respond. Please check the USB/Wi-Fi cable and ensure power is ON.`;
+      }
       if (side === 'Left') setScannerErrorLeft(errorMsg);
       else setScannerErrorRight(errorMsg);
     } finally {

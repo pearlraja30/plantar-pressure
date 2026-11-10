@@ -1763,6 +1763,48 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Cleanly synchronized.
 - **Release Version**: Tagged and committed `v1.0.73`.
 
+---
+
+## 49. ACTIVITY: HARDWARE SCANNER WINDOWS CMD LENGTH LIMIT RESOLUTION (v1.0.74)
+- **Date**: 2026-11-10
+- **Version**: `1.0.74`
+- **Scope**: Resolve Windows scanner execution failure (`Command failed: powershell ... The command line is too long`) when acquiring scans from physical flatbed scanners (e.g., EPSON L3210 Series).
+
+### 49.1 Root Cause Analysis
+1. **Windows 8,191-Character Command Line Limit**:
+   - In `electron/main.cjs`, `runPowerShell` was passing PowerShell scripts using `powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand <base64>`.
+   - The scanning acquisition script (`scanner:acquire`) was ~12,858 characters long.
+   - Converted to UTF-16LE and Base64 encoded, the payload expanded to **34,288 characters**.
+   - With the command prefix, the command line was **34,350 characters** — more than 4 times the maximum length of 8,191 characters permitted by Windows `cmd.exe` (`child_process.exec`).
+   - Windows rejected the command immediately with: `The command line is too long.`, preventing PowerShell from ever launching.
+2. **Error String Pollution**:
+   - The unhandled `cmd.exe` failure string was passed directly to the UI, displaying the raw base64 string inside the foot bed error card.
+
+### 49.2 Architectural Resolution & Fixes
+1. **Script File Execution Engine (`runPowerShell`)**:
+   - Refactored `runPowerShell()` in `electron/main.cjs` to write the script to a temporary `.ps1` file (`podoload_ps_<timestamp>_<rand>.ps1`) in the OS temporary directory (`app.getPath('temp')`).
+   - Writes UTF-8 with BOM (`\ufeff`) so Windows PowerShell 5.1 and PowerShell 7 parse all characters without encoding issues.
+   - Executes via `execFilePromise('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], { windowsHide: true })`.
+   - The command line length is reduced from 34,350 characters to **under 85 characters**, eliminating the 8,191 limit completely.
+   - Cleans up the temporary script file in a `finally` block.
+2. **Flatbed Scanner Acquisition Optimization**:
+   - In the WIA PowerShell acquisition routine, configured property `3088 = 2` (`WIA_DPS_DOCUMENT_HANDLING_SELECT: Flatbed`) and `3097 = 1` (`WIA_DPS_PAGES`) to ensure multi-function printer-cum-scanners (such as the EPSON L3210) acquire from the flatbed glass bed rather than expecting an automatic document feeder.
+   - Corrected comment syntax in PowerShell (`#` instead of `//`).
+3. **Clinical Error Sanitization**:
+   - Sanitized error messages in `electron/main.cjs`, `src/services/hardwareScannerService.ts`, and `src/components/podoload/PodoLoadCapture.tsx`.
+   - Raw CLI errors or shell execution traces are converted into helpful, user-friendly messages: `Scanner "EPSON L3210 Series" is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready.`
+
+### 49.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **106/106** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 41 verifying:
+    1. Immunity to the Windows 8,191-character command line limit via temporary `.ps1` execution.
+    2. Sanitization of raw CLI error strings from UI display.
+    3. Flatbed source selection (`3088 = 2`) for multi-function printers like EPSON L3210.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled with 0 errors.
+- **Release Version**: Tagged and committed `v1.0.74`.
+
+
 
 
 

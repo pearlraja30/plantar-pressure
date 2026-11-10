@@ -197,20 +197,28 @@ class HardwareScannerService {
             deviceName: devName,
           };
         } else {
+          let cleanError = (res?.error || '').trim();
+          if (cleanError.includes('Command failed:') || cleanError.includes('-EncodedCommand') || cleanError.includes('The command line is too long')) {
+            cleanError = `Scanner "${devName}" is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready.`;
+          }
           return {
             success: false,
             connected: false,
             error:
-              res?.error ||
+              cleanError ||
               `Scanner "${devName}" is offline or disconnected. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON.`,
             deviceName: devName,
           };
         }
       } catch (err: any) {
+        let cleanError = (err && err.message ? err.message : '').trim();
+        if (cleanError.includes('Command failed:') || cleanError.includes('-EncodedCommand') || cleanError.includes('The command line is too long')) {
+          cleanError = `Scanner "${devName}" communication error. Please check the USB/Wi-Fi connection and scanner power.`;
+        }
         return {
           success: false,
           connected: false,
-          error: `Hardware scanner communication error: ${err.message || 'Device disconnected'}. Please check cable and power.`,
+          error: cleanError || `Hardware scanner communication error. Please check cable and power.`,
           deviceName: devName,
         };
       }

@@ -2,9 +2,11 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const util = require('util');
+const os = require('os');
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
 let mainWindow = null;
 
@@ -93,13 +95,52 @@ function createWindow() {
   });
 }
 
-// Helper: Execute PowerShell script reliably via Base64 EncodedCommand
+// Helper: Execute PowerShell script reliably via temporary .ps1 file
+// This eliminates the Windows cmd.exe 8,191-character command line limit and prevents "The command line is too long" errors!
 async function runPowerShell(scriptText, timeoutMs = 15000) {
-  const b64 = Buffer.from(scriptText, 'utf16le').toString('base64');
-  return await execPromise(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${b64}`, {
-    timeout: timeoutMs,
-    maxBuffer: 10 * 1024 * 1024,
-  });
+  const tempDir = app ? app.getPath('temp') : (process.env.TEMP || process.env.TMP || os.tmpdir());
+  const scriptPath = path.join(
+    tempDir,
+    `podoload_ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.ps1`
+  );
+
+  // Write UTF-8 with BOM (\ufeff) so Windows PowerShell 5.1/7 parses Unicode characters without encoding corruption
+  fs.writeFileSync(scriptPath, '\ufeff' + scriptText, 'utf8');
+
+  try {
+    return await execFilePromise(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+      {
+        timeout: timeoutMs,
+        maxBuffer: 20 * 1024 * 1024,
+        windowsHide: true,
+      }
+    );
+  } catch (err) {
+    // If powershell.exe is not invokable directly via execFile, fallback to shell exec with -File parameter
+    if (fs.existsSync(scriptPath)) {
+      try {
+        return await execPromise(
+          `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
+          {
+            timeout: timeoutMs,
+            maxBuffer: 20 * 1024 * 1024,
+            windowsHide: true,
+          }
+        );
+      } catch (fallbackErr) {
+        throw fallbackErr || err;
+      }
+    }
+    throw err;
+  } finally {
+    try {
+      if (fs.existsSync(scriptPath)) {
+        fs.unlinkSync(scriptPath);
+      }
+    } catch {}
+  }
 }
 
 // OS Hardware Scanner Discovery - Pure Real Device Query (Zero Mock/Stale Data)
@@ -358,7 +399,7 @@ try {
   Get-Service stisvc | Where-Object { $_.Status -ne 'Running' } | Start-Service -ErrorAction SilentlyContinue
 } catch {}
 
-// 1. Try programmatic WIA DeviceManager
+# 1. Try programmatic WIA DeviceManager
 try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction SilentlyContinue
   if ($dm -and $dm.DeviceInfos) {
@@ -406,13 +447,31 @@ try {
       }
 
       if ($dev) {
-        $item = try { $dev.Items.Item(1) } catch { try { $dev.Items | Select-Object -First 1 } catch { $null } }
+        # Select Flatbed glass (3088 = 2) for flatbed scanners and printer-cum-scanners (e.g. Epson L3210)
+        try { $dev.Properties.Item("3088").Value = 2 } catch {}
+        try { $dev.Properties.Item("3097").Value = 1 } catch {}
+
+        $item = $null
+        try { $item = $dev.Items.Item(1) } catch {}
+        if (-not $item) {
+          try { $item = $dev.Items[1] } catch {}
+        }
+        if (-not $item) {
+          try {
+            foreach ($subItem in $dev.Items) {
+              $item = $subItem
+              break
+            }
+          } catch {}
+        }
+
         if ($item) {
           try { $item.Properties.Item("6146").Value = ${colorMode} } catch {}
           try { $item.Properties.Item("6147").Value = ${dpi} } catch {}
           try { $item.Properties.Item("6148").Value = ${dpi} } catch {}
 
           $image = $null
+          $transferErr = ""
           # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
           try {
             $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
@@ -422,7 +481,9 @@ try {
             } catch {
               try {
                 $image = $item.Transfer()
-              } catch {}
+              } catch {
+                $transferErr = $_.Exception.Message
+              }
             }
           }
 
@@ -430,6 +491,8 @@ try {
             if (Test-Path $temp) { Remove-Item $temp -Force }
             $image.SaveFile($temp)
             $scanned = $true
+          } elseif (-not $scanned -and $transferErr) {
+            $errMsg = "Scanner transfer error: $transferErr"
           }
         }
       } else {
@@ -500,9 +563,18 @@ if ($scanned -and (Test-Path $temp)) {
         };
       }
     } catch (err) {
+      let rawErr = (err && err.message) ? err.message : 'WIA scan acquisition execution failed.';
+      if (rawErr.includes('Command failed:')) {
+        const lines = rawErr.split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l && !l.startsWith('Command failed: powershell'));
+        if (lines.length > 0) {
+          rawErr = lines.join(' ');
+        }
+      }
       return {
         success: false,
-        error: err.message || 'WIA scan acquisition execution failed.',
+        error: rawErr,
       };
     }
   }

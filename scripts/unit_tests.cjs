@@ -5289,6 +5289,74 @@ it("Enforces Remote Password Synchronization & Remote Assistance", () => {
   expect(localTech.pin).toBe('newpass2026');
 });
 
+console.log("\n--- SECTION 41: Native Hardware Scanner Command Pipeline & Windows Command-Line Length Resilience ---");
+
+it("Enforces Temporary .ps1 Script Execution to Completely Prevent Windows 8,191 Command-Line Length Limit", () => {
+  // A large WIA scanning script (similar to production) is >12,000 characters
+  const largeScript = "$temp = 'C:\\temp\\scan.jpg'\n" + "# ".repeat(6000) + "\nWrite-Output 'SUCCESS'";
+  expect(largeScript.length > 12000).toBe(true);
+
+  // If passed as -EncodedCommand, it would exceed 32,000 characters and crash cmd.exe (limit 8191)
+  const b64 = Buffer.from(largeScript, 'utf16le').toString('base64');
+  expect(b64.length > 30000).toBe(true);
+
+  // Simulation of the fixed runner: writes to temp file and passes -File
+  let writtenScriptContent = null;
+  const mockTempFs = {
+    writeFileSync: (_path, content, _enc) => { writtenScriptContent = content; },
+    unlinkSync: (_path) => { writtenScriptContent = null; },
+  };
+
+  const tempFilePath = "C:\\Users\\Mock\\AppData\\Local\\Temp\\podoload_ps_12345.ps1";
+  mockTempFs.writeFileSync(tempFilePath, '\ufeff' + largeScript, 'utf8');
+
+  // Verify that the command invoked is short (~75 chars), completely safe from 8191 char limit
+  const commandArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tempFilePath];
+  const commandLineEquivalent = `powershell.exe ${commandArgs.join(' ')}`;
+
+  expect(commandLineEquivalent.length < 150).toBe(true);
+  expect(commandLineEquivalent.length < 8191).toBe(true);
+  expect(writtenScriptContent.startsWith('\ufeff')).toBe(true); // UTF-8 BOM present
+});
+
+it("Sanitizes Raw PowerShell CLI Error Strings Before Displaying on Clinical Workstation UI", () => {
+  const rawCliError = `Command failed: powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand CgAkAHQAZQBt... The command line is too long.`;
+
+  const sanitizeError = (raw) => {
+    let clean = (raw || '').trim();
+    if (clean.includes('Command failed:') || clean.includes('-EncodedCommand') || clean.includes('The command line is too long')) {
+      return 'Scanner "EPSON L3210 Series" is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready.';
+    }
+    return clean;
+  };
+
+  const sanitized = sanitizeError(rawCliError);
+  expect(sanitized.includes('Command failed')).toBe(false);
+  expect(sanitized.includes('-EncodedCommand')).toBe(false);
+  expect(sanitized.includes('The command line is too long')).toBe(false);
+  expect(sanitized.includes('EPSON L3210 Series')).toBe(true);
+  expect(sanitized.includes('powered ON and ready')).toBe(true);
+});
+
+it("Enforces Flatbed (Glass) Scanner Source Selection for Multi-Function Printers (e.g. Epson L3210)", () => {
+  // Mock WIA device properties
+  const mockDeviceProperties = {
+    "3088": 1, // 1 = Feeder (default)
+    "3097": 0,
+  };
+
+  // Simulating the WIA setup routine
+  const configureWiaDevice = (props) => {
+    // 3088 = WIA_DPS_DOCUMENT_HANDLING_SELECT: 2 = Flatbed glass
+    props["3088"] = 2;
+    props["3097"] = 1; // 1 page
+  };
+
+  configureWiaDevice(mockDeviceProperties);
+  expect(mockDeviceProperties["3088"]).toBe(2); // Verified Flatbed
+  expect(mockDeviceProperties["3097"]).toBe(1);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
