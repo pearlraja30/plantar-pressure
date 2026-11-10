@@ -1347,10 +1347,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
-                      <strong>Full Multi-Tenant Governance:</strong> Provision Hospital Admins, inspect all workstation hardware MAC bindings, trace voucher code burns and permit expirations, audit all patient reports, and export global backups.
-                    </div>
-
                     <div
                       style={{
                         display: 'grid',
@@ -1469,10 +1465,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       <span className="podo-badge podo-badge-green" style={{ fontSize: '0.64rem' }}>
                         Master Access
                       </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
-                      <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
                     </div>
 
                     {(!registeredAdmin && dbService.getAdminAccountsListSync().length === 0) && (
@@ -1654,10 +1646,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           }}
                         />
                       </div>
-                    </div>
-
-                    <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45, paddingLeft: '2.5rem' }}>
-                      <strong>Clinical Reporting & Intake:</strong> Access to <strong>ALL historical reports</strong> (Patient Reports Hub, Patient Directory, Reports & Cloud archive), scanning, processing, report printing, PDF generation, and sharing.
                     </div>
 
                     {selectedRole === 'technician' && (
@@ -2511,21 +2499,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             </div>
           )}
         </div>
-
-        {/* Footer Regulatory & Compliance note on Full-Screen Login */}
-        {isSessionLocked && (
-          <div
-            style={{
-              marginTop: '1.25rem',
-              fontSize: '0.7rem',
-              color: '#64748b',
-              textAlign: 'center',
-              letterSpacing: '0.02em',
-            }}
-          >
-            IEC 62304 Class B SaMD · 21 CFR Part 11 Audit Trail Active · Zero Stale Data Guarantee
-          </div>
-        )}
       </div>
 
       {/* Multi-Device Payment Modal */}

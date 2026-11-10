@@ -1737,6 +1737,33 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced across Android, iOS, and Web platforms.
 - **Release Version**: Tagged and committed `v1.0.72`.
 
+---
+
+## 48. ACTIVITY: LOGIN SCREEN MINIMALIZATION & REDUNDANT TEXT ELIMINATION (v1.0.73)
+- **Date**: 2026-11-10
+- **Version**: `1.0.73`
+- **Scope**: Clean up the Clinical Diagnostic Station Sign-In modal by removing bottom highlighted regulatory footer text and trimming redundant descriptive marketing paragraphs from Super Admin, Hospital Admin, and Clinical Technician login cards.
+
+### 48.1 Removed Unnecessary Elements
+1. **Regulatory Footer Banner**:
+   - Removed the bottom highlighted text block:
+     `IEC 62304 Class B SaMD · 21 CFR Part 11 Audit Trail Active · Zero Stale Data Guarantee`
+   - This footer bar added visual clutter to the sign-in modal without clinical operational utility for daily operators.
+2. **Card Description Blocks**:
+   - Super Admin: Removed redundant multi-line description (`Full Multi-Tenant Governance: Provision Hospital Admins, inspect all workstation hardware MAC bindings...`).
+   - Hospital Admin: Removed redundant description (`Full Management Access: Hospital profiles & branding, create technician logins, manage hospital-wise patient records...`).
+   - Clinical Technician: Removed redundant description (`Clinical Reporting & Intake: Access to ALL historical reports (Patient Reports Hub, Patient Directory...)...`).
+3. **Visual Polish**:
+   - Login cards are now compact, streamlined, and direct. Operators see only the clinic badge, role icon, and direct credentials inputs.
+
+### 48.2 Quality Verification & Conformance
+- **Unit Test Battery**: All **103/103** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 405ms with 0 errors.
+- **Capacitor Synchronization**: Cleanly synchronized.
+- **Release Version**: Tagged and committed `v1.0.73`.
+
+
 
 
 
