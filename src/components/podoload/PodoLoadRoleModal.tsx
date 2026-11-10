@@ -142,7 +142,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [recoveryMode, setRecoveryMode] = useState<'none' | 'admin' | 'technician'>('none');
 
   // Admin Recovery Form state
-  const [adminRecoveryUser, setAdminRecoveryUser] = useState(registeredAdmin?.username || 'admin@technomind.health');
+  const [adminRecoveryUser, setAdminRecoveryUser] = useState<string>(() => {
+    return registeredAdmin?.username || dbService.getAdminAccountsListSync()[0]?.username || '';
+  });
   const [adminRecoveryVerify, setAdminRecoveryVerify] = useState('');
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminNewPasswordConfirm, setAdminNewPasswordConfirm] = useState('');
@@ -191,7 +193,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   // Admin Login Credentials
   const [adminUsernameInput, setAdminUsernameInput] = useState<string>(() => {
     const acc = dbService.getAdminAccountSync();
-    return acc?.username || 'admin@technomind.health';
+    if (acc?.username) return acc.username;
+    const list = dbService.getAdminAccountsListSync();
+    return list[0]?.username || '';
   });
 
   // Super Admin Login Credentials (Global Vendor Authority)
@@ -1458,7 +1462,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                             {registeredAdmin
                               ? `${registeredAdmin.username} · ${registeredAdmin.name}`
-                              : 'admin@technomind.health · Hospital Administrator'}
+                              : 'Hospital Administrator Sign-In'}
                           </div>
                         </div>
                       </div>
@@ -1470,6 +1474,49 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
                       <strong>Full Management Access:</strong> Hospital profiles & branding, create technician logins, manage hospital-wise patient records, device binding licenses, and all clinical reports.
                     </div>
+
+                    {(!registeredAdmin && dbService.getAdminAccountsListSync().length === 0) && (
+                      <div
+                        style={{
+                          backgroundColor: '#fefce8',
+                          border: '1px solid #fef08a',
+                          borderRadius: '6px',
+                          padding: '0.45rem 0.65rem',
+                          fontSize: '0.7rem',
+                          color: '#854d0e',
+                          lineHeight: 1.4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <div>
+                          <strong>First-Time Setup Notice:</strong> No local Clinic Administrator has been registered yet on this station. Please log in using the <strong>Super Admin</strong> tab (top right) or enter Super Admin Master Password (<code>superadmin@123</code>).
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRole('superadmin');
+                            setPinError(null);
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            backgroundColor: '#0f766e',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0.25rem 0.55rem',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Super Admin →
+                        </button>
+                      </div>
+                    )}
 
                     <div
                       style={{
@@ -2129,6 +2176,110 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                     >
                       <KeyRound className="w-3 h-3 text-red-600" />
                       <span>🔑 Reset Password with Administrator Authorization</span>
+                    </button>
+                  </div>
+                )}
+                {(pinError.includes('locked') || pinError.includes('consecutive failed attempts')) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dbService.clearAdminLockout();
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <span>⚡ Instant Unlock / Reset Lockout</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dbService.clearAdminLockout();
+                        setSelectedRole('superadmin');
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #dc2626',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.68rem',
+                        color: '#dc2626',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <ShieldCheck className="w-3 h-3 text-red-600" />
+                      <span>Switch to Super Admin Portal →</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRecoveryMode('admin');
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.68rem',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <KeyRound className="w-3 h-3 text-slate-600" />
+                      <span>Use Recovery Key / Reset Password</span>
+                    </button>
+                  </div>
+                )}
+                {pinError.includes('Super Admin') && !pinError.includes('locked') && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRole('superadmin');
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: '#0f766e',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <ShieldCheck className="w-3 h-3 text-white" />
+                      <span>Switch to Super Admin Tab →</span>
                     </button>
                   </div>
                 )}

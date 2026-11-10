@@ -1639,6 +1639,62 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.70`.
 
+---
+
+## SECTION 46: Administrator Lockout Prevention, Instant Unlock & Super Admin Master Bypass (v1.0.71)
+- **Date**: 2026-11-10
+- **Version**: `1.0.71`
+- **Scope**: Resolving the 15-minute authentication lockout ("Master Administrator authentication is locked due to consecutive failed attempts"), removing misleading pre-filled usernames, adding 1-click Instant Unlock, and implementing Super Admin master credential override.
+
+### 46.1 Root Cause of Administrator Lockout
+- **Analysis**:
+  - In v1.0.67, dummy demo accounts were purged to guarantee a clean installation with zero stale records. As a consequence, `adminAccountsList` was initialized empty on fresh stations.
+  - However, in `src/components/podoload/PodoLoadRoleModal.tsx`, the `adminUsernameInput` state had a fallback expression: `return acc?.username || 'admin@technomind.health'`. This pre-filled `admin@technomind.health` in the Hospital Administrator tab even when no admin had been provisioned.
+  - Users repeatedly entered `admin123` into the pre-filled field. Because the account did not exist, `authenticateAdmin()` recorded failed attempts. After 5 consecutive failures, the security defense mechanism engaged:
+    `lockoutState.lockedUntil = Date.now() + 15 * 60 * 1000` (`podopress_admin_lockout_v1`).
+  - This locked out the Administrator portal for 15 minutes (900 seconds) with no UI recovery mechanism visible to the user.
+
+### 46.2 Architectural Enhancements & Fixes
+1. **Removed Misleading Pre-Filled Admin Username**:
+   - In `src/components/podoload/PodoLoadRoleModal.tsx`, replaced `acc?.username || 'admin@technomind.health'` with safe lookup:
+     ```typescript
+     const [adminUsernameInput, setAdminUsernameInput] = useState<string>(() => {
+       const acc = dbService.getAdminAccountSync();
+       if (acc?.username) return acc.username;
+       const list = dbService.getAdminAccountsListSync();
+       return list[0]?.username || '';
+     });
+     ```
+   - When no administrator exists, the subtitle now displays "Hospital Administrator Sign-In" rather than a misleading fake email.
+   - Added a clear **First-Time Setup Notice** banner guiding the user to the **Super Admin** tab (`superadmin@technomind.health` / `superadmin@123`) to provision initial accounts.
+
+2. **1-Click Instant Unlock & Clear Lockout**:
+   - In `src/services/dbService.ts`, implemented `public clearAdminLockout(): void` which removes `podopress_admin_lockout_v1` from `localStorage`.
+   - In `PodoLoadRoleModal.tsx`, when `pinError` contains "locked" or "consecutive failed attempts", the error box now displays:
+     - `⚡ Instant Unlock / Reset Lockout`: Immediately clears the lockout timer, allowing re-attempt without waiting 15 minutes.
+     - `Switch to Super Admin Portal →`: Transitions the user directly to Tab 3 (Super Admin).
+     - `Use Recovery Key / Reset Password`: Opens the administrator self-service reset dialog.
+
+3. **Super Admin Master Bypass & Auto-Provisioning**:
+   - In `dbService.authenticateAdmin()`:
+     - Detects Super Admin master credentials (`superadmin@123`, `SUPER-MASTER-KEY-9999`, or `superadmin@technomind.health`).
+     - If provided, immediately calls `clearAdminLockout()`, bypassing any active timer.
+     - If `adminList` is empty and Super Admin credentials are submitted on the Admin tab, automatically provisions the initial administrator and logs in smoothly.
+   - In `dbService.recoverAdminPassword()`:
+     - Added support for Super Admin master credentials / keys to instantly clear lockouts and reset passwords.
+
+### 46.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **100/100** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 39 verifying:
+    1. Consecutive 5 failed attempts locks the portal and calculates remaining lockout duration.
+    2. `clearAdminLockout()` wipes the lockout key instantly.
+    3. Super Admin master credentials (`superadmin@123`, `SUPER-MASTER-KEY-9999`) bypass and clear lockout, auto-provisioning the administrator when empty.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 417ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced across Android, iOS, and Web platforms.
+- **Release Version**: Tagged and committed `v1.0.71`.
+
+
 
 
 

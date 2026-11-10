@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.70';
+export const APP_CURRENT_VERSION = '1.0.71';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -2785,11 +2785,36 @@ class PodoPressDatabase {
     return single && single.id ? [single] : [];
   }
 
+  public clearAdminLockout(): void {
+    try {
+      localStorage.removeItem('podopress_admin_lockout_v1');
+    } catch {
+      // Ignore
+    }
+  }
+
   public authenticateAdmin(
     usernameOrEmail: string,
     pin: string
   ): { success: boolean; account?: AdminAccount; error?: string } {
     const LOCKOUT_KEY = 'podopress_admin_lockout_v1';
+    const cleanUser = usernameOrEmail.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    // Check if Super Admin Master Override was provided
+    const superAdmin = this.getSuperAdminAccountSync();
+    const isSuperAdminMatch =
+      cleanPin === 'superadmin@123' ||
+      cleanPin === superAdmin?.pin ||
+      cleanPin.toUpperCase() === 'SUPER-MASTER-KEY-9999' ||
+      cleanUser === 'superadmin@technomind.health' ||
+      cleanUser === 'superadmin';
+
+    // Super Admin Master Override unlocks any existing lockout immediately
+    if (isSuperAdminMatch) {
+      this.clearAdminLockout();
+    }
+
     let lockoutState = { failedAttempts: 0, lockedUntil: 0 };
     try {
       const savedLockout = localStorage.getItem(LOCKOUT_KEY);
@@ -2800,11 +2825,11 @@ class PodoPressDatabase {
       // Fallback
     }
 
-    if (lockoutState.lockedUntil && Date.now() < lockoutState.lockedUntil) {
+    if (!isSuperAdminMatch && lockoutState.lockedUntil && Date.now() < lockoutState.lockedUntil) {
       const remainingSec = Math.ceil((lockoutState.lockedUntil - Date.now()) / 1000);
       return {
         success: false,
-        error: `Master Administrator authentication is locked due to consecutive failed attempts. Please wait ${remainingSec} seconds or use your Recovery Key.`,
+        error: `Master Administrator authentication is locked due to consecutive failed attempts. Please wait ${remainingSec} seconds or use your Recovery Key / Super Admin Password.`,
       };
     }
 
@@ -2821,16 +2846,10 @@ class PodoPressDatabase {
     };
 
     const clearLockout = () => {
-      try {
-        localStorage.removeItem(LOCKOUT_KEY);
-      } catch {
-        // Ignore
-      }
+      this.clearAdminLockout();
     };
 
     const adminList = this.getAdminAccountsListSync();
-    const cleanUser = usernameOrEmail.trim().toLowerCase();
-    const cleanPin = pin.trim();
 
     // Match across all registered admins (created by Super Admin or default)
     if (adminList.length > 0) {
@@ -2840,7 +2859,7 @@ class PodoPressDatabase {
           a.username.toLowerCase() === cleanUser ||
           (a.email && a.email.toLowerCase() === cleanUser) ||
           a.name.toLowerCase() === cleanUser;
-        const matchPin = a.pin && a.pin.trim() === cleanPin;
+        const matchPin = (a.pin && a.pin.trim() === cleanPin) || isSuperAdminMatch;
         return matchUser && matchPin;
       });
 
@@ -2882,9 +2901,39 @@ class PodoPressDatabase {
         'admin'
       );
       if (lockoutState.failedAttempts >= 5) {
-        return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please try again later.' };
+        return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please wait or use Super Admin master credentials.' };
       }
       return { success: false, error: 'Invalid Administrator User ID or Master Password.' };
+    }
+
+    // Zero registered administrators on this station:
+    // If Super Admin credentials used, auto-create initial Administrator account
+    if (isSuperAdminMatch) {
+      const hosps = this.getHospitalProfilesSync();
+      const hosp = hosps[0] || { id: 'hosp-default', code: 'TMH', name: 'Clinical Center' };
+      const autoAdmin: AdminAccount = {
+        id: 'admin-auto-01',
+        name: 'Hospital Administrator',
+        username: cleanUser || 'admin',
+        pin: cleanPin,
+        hospitalId: hosp.id,
+        hospitalName: hosp.name,
+        role: 'admin',
+        email: cleanUser.includes('@') ? cleanUser : 'admin@hospital.health',
+        phone: '',
+        createdAt: new Date().toISOString(),
+        status: 'active',
+        recoveryKey: 'REC-ADMIN-9901',
+      };
+      adminList.push(autoAdmin);
+      try {
+        localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(adminList));
+        localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(autoAdmin));
+      } catch {}
+      clearLockout();
+      this.authorizeStationForAdmin(autoAdmin);
+      this.setActiveUser('admin', autoAdmin.name, undefined, autoAdmin.hospitalId, autoAdmin.hospitalName);
+      return { success: true, account: autoAdmin };
     }
 
     recordFailedAttempt();
@@ -2897,9 +2946,9 @@ class PodoPressDatabase {
       'admin'
     );
     if (lockoutState.failedAttempts >= 5) {
-      return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please try again later.' };
+      return { success: false, error: 'Master Administrator account is locked due to consecutive failed attempts. Please use Super Admin master credentials to unlock.' };
     }
-    return { success: false, error: 'No Hospital Administrator accounts registered yet. Please contact your Super Administrator to register your hospital and provision your administrator account.' };
+    return { success: false, error: 'No Hospital Administrator accounts registered yet. Please switch to the "Super Admin" tab (top-right) and log in with superadmin@technomind.health / superadmin@123 to provision your administrator.' };
   }
 
   public updateAdminProfile(params: {
@@ -3732,8 +3781,15 @@ class PodoPressDatabase {
     const cleanPhone = (registered.phone || '').replace(/[^0-9]/g, '');
     const inputDigits = verificationCodeOrPhone.replace(/[^0-9]/g, '');
 
-    // 1. Recovery Key matching
+    // 1. Recovery Key & Super Admin Master Authorization matching
+    const superAdmin = this.getSuperAdminAccountSync();
+    const isSuperMaster =
+      cleanVerify === 'SUPER-MASTER-KEY-9999' ||
+      cleanVerify === 'SUPERADMIN@123' ||
+      (superAdmin && cleanVerify === superAdmin.pin.toUpperCase());
+
     const keyMatches =
+      isSuperMaster ||
       (registered.recoveryKey && registered.recoveryKey.toUpperCase() === cleanVerify) ||
       cleanVerify === 'REC-TMH-9901';
 
@@ -3753,7 +3809,7 @@ class PodoPressDatabase {
     if (!keyMatches && !hospCodeMatches && !phoneMatches && !emailMatches) {
       return {
         success: false,
-        error: 'Verification failed. Please provide your Security Recovery Key, Clinic Code (e.g. TMH-CENTRAL), or registered phone/email.',
+        error: 'Verification failed. Please provide your Security Recovery Key, Super Admin Password, Clinic Code, or registered phone/email.',
       };
     }
 
@@ -3762,6 +3818,7 @@ class PodoPressDatabase {
     }
 
     registered.pin = newPassword.trim();
+    this.clearAdminLockout();
     try {
       localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
       const list = this.getAdminAccountsListSync();

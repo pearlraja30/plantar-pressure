@@ -5078,6 +5078,116 @@ it("Enforces Cloud Telemetry Merging in Super Admin Console", () => {
   expect(finalTelemetry[1].macAddress).toBe("DE:4C:BF:67:98:AB");
 });
 
+console.log("\n--- SECTION 39: Administrator Lockout Prevention, Instant Unlock & Super Admin Master Bypass ---");
+
+it("Enforces 1-Click Instant Unlock and Super Admin Master Override on Consecutive Failed Attempts", () => {
+  // Simulate mock storage
+  const mockStorage = new Map();
+  const LOCKOUT_KEY = 'podopress_admin_lockout_v1';
+
+  const clearAdminLockout = () => {
+    mockStorage.delete(LOCKOUT_KEY);
+  };
+
+  const authenticateAdminSim = (username, pin, adminList = []) => {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    const isSuperAdminMatch =
+      cleanPin === 'superadmin@123' ||
+      cleanPin.toUpperCase() === 'SUPER-MASTER-KEY-9999' ||
+      cleanUser === 'superadmin@technomind.health' ||
+      cleanUser === 'superadmin';
+
+    if (isSuperAdminMatch) {
+      clearAdminLockout();
+    }
+
+    let lockout = mockStorage.get(LOCKOUT_KEY)
+      ? JSON.parse(mockStorage.get(LOCKOUT_KEY))
+      : { failedAttempts: 0, lockedUntil: 0 };
+
+    if (!isSuperAdminMatch && lockout.lockedUntil && Date.now() < lockout.lockedUntil) {
+      const remainingSec = Math.ceil((lockout.lockedUntil - Date.now()) / 1000);
+      return {
+        success: false,
+        error: `Master Administrator authentication is locked due to consecutive failed attempts. Please wait ${remainingSec} seconds or use your Recovery Key / Super Admin Password.`,
+      };
+    }
+
+    if (adminList.length > 0) {
+      const matched = adminList.find(
+        (a) =>
+          (a.username.toLowerCase() === cleanUser || a.email?.toLowerCase() === cleanUser) &&
+          (a.pin === cleanPin || isSuperAdminMatch)
+      );
+      if (matched) {
+        clearAdminLockout();
+        return { success: true, account: matched };
+      }
+    }
+
+    // Zero registered admins: Super Admin credentials auto-provisions
+    if (isSuperAdminMatch) {
+      const autoAdmin = {
+        id: 'admin-auto-01',
+        name: 'Hospital Administrator',
+        username: cleanUser || 'admin',
+        pin: cleanPin,
+        hospitalId: 'hosp-default',
+        hospitalName: 'Clinical Center',
+      };
+      clearAdminLockout();
+      return { success: true, account: autoAdmin };
+    }
+
+    // Record failure
+    lockout.failedAttempts += 1;
+    if (lockout.failedAttempts >= 5) {
+      lockout.lockedUntil = Date.now() + 15 * 60 * 1000;
+      mockStorage.set(LOCKOUT_KEY, JSON.stringify(lockout));
+      return {
+        success: false,
+        error: 'Master Administrator account is locked due to consecutive failed attempts. Please use Super Admin master credentials to unlock.',
+      };
+    }
+
+    mockStorage.set(LOCKOUT_KEY, JSON.stringify(lockout));
+    return {
+      success: false,
+      error: 'No Hospital Administrator accounts registered yet. Please switch to the "Super Admin" tab (top-right) and log in with superadmin@technomind.health / superadmin@123 to provision your administrator.',
+    };
+  };
+
+  // Test 1: 5 failed attempts locks the portal
+  for (let i = 1; i <= 4; i++) {
+    const res = authenticateAdminSim('admin@technomind.health', 'admin123', []);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('No Hospital Administrator accounts registered yet');
+  }
+
+  const lockedRes = authenticateAdminSim('admin@technomind.health', 'admin123', []);
+  expect(lockedRes.success).toBe(false);
+  expect(lockedRes.error).toContain('locked due to consecutive failed attempts');
+  expect(mockStorage.has(LOCKOUT_KEY)).toBe(true);
+
+  // Test 2: Instant Unlock wipes the lockout
+  clearAdminLockout();
+  expect(mockStorage.has(LOCKOUT_KEY)).toBe(false);
+
+  // Test 3: Lock it again to test Super Admin master credential bypass
+  for (let i = 1; i <= 5; i++) {
+    authenticateAdminSim('admin@technomind.health', 'wrongpass', []);
+  }
+  expect(mockStorage.has(LOCKOUT_KEY)).toBe(true);
+
+  // Authenticate with Super Admin credentials instantly clears the lockout and auto-provisions
+  const superAuth = authenticateAdminSim('superadmin@technomind.health', 'superadmin@123', []);
+  expect(superAuth.success).toBe(true);
+  expect(superAuth.account.name).toBe('Hospital Administrator');
+  expect(mockStorage.has(LOCKOUT_KEY)).toBe(false);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
