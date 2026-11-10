@@ -1773,13 +1773,9 @@ export function PodoLoadApp() {
             </div>
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Clinical Station Activation Required</h3>
             <p style={{ margin: 0, fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-              {deviceAuthStatus.reason === 'permit_expired'
-                ? 'Station license permit has expired. Hardware re-authorization via a fresh single-use Station Activation Code from your Hospital Administrator is required before clinical scanning.'
-                : deviceAuthStatus.reason === 'new_version'
-                  ? `PodoPress was updated to build v${deviceAuthStatus.currentVersion}. Re-authorization via your Clinic Code and Station Activation Code is required before proceeding.`
-                  : deviceAuthStatus.reason === 'new_device'
-                    ? `New physical device detected (${deviceAuthStatus.deviceId}). Hardware station pairing with your Clinic Code and Station Activation Code is required.`
-                    : 'This terminal has not been enrolled. Enter your Clinic Code and Station Activation Code to authorize this station.'}
+              {deviceAuthStatus.reason === 'new_device'
+                ? `New physical device detected (${deviceAuthStatus.deviceId}). Hardware station pairing with your Clinic Code and Station Activation Code is required.`
+                : 'This workstation has not been enrolled. Enter your Clinic Code and Station Activation Code to authorize this station.'}
             </p>
             <button
               type="button"

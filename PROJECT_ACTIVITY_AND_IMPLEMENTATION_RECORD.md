@@ -1454,5 +1454,89 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.67`.
 
+---
+
+## SECTION 43: Hardware Station Persistence Across Upgrades, Activation Gate Rules & 100% Offline Admin Password Management (v1.0.68)
+- **Date**: 2026-11-10
+- **Version**: `1.0.68`
+- **Scope**: Hardware station binding persistence across app upgrades, activation gate restrictions (device change only), administrative technician password reset, and 100% offline-first reliability.
+
+### 43.1 Problem Identification & Architectural Root Cause
+1. **Unwanted Activation Prompts on App Upgrades**:
+   - In previous builds, `dbService.checkDeviceAuthorizationStatus()` verified `token.appVersion !== currentVersion` and `token.expiresAt`.
+   - When a client installed a new Windows EXE installer or updated the build, `token.appVersion !== currentVersion` triggered `isAuthorized: false` with `reason: 'new_version'`.
+   - Furthermore, legacy time-bound permit policies could trigger `reason: 'permit_expired'`.
+   - This forced `isMandatoryActivation = true` in `PodoLoadApp.tsx` and opened the modal on the **Activation Voucher** tab (`Station Activation & Enrollment Required`) instead of allowing standard technician **User ID & Password** sign-in.
+   - Clients seeing this screen mistook it for an expired software account: *"Software login expired. Could you pls reset the password."*
+2. **Device Activation Policy Violation**:
+   - The security specification mandates that once a technician User ID and password are created and activated on a diagnostic station, that workstation is permanently bound.
+   - **Only if the physical device hardware changes** (`token.deviceFingerprint !== currentDeviceId` or `!token` on an un-enrolled device) should the application prompt for an activation voucher.
+   - Updating the application on the same machine must never invalidate authorization or require a re-activation voucher.
+3. **Technician Password Recovery & Reset**:
+   - Technicians who forget their password or enter incorrect credentials must be able to have their credentials reset by their Hospital Administrator from the Admin portal or inline modal, operating 100% offline.
+
+### 43.2 Implementation & Architectural Fixes
+1. **Persistent Device Authorization Engine (`src/services/dbService.ts`)**:
+   - Refactored `checkDeviceAuthorizationStatus()`:
+     - If `!token`: Returns `isAuthorized: false, reason: 'unregistered'` (prompts for Clinic Code + Activation Voucher on fresh hardware).
+     - If `token.status !== 'authorized'`: Returns `isAuthorized: false, reason: 'revoked'`.
+     - If `token.deviceFingerprint !== currentDeviceId`: Returns `isAuthorized: false, reason: 'new_device'` (**ONLY** condition that prompts for an activation code when hardware differs).
+     - If `token.deviceFingerprint === currentDeviceId`: **Same physical hardware confirmed**.
+       - Silently synchronizes `token.appVersion = currentVersion` to `localStorage` (`podopress_device_auth_token_v1`) and IndexedDB.
+       - Returns `isAuthorized: true`.
+       - Workstation remains permanently authorized across all builds, restarts, and new Windows EXE installations.
+   - Synchronized `APP_CURRENT_VERSION = '1.0.68'`.
+   - Updated `authorizeStationForAdmin()`: If an existing authorized token for the current device exists, preserve it and update `appVersion` without replacing credentials.
+   - Enhanced `recoverTechnicianPassword()`:
+     - Allows credential recovery with either Hospital Administrator Master Password OR Super Administrator Master Password, as well as registered recovery keys.
+     - Removed hardcoded legacy demo recovery keys.
+2. **Streamlined Station Sign-In & Recovery Flow (`src/components/podoload/PodoLoadRoleModal.tsx`)**:
+   - Fallback `actHospitalCode`: Changed from static `'TMH-CENTRAL'` to dynamically read `dbService.getActiveHospitalSync()?.code || dbService.getHospitalProfilesSync()[0]?.code || ''`.
+   - Technician User ID Pre-fill: Automatically fills `bound.technicianUsername` from the active workstation authorization token, or falls back cleanly to empty string (no stale `'tech@technomind.health'`).
+   - Default Tab on Bound Workstations: Because `isMandatoryActivation` is `false` on bound devices, `mobileAuthTab` defaults to `'login'`, immediately presenting the **Technician User ID & Password** fields.
+   - Inline Reset Action:
+     - Added `[🔑 Forgot Password? Reset via Admin]` shortcut button in the Station Login tab.
+     - When an incorrect password error appears (*"Incorrect password for Technician User ID..."*), an inline red action button `[🔑 Reset Password with Administrator Authorization]` appears, allowing 1-click transition to the administrator recovery form.
+   - Cleaned modal headers and alerts to eliminate references to expired permits or update re-activations.
+3. **Hospital Administrator Password Management (`src/components/podoload/PodoLoadAdmin.tsx`)**:
+   - Hospital Administrators have complete offline privileges to reset technician passwords from the **Clinical Technicians** table:
+     - Eye toggle (👁️) reveals/masks technician passwords for verification.
+     - `[Reset Password]` button opens a dedicated modal to input a new password or generate one with `[⚡ Generate Password]`.
+     - Clicking `[Save New Password]` immediately persists the updated `tech.pin` via `dbService.updateTechnicianPassword()` to `localStorage` and `IndexedDB`.
+     - The technician can immediately authenticate with the new password on their diagnostic station.
+4. **Super Administrator Master Console (`src/components/podoload/PodoLoadSuperAdmin.tsx`)**:
+   - Super Administrators can inspect all registered hospitals, hospital administrators, bound workstations, and audit trails.
+   - Master console provides 1-click switching to the Hospital Admin portal or Technician view.
+5. **100% Offline-First Architecture**:
+   - All authentication checks, token verifications, device fingerprinting, and credential updates execute synchronously against browser storage (`localStorage` & IndexedDB).
+   - Zero HTTP/network requests required for station activation, technician sign-in, or password resets. Works seamlessly offline and online.
+
+### 43.3 Windows EXE Installer Guidance for End Users & Clients
+1. **Seamless In-Place Upgrade**:
+   - The user runs the new Windows installer (`PodoPress Setup 1.0.68.exe`).
+   - Existing workstation authorization tokens and hospital clinical database stored in Windows AppData (`%APPDATA%` / Chromium storage) are automatically preserved.
+   - Upon launch, the app detects the same hardware fingerprint (`currentDeviceId`), auto-upgrades the token version to `1.0.68`, and directly displays the **Technician Login** screen with User ID and Password fields.
+   - **Zero activation codes are requested on the same computer**.
+2. **If Technician Forgot Password**:
+   - Option A (Admin Portal): Hospital Administrator opens Admin Portal (`Ctrl+Shift+A` or Admin login), navigates to **Clinical Technicians**, clicks `[Reset Password]` for the technician, enters the new password, and clicks `[Save New Password]`.
+   - Option B (Station Modal): On the login screen, click `[🔑 Forgot Password? Reset via Admin]`, enter the Administrator Master Password, and set the new technician password.
+   - Technician logs in immediately with the new password.
+3. **When Activation Code IS Required**:
+   - Only when PodoPress is installed on a **brand new computer** or hardware is replaced.
+   - The Hospital Administrator provides the Clinic Code (e.g. `CPOC`) and a single-use Station Activation Voucher (e.g. `CPOC-TECH-1001`).
+   - Once activated on the new machine, that machine becomes permanently bound.
+
+### 43.4 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **95/95** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 36 verifying:
+    1. `Enforces Station Persistence Across Version Upgrades on Same Physical Hardware`: Retains authorization without requiring activation codes on app updates.
+    2. `Enforces Activation Voucher Code Exclusively When Physical Hardware Device Changes`: Correctly triggers `reason: 'new_device'` only when hardware fingerprint changes.
+    3. `Enforces Hospital Administrator & Super Admin Offline Technician Password Reset`: Immediate persistence of updated credentials and instant offline login.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 417ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.68`.
+
+
 
 

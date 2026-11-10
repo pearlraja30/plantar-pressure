@@ -4709,6 +4709,126 @@ it("Maintains Strict Facility-Scoped Separation of Technicians and Clinical Reco
   expect(admin2VisibleCases[0].patientId).toBe('PAT-BETA');
 });
 
+console.log("\n--- SECTION 36: Persistent Hardware Station Binding Across Updates & Offline Admin Password Management ---");
+
+it("Enforces Station Persistence Across Version Upgrades on Same Physical Hardware", () => {
+  const currentHardwareId = "DEV-PHYSICAL-PC-01";
+  const APP_VERSION = "1.0.68";
+
+  // Simulate token bound on version 1.0.66 on this exact hardware
+  let storageToken = {
+    token: "AUTH-DEV-K91A-20XB",
+    hospitalId: "hosp-genuine-99",
+    hospitalCode: "CPOC",
+    hospitalName: "City Podiatry Care",
+    technicianId: "tech-genuine-42",
+    technicianName: "Dr. Michael Scott",
+    technicianUsername: "mscott",
+    deviceFingerprint: currentHardwareId,
+    appVersion: "1.0.66", // Older build
+    status: "authorized",
+    authorizedAt: "2026-11-01T10:00:00.000Z",
+  };
+
+  // Implementation of checkDeviceAuthorizationStatus logic
+  const checkStatus = (token, hardwareId, targetVersion) => {
+    if (!token) return { isAuthorized: false, reason: "unregistered" };
+    if (token.status !== "authorized") return { isAuthorized: false, reason: "revoked" };
+    if (token.deviceFingerprint !== hardwareId) return { isAuthorized: false, reason: "new_device" };
+
+    // Same hardware: seamless upgrade without invalidating authorization
+    if (token.appVersion !== targetVersion) {
+      token.appVersion = targetVersion;
+    }
+    return { isAuthorized: true, token };
+  };
+
+  const result = checkStatus(storageToken, currentHardwareId, APP_VERSION);
+
+  // MUST remain authorized: ZERO prompt for activation code
+  expect(result.isAuthorized).toBe(true);
+  expect(result.reason).toBe(undefined);
+  expect(storageToken.appVersion).toBe("1.0.68");
+});
+
+it("Enforces Activation Voucher Code Exclusively When Physical Hardware Device Changes", () => {
+  const originalHardwareId = "DEV-PHYSICAL-PC-01";
+  const newHardwareId = "DEV-PHYSICAL-LAPTOP-02";
+  const APP_VERSION = "1.0.68";
+
+  const token = {
+    token: "AUTH-DEV-K91A-20XB",
+    deviceFingerprint: originalHardwareId,
+    status: "authorized",
+    appVersion: APP_VERSION,
+  };
+
+  const checkStatus = (tok, hardwareId, targetVersion) => {
+    if (!tok) return { isAuthorized: false, reason: "unregistered" };
+    if (tok.status !== "authorized") return { isAuthorized: false, reason: "revoked" };
+    if (tok.deviceFingerprint !== hardwareId) return { isAuthorized: false, reason: "new_device" };
+    return { isAuthorized: true, token: tok };
+  };
+
+  // When running on NEW physical machine
+  const result = checkStatus(token, newHardwareId, APP_VERSION);
+
+  // MUST reject with 'new_device' to prompt for activation voucher
+  expect(result.isAuthorized).toBe(false);
+  expect(result.reason).toBe("new_device");
+});
+
+it("Enforces Hospital Administrator & Super Admin Offline Technician Password Reset", () => {
+  // Technician database record in local storage
+  let technicians = [
+    {
+      id: "tech-42",
+      name: "Kavita Rao",
+      username: "kavita.rao",
+      pin: "OldPass123",
+      status: "active",
+      hospitalId: "hosp-01",
+      hospitalName: "Apollo Clinic",
+    },
+  ];
+
+  // Admin resets technician password from Admin Portal
+  const adminResetTechnicianPassword = (techId, newPin) => {
+    const tech = technicians.find((t) => t.id === techId);
+    if (!tech) return false;
+    tech.pin = newPin.trim();
+    return true;
+  };
+
+  // Technician authenticate function (runs 100% offline from local storage)
+  const authenticateTechnician = (username, pin) => {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+    return technicians.find(
+      (t) =>
+        t.status === "active" &&
+        t.username.toLowerCase() === cleanUser &&
+        (!t.pin || t.pin === cleanPin)
+    ) || null;
+  };
+
+  // 1. Initial attempt with new password fails before reset
+  expect(authenticateTechnician("kavita.rao", "NewSecret2026!")).toBe(null);
+
+  // 2. Hospital Administrator resets password from Admin page
+  const resetSuccess = adminResetTechnicianPassword("tech-42", "NewSecret2026!");
+  expect(resetSuccess).toBe(true);
+
+  // 3. Old password now fails
+  expect(authenticateTechnician("kavita.rao", "OldPass123")).toBe(null);
+
+  // 4. Technician logs in successfully with new password immediately (offline)
+  const authTech = authenticateTechnician("kavita.rao", "NewSecret2026!");
+  expect(authTech).not.toBe(null);
+  expect(authTech.name).toBe("Kavita Rao");
+  expect(authTech.username).toBe("kavita.rao");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

@@ -168,9 +168,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   });
 
   // Code Activation Form State
-  const [actHospitalCode, setActHospitalCode] = useState(
-    dbService.getDeviceAuthorizationSync()?.hospitalCode || 'TMH-CENTRAL'
-  );
+  const [actHospitalCode, setActHospitalCode] = useState(() => {
+    return (
+      dbService.getDeviceAuthorizationSync()?.hospitalCode ||
+      dbService.getActiveHospitalSync()?.code ||
+      dbService.getHospitalProfilesSync()[0]?.code ||
+      ''
+    );
+  });
   const [actUsername, setActUsername] = useState(
     dbService.getDeviceAuthorizationSync()?.technicianUsername || ''
   );
@@ -203,12 +208,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       if (t) return t.username;
     }
     const bound = dbService.getDeviceAuthorizationSync();
+    if (bound?.technicianUsername) {
+      return bound.technicianUsername;
+    }
     if (bound?.technicianId) {
       const t = dbService.getTechniciansSync().find((x) => x.id === bound.technicianId);
       if (t) return t.username;
     }
     const techs = dbService.getTechniciansSync();
-    return techs[0]?.username || 'tech@technomind.health';
+    return techs[0]?.username || '';
   });
 
   // Device Binding Lockout State
@@ -660,13 +668,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       : deviceLockout
                         ? 'Device Binding Security Lockout'
                         : isMandatoryActivation
-                          ? activationReason === 'permit_expired'
-                            ? 'Station Permit Expired — Re-Activation Required'
-                            : activationReason === 'new_version'
-                              ? `PodoPress v${APP_CURRENT_VERSION} Update — Activation Required`
-                              : activationReason === 'new_device'
-                                ? 'New Hardware Device Detected — Registration Required'
-                                : 'Station Activation & Enrollment Required'
+                          ? activationReason === 'new_device'
+                            ? 'New Hardware Device Detected — Registration Required'
+                            : 'Station Activation & Enrollment Required'
                           : isSessionLocked
                             ? 'Clinical Diagnostic Station Sign-In'
                             : isAdminContext
@@ -681,9 +685,9 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       : deviceLockout
                         ? 'Single-device license policy active. Upgraded multi-device license required.'
                         : isMandatoryActivation
-                          ? activationReason === 'permit_expired'
-                            ? 'Security Policy: Your Station Permit has expired. Enter a fresh single-use Station Activation Code from your Hospital Administrator to renew this station.'
-                            : 'Security Policy: Enter your Clinic Code and Station Activation Code to authorize this station before proceeding with clinical examinations.'
+                          ? activationReason === 'new_device'
+                            ? 'Security Policy: This physical hardware station is not yet registered. Enter your Clinic Code and Station Activation Voucher to authorize this terminal.'
+                            : 'Security Policy: Enter your Clinic Code and Station Activation Voucher to authorize this station before proceeding with clinical examinations.'
                           : isSessionLocked
                             ? 'Select your role and authenticate with your assigned credentials to start a fresh clinical session.'
                             : isAdminContext
@@ -724,22 +728,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
                 <div>
                   <strong>
-                    {activationReason === 'permit_expired'
-                      ? 'Station License Permit Expired (Timed Hour/Day Policy)'
-                      : activationReason === 'new_version'
-                        ? 'Application Update / New Version Authorization Required'
-                        : activationReason === 'new_device'
-                          ? 'New Hardware Device Detected — Authorization Required'
-                          : 'Initial Device Registration Required'}
+                    {activationReason === 'new_device'
+                      ? 'New Hardware Device Detected — Station Authorization Required'
+                      : 'Initial Device Registration Required'}
                   </strong>
                   <div style={{ marginTop: '2px', fontSize: '0.7rem', color: '#78350f', lineHeight: 1.4 }}>
-                    {activationReason === 'permit_expired'
-                      ? 'The hour/day permit for this station has expired. Please contact your Hospital Administrator to obtain a fresh single-use Station Activation Code.'
-                      : activationReason === 'new_version'
-                        ? `PodoPress was updated to build v${APP_CURRENT_VERSION}. Enter your Clinic Code and Station Activation Code to authorize this new release before clinical examinations.`
-                        : activationReason === 'new_device'
-                          ? 'This physical device is not yet registered. Enter your Clinic Code and Station Activation Code to bind this terminal for offline clinical scanning.'
-                          : 'Please enter your Clinic Code and Station Activation Code to authorize this device before proceeding with examinations.'}
+                    {activationReason === 'new_device'
+                      ? 'This physical device differs from the previously registered station. Enter your Clinic Code and Station Activation Code from your Hospital Administrator to bind this computer.'
+                      : 'Please enter your Clinic Code and Station Activation Code provided by your Hospital Administrator to authorize this station.'}
                   </div>
                 </div>
               </div>
@@ -1988,7 +1984,31 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                               </div>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRecoveryMode('technician');
+                                  setPinError(null);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  fontSize: '0.68rem',
+                                  color: '#0f766e',
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                }}
+                              >
+                                <KeyRound className="w-3 h-3 text-teal-600" />
+                                <span>🔑 Forgot Password? Reset via Admin</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2000,7 +2020,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   background: 'none',
                                   border: 'none',
                                   fontSize: '0.68rem',
-                                  color: '#0f766e',
+                                  color: '#64748b',
                                   textDecoration: 'underline',
                                   cursor: 'pointer',
                                 }}
@@ -2020,16 +2040,47 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
             {pinError && (
               <div
                 style={{
-                  padding: '0.5rem 0.75rem',
+                  padding: '0.55rem 0.75rem',
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
                   borderRadius: '6px',
                   fontSize: '0.72rem',
                   color: '#b91c1c',
                   fontWeight: 600,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
                 }}
               >
-                {pinError}
+                <div>{pinError}</div>
+                {pinError.includes('Incorrect password') && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRecoveryMode('technician');
+                        setPinError(null);
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #f87171',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.55rem',
+                        fontSize: '0.68rem',
+                        color: '#b91c1c',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                      }}
+                    >
+                      <KeyRound className="w-3 h-3 text-red-600" />
+                      <span>🔑 Reset Password with Administrator Authorization</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

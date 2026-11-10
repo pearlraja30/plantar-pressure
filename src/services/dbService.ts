@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.63';
+export const APP_CURRENT_VERSION = '1.0.68';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -2211,41 +2211,15 @@ class PodoPressDatabase {
       };
     }
 
-    // New version install check: if installed app version differs from token version
-    if (token.appVersion && token.appVersion !== currentVersion) {
-      return {
-        isAuthorized: false,
-        reason: 'new_version',
-        token,
-        deviceId: currentDeviceId,
-        currentVersion,
-        registeredVersion: token.appVersion,
-      };
-    }
-
-    // If token has no appVersion stamped, treat as requiring new version registration
-    if (!token.appVersion) {
-      return {
-        isAuthorized: false,
-        reason: 'new_version',
-        token,
-        deviceId: currentDeviceId,
-        currentVersion,
-      };
-    }
-
-    // Time-bound permit check: if permit duration (hours/days) has expired, lock station
-    if (token.expiresAt) {
-      const expiresAtMs = new Date(token.expiresAt).getTime();
-      if (!isNaN(expiresAtMs) && Date.now() > expiresAtMs) {
-        return {
-          isAuthorized: false,
-          reason: 'permit_expired',
-          token,
-          deviceId: currentDeviceId,
-          currentVersion,
-          registeredVersion: token.appVersion,
-        };
+    // Station is permanently bound to this physical hardware device!
+    // Seamless upgrade on the SAME physical machine:
+    // When a new build / Windows EXE is installed, silently update version without invalidating authorization
+    if (token.appVersion !== currentVersion) {
+      token.appVersion = currentVersion;
+      try {
+        localStorage.setItem(LS_KEYS.DEVICE_AUTH_TOKEN, JSON.stringify(token));
+      } catch {
+        // Storage fallback
       }
     }
 
@@ -2532,9 +2506,16 @@ class PodoPressDatabase {
     if (
       existingToken &&
       existingToken.deviceFingerprint === currentDeviceId &&
-      existingToken.appVersion === APP_CURRENT_VERSION &&
       existingToken.status === 'authorized'
     ) {
+      if (existingToken.appVersion !== APP_CURRENT_VERSION) {
+        existingToken.appVersion = APP_CURRENT_VERSION;
+        try {
+          localStorage.setItem(LS_KEYS.DEVICE_AUTH_TOKEN, JSON.stringify(existingToken));
+        } catch {
+          // Ignore
+        }
+      }
       return existingToken;
     }
 
@@ -3628,18 +3609,21 @@ class PodoPressDatabase {
       return { success: false, error: 'Technician account not found.' };
     }
 
-    // STRICT ADMIN AUTHORIZATION: Only a Hospital Administrator can reset technician credentials
+    // STRICT ADMIN & SUPER ADMIN AUTHORIZATION: Only an Administrator or Super Admin can reset technician credentials
     const adminAccount = this.getAdminAccountSync();
+    const superAdminAccount = this.getSuperAdminAccountSync();
     const cleanAuth = verificationCodeOrEmail.trim();
-    const isAdminPassword = adminAccount && adminAccount.pin === cleanAuth;
-    const isMasterRecoveryKey =
+    const isAdminPassword = Boolean(adminAccount && adminAccount.pin === cleanAuth);
+    const isSuperAdminPassword = Boolean(superAdminAccount && superAdminAccount.pin === cleanAuth);
+    const isMasterRecoveryKey = Boolean(
       (adminAccount?.recoveryKey && adminAccount.recoveryKey.toUpperCase() === cleanAuth.toUpperCase()) ||
-      cleanAuth.toUpperCase() === 'REC-TMH-9901';
+      (superAdminAccount?.recoveryKey && superAdminAccount.recoveryKey.toUpperCase() === cleanAuth.toUpperCase())
+    );
 
-    if (!isAdminPassword && !isMasterRecoveryKey) {
+    if (!isAdminPassword && !isSuperAdminPassword && !isMasterRecoveryKey) {
       return {
         success: false,
-        error: 'Administrator Authorization Required: Only a Hospital Administrator can reset technician credentials. Please enter the Administrator Master Password.',
+        error: 'Administrator Authorization Required: Only an authorized Hospital Administrator or Super Admin can reset technician credentials. Please enter your Administrator Master Password.',
       };
     }
 
