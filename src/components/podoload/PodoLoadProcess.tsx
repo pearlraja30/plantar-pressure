@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, RotateCcw, Check, Sliders } from 'lucide-react';
 import { FootCaptureData } from './PodoLoadCapture';
 import { processHarrisMatScan } from '../../services/imageProcessingService';
+import { dbService, DEFAULT_PROCESSING_PARAMETERS } from '../../services/dbService';
+import { ProcessingParameters } from '../../types';
 
 interface PodoLoadProcessProps {
   leftFoot: FootCaptureData | null;
@@ -21,16 +24,64 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   onBack,
   onContinue,
 }) => {
-  // Processing parameters matching Screenshot 3
-  const [smoothingStrength, setSmoothingStrength] = useState<number>(5);
-  const [intensityLevels, setIntensityLevels] = useState<string>('6 levels');
-  const [colorMap, setColorMap] = useState<string>('Jet');
-  const [backgroundThreshold, setBackgroundThreshold] = useState<number>(12);
-  const [flattenLighting, setFlattenLighting] = useState<boolean>(true);
-  const [removePaperNoise, setRemovePaperNoise] = useState<boolean>(true);
+  // Load persistent processing parameters from storage (persists across all exams until user explicitly updates)
+  const [savedParams, setSavedParams] = useState<ProcessingParameters>(() => dbService.getProcessingParametersSync());
+  const [smoothingStrength, setSmoothingStrength] = useState<number>(savedParams.smoothingStrength);
+  const [intensityLevels, setIntensityLevels] = useState<string>(savedParams.intensityLevels);
+  const [colorMap, setColorMap] = useState<string>(savedParams.colorMap);
+  const [backgroundThreshold, setBackgroundThreshold] = useState<number>(savedParams.backgroundThreshold);
+  const [flattenLighting, setFlattenLighting] = useState<boolean>(savedParams.flattenLighting);
+  const [removePaperNoise, setRemovePaperNoise] = useState<boolean>(savedParams.removePaperNoise);
+  const [saveNotification, setSaveNotification] = useState<string | null>(null);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const isFirstMount = useRef(true);
+
+  // Save current parameters as persistent defaults for all subsequent exams
+  const handleSaveDefaultSettings = () => {
+    const newParams: ProcessingParameters = {
+      smoothingStrength,
+      intensityLevels,
+      colorMap,
+      backgroundThreshold,
+      flattenLighting,
+      removePaperNoise,
+    };
+    dbService.saveProcessingParameters(newParams);
+    setSavedParams(newParams);
+    setSaveNotification('✓ Parameters saved & persistent for all exams');
+    setTimeout(() => setSaveNotification(null), 3000);
+  };
+
+  // Reset to standard clinical defaults
+  const handleResetDefaults = () => {
+    const def = { ...DEFAULT_PROCESSING_PARAMETERS };
+    setSmoothingStrength(def.smoothingStrength);
+    setIntensityLevels(def.intensityLevels);
+    setColorMap(def.colorMap);
+    setBackgroundThreshold(def.backgroundThreshold);
+    setFlattenLighting(def.flattenLighting);
+    setRemovePaperNoise(def.removePaperNoise);
+    dbService.saveProcessingParameters(def);
+    setSavedParams(def);
+    setSaveNotification('✓ Restored and saved clinical defaults');
+    setTimeout(() => setSaveNotification(null), 3000);
+  };
+
+  // Safe asynchronous image loader that handles caching and errors without hanging
+  const loadImageSafe = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load scan image for processing'));
+      img.src = src;
+      if (img.complete && img.naturalWidth > 0) {
+        resolve(img);
+      }
+    });
+  };
 
   // Process both scans (or single available foot) using clinical imageProcessingService
   const runProcessingPipeline = async () => {
@@ -45,37 +96,41 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
       let rightUrl = rightHeatmapUrl || '';
 
       if (leftFoot?.rawDataUrl) {
-        const leftImg = new Image();
-        leftImg.src = leftFoot.rawDataUrl;
-        await new Promise((res) => (leftImg.onload = res));
-
-        leftResult = await processHarrisMatScan(leftImg, 'Left', {
-          smoothRadius: smoothingStrength,
-          intensityLevels,
-          colorMap,
-          backgroundThreshold,
-          flattenLighting,
-          removePaperNoise,
-          sensitivity: 1.0,
-        });
-        leftUrl = leftResult.processedDataUrl;
+        try {
+          const leftImg = await loadImageSafe(leftFoot.rawDataUrl);
+          leftResult = await processHarrisMatScan(leftImg, 'Left', {
+            smoothRadius: smoothingStrength,
+            intensityLevels,
+            colorMap,
+            backgroundThreshold,
+            flattenLighting,
+            removePaperNoise,
+            sensitivity: 1.0,
+          });
+          leftUrl = leftResult.processedDataUrl;
+        } catch (err) {
+          console.warn('[PodoLoadProcess] Left foot heatmap generation fallback:', err);
+          leftUrl = leftFoot.rawDataUrl;
+        }
       }
 
       if (rightFoot?.rawDataUrl) {
-        const rightImg = new Image();
-        rightImg.src = rightFoot.rawDataUrl;
-        await new Promise((res) => (rightImg.onload = res));
-
-        rightResult = await processHarrisMatScan(rightImg, 'Right', {
-          smoothRadius: smoothingStrength,
-          intensityLevels,
-          colorMap,
-          backgroundThreshold,
-          flattenLighting,
-          removePaperNoise,
-          sensitivity: 1.0,
-        });
-        rightUrl = rightResult.processedDataUrl;
+        try {
+          const rightImg = await loadImageSafe(rightFoot.rawDataUrl);
+          rightResult = await processHarrisMatScan(rightImg, 'Right', {
+            smoothRadius: smoothingStrength,
+            intensityLevels,
+            colorMap,
+            backgroundThreshold,
+            flattenLighting,
+            removePaperNoise,
+            sensitivity: 1.0,
+          });
+          rightUrl = rightResult.processedDataUrl;
+        } catch (err) {
+          console.warn('[PodoLoadProcess] Right foot heatmap generation fallback:', err);
+          rightUrl = rightFoot.rawDataUrl;
+        }
       }
 
       onUpdateHeatmaps(
@@ -91,7 +146,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
     }
   };
 
-  // Run automatically on first load if heatmaps not yet generated
+  // Run automatically on initial mount ONLY if heatmaps have not yet been generated
   useEffect(() => {
     const hasAnyScan = Boolean(leftFoot?.rawDataUrl || rightFoot?.rawDataUrl);
     const needsProcessing = (leftFoot?.rawDataUrl && !leftHeatmapUrl) || (rightFoot?.rawDataUrl && !rightHeatmapUrl);
@@ -100,9 +155,25 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
     }
   }, [leftFoot, rightFoot]);
 
-  // Live real-time reactive debounce: reprocesses heatmaps whenever any parameter changes
+  // Live real-time reactive debounce: reprocesses heatmaps whenever any parameter changes and persists them
   useEffect(() => {
+    // Prevent immediate re-execution on initial component mount to preserve existing generated heatmaps
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     if (!leftFoot?.rawDataUrl && !rightFoot?.rawDataUrl) return;
+
+    // Automatically synchronize modified parameters to storage so they persist across navigation
+    dbService.saveProcessingParameters({
+      smoothingStrength,
+      intensityLevels,
+      colorMap,
+      backgroundThreshold,
+      flattenLighting,
+      removePaperNoise,
+    });
 
     const timer = setTimeout(() => {
       runProcessingPipeline();
@@ -208,7 +279,48 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
 
         {/* ================= RIGHT PANEL: PROCESSING PARAMETERS ================= */}
         <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <h3 className="podoload-card-title">PROCESSING PARAMETERS</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem' }}>
+            <h3 className="podoload-card-title" style={{ margin: 0 }}>PROCESSING PARAMETERS</h3>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                color: '#047857',
+                backgroundColor: '#ecfdf5',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                border: '1px solid #a7f3d0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
+              title="Parameters are locked and saved for all future exams"
+            >
+              <Check className="w-3 h-3 text-emerald-600" />
+              <span>Persistent Settings</span>
+            </span>
+          </div>
+
+          {saveNotification && (
+            <div
+              style={{
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #6ee7b7',
+                color: '#065f46',
+                padding: '0.4rem 0.6rem',
+                borderRadius: '4px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                boxShadow: '0 1px 3px rgba(16, 185, 129, 0.15)',
+              }}
+            >
+              <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+              <span>{saveNotification}</span>
+            </div>
+          )}
 
           <div className="podoload-form-group" style={{ marginBottom: '0.4rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#3d585e', fontWeight: 600 }}>
@@ -296,14 +408,39 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             </div>
           </div>
 
+          {/* Action Buttons: Save Settings, Reset Defaults, Reprocess */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="podoload-btn-secondary podoload-btn-sm"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+              onClick={handleSaveDefaultSettings}
+              title="Save current parameters as persistent defaults for all future exams"
+            >
+              <Save className="w-3.5 h-3.5 text-teal-600" />
+              <span>Save Setting</span>
+            </button>
+
+            <button
+              type="button"
+              className="podoload-btn-secondary podoload-btn-sm"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.35rem 0.55rem' }}
+              onClick={handleResetDefaults}
+              title="Reset parameters to standard clinical defaults"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reset</span>
+            </button>
+          </div>
+
           <button
             type="button"
-            className="podoload-btn-secondary"
-            style={{ marginTop: 'auto', width: '100%' }}
+            className="podoload-btn-primary"
+            style={{ width: '100%' }}
             onClick={runProcessingPipeline}
             disabled={isProcessing}
           >
-            {isProcessing ? 'Processing...' : 'Reprocess'}
+            {isProcessing ? 'Processing Heatmaps...' : 'Reprocess Heatmaps'}
           </button>
         </div>
       </div>

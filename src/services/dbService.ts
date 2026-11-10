@@ -1,7 +1,7 @@
 // PodoPress Inbuilt Database & Persistence Engine (IndexedDB + Storage Cache)
 // Provides unified persistence for Application Settings, Alphanumeric Patient IDs, Patient Profiles, and Clinical Exam Reports.
 
-import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, SuperAdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy } from '../types';
+import { AnalysisCase, AuditEvent, Patient, PatientIdConfig, SystemSettings, HospitalProfile, TechnicianUser, AdminAccount, SuperAdminAccount, BoundDevice, DeviceLicense, DeviceAuthorizationToken, VoucherExpiryPolicy, ProcessingParameters } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { safeStorage, stripHeavyCasePayloads } from './storageUtils';
 import { deviceBindingService } from './deviceBindingService';
@@ -284,6 +284,16 @@ const LS_KEYS = {
   DEVICE_AUTH_TOKEN: 'podopress_device_auth_token_v1',
   VOUCHER_EXPIRY_POLICY: 'podopress_voucher_expiry_policy_v1',
   BURNED_ACTIVATION_CODES: 'podopress_burned_activation_codes_v1',
+  PROCESSING_PARAMETERS: 'podopress_processing_parameters_v1',
+};
+
+export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
+  smoothingStrength: 5,
+  intensityLevels: '6 levels',
+  colorMap: 'Jet',
+  backgroundThreshold: 12,
+  flattenLighting: true,
+  removePaperNoise: true,
 };
 
 export const DEFAULT_SUPER_ADMIN_ACCOUNT: SuperAdminAccount = {
@@ -779,6 +789,48 @@ class PodoPressDatabase {
       },
     };
     await this.saveSettings(updated);
+  }
+
+  /**
+   * Retrieves persistent processing parameters for plantar pressure heatmap synthesis.
+   * Persists across all exams and sessions until updated by user.
+   */
+  public getProcessingParametersSync(): ProcessingParameters {
+    try {
+      const saved = localStorage.getItem(LS_KEYS.PROCESSING_PARAMETERS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.smoothingStrength === 'number') {
+          return {
+            smoothingStrength: parsed.smoothingStrength,
+            intensityLevels: parsed.intensityLevels || DEFAULT_PROCESSING_PARAMETERS.intensityLevels,
+            colorMap: parsed.colorMap || DEFAULT_PROCESSING_PARAMETERS.colorMap,
+            backgroundThreshold: typeof parsed.backgroundThreshold === 'number' ? parsed.backgroundThreshold : DEFAULT_PROCESSING_PARAMETERS.backgroundThreshold,
+            flattenLighting: typeof parsed.flattenLighting === 'boolean' ? parsed.flattenLighting : DEFAULT_PROCESSING_PARAMETERS.flattenLighting,
+            removePaperNoise: typeof parsed.removePaperNoise === 'boolean' ? parsed.removePaperNoise : DEFAULT_PROCESSING_PARAMETERS.removePaperNoise,
+          };
+        }
+      }
+
+      // Check settings fallback
+      const settings = this.getSettingsSync();
+      if (settings.processing) {
+        return { ...settings.processing };
+      }
+    } catch {}
+    return { ...DEFAULT_PROCESSING_PARAMETERS };
+  }
+
+  /**
+   * Saves and permanently persists processing parameters for all subsequent exams.
+   */
+  public saveProcessingParameters(params: ProcessingParameters): void {
+    try {
+      localStorage.setItem(LS_KEYS.PROCESSING_PARAMETERS, JSON.stringify(params));
+      const current = this.getSettingsSync();
+      current.processing = { ...params };
+      this.saveSettings(current);
+    } catch {}
   }
 
   // =========================================================================

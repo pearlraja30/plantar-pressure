@@ -274,6 +274,16 @@ export interface SystemSettings {
   stationSecurity?: {
     allowStationAdminLogin?: boolean; // Default false on native kiosks (.exe, .apk, .ipa), true in browser
   };
+  processing?: ProcessingParameters;
+}
+
+export interface ProcessingParameters {
+  smoothingStrength: number;
+  intensityLevels: string;
+  colorMap: string;
+  backgroundThreshold: number;
+  flattenLighting: boolean;
+  removePaperNoise: boolean;
 }
 
 export interface HospitalDoctor {

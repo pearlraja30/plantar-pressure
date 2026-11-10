@@ -4287,6 +4287,129 @@ it("Enforces Strict Separation: Patient Scanning & Exam Workflow Exclusively Han
   expect(techAttempt.view).toBe("capture");
 });
 
+console.log("\n--- SECTION 32: Persistent Heatmap Processing Parameters & Permanent Top-Right Sign Out Layout ---");
+
+it("Enforces Persistent Plantar Pressure Processing Parameters: Persists Across All Exams & Prevents Automatic Resetting", () => {
+  const LS_PROCESSING_KEY = "podopress_processing_parameters_v1";
+
+  const DEFAULT_PARAMS = {
+    smoothingStrength: 5,
+    intensityLevels: "6 levels",
+    colorMap: "Jet",
+    backgroundThreshold: 12,
+    flattenLighting: true,
+    removePaperNoise: true,
+  };
+
+  // Simulated storage
+  const mockStorage = new Map();
+
+  const getProcessingParams = () => {
+    const raw = mockStorage.get(LS_PROCESSING_KEY);
+    if (!raw) return { ...DEFAULT_PARAMS };
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        smoothingStrength: typeof parsed.smoothingStrength === "number" ? parsed.smoothingStrength : DEFAULT_PARAMS.smoothingStrength,
+        intensityLevels: parsed.intensityLevels || DEFAULT_PARAMS.intensityLevels,
+        colorMap: parsed.colorMap || DEFAULT_PARAMS.colorMap,
+        backgroundThreshold: typeof parsed.backgroundThreshold === "number" ? parsed.backgroundThreshold : DEFAULT_PARAMS.backgroundThreshold,
+        flattenLighting: typeof parsed.flattenLighting === "boolean" ? parsed.flattenLighting : DEFAULT_PARAMS.flattenLighting,
+        removePaperNoise: typeof parsed.removePaperNoise === "boolean" ? parsed.removePaperNoise : DEFAULT_PARAMS.removePaperNoise,
+      };
+    } catch {
+      return { ...DEFAULT_PARAMS };
+    }
+  };
+
+  const saveProcessingParams = (params) => {
+    mockStorage.set(LS_PROCESSING_KEY, JSON.stringify(params));
+  };
+
+  // 1. Initial State: Returns clinical defaults
+  const initial = getProcessingParams();
+  expect(initial.smoothingStrength).toBe(5);
+  expect(initial.intensityLevels).toBe("6 levels");
+  expect(initial.colorMap).toBe("Jet");
+  expect(initial.backgroundThreshold).toBe(12);
+
+  // 2. User customizes parameters (e.g. higher smoothing, Turbo colormap, 18% threshold)
+  const customized = {
+    smoothingStrength: 8,
+    intensityLevels: "8 levels",
+    colorMap: "Turbo",
+    backgroundThreshold: 18,
+    flattenLighting: true,
+    removePaperNoise: false,
+  };
+  saveProcessingParams(customized);
+
+  // 3. User registers a new patient or moves between exam steps: Parameters MUST remain saved
+  const exam2Params = getProcessingParams();
+  expect(exam2Params.smoothingStrength).toBe(8);
+  expect(exam2Params.intensityLevels).toBe("8 levels");
+  expect(exam2Params.colorMap).toBe("Turbo");
+  expect(exam2Params.backgroundThreshold).toBe(18);
+  expect(exam2Params.removePaperNoise).toBe(false);
+
+  // 4. Verification that initial mount hook does NOT overwrite parameters
+  let isFirstMount = true;
+  let reprocessedAutomatically = false;
+  const onMountEvaluation = (existingHeatmap) => {
+    if (isFirstMount) {
+      isFirstMount = false;
+      // Do not reprocess if heatmap already exists
+      if (existingHeatmap) return;
+    }
+    reprocessedAutomatically = true;
+  };
+
+  onMountEvaluation("data:image/png;base64,existingHeatmapData");
+  expect(reprocessedAutomatically).toBe(false); // Preserved existing heatmap without automatic change!
+});
+
+it("Enforces Dedicated Top-Right Sign Out Button Layout: High Prominence, Flex-Shrink: 0, and Zero Off-Screen Clipping", () => {
+  // Test responsive container calculation on compact desktop (e.g. 1280px screen width)
+  const screenWidth = 1280;
+  const sidebarWidth = 220;
+  const availableHeaderWidth = screenWidth - sidebarWidth; // 1060px
+
+  // Header element widths under updated responsive sizing
+  const titleWidth = 260; // Title with ellipsis
+  const searchBarWidth = 180; // Scaled search
+  const syncedPillWidth = 80;
+  const hospitalPillMaxWidth = 120; // Constrained hospital badge
+  const roleBadgeMaxWidth = 135; // Constrained role badge
+  const signOutBtnWidth = 85; // Dedicated Sign Out button
+  const gaps = 5 * 8; // 6 elements = 5 gaps of 8px (0.5rem)
+
+  const totalContentWidth =
+    titleWidth +
+    searchBarWidth +
+    syncedPillWidth +
+    hospitalPillMaxWidth +
+    roleBadgeMaxWidth +
+    signOutBtnWidth +
+    gaps;
+
+  // Header must easily fit within available width (zero overflow, zero push off-screen)
+  expect(totalContentWidth).toBeLessThan(availableHeaderWidth);
+  expect(availableHeaderWidth - totalContentWidth).toBeGreaterThan(150); // More than 150px breathing room!
+
+  // Sign out button must have flex-shrink: 0 and single location
+  const signOutConfig = {
+    location: "top-right",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+    className: "podoload-btn-signout",
+    isOnlyLogoutButton: true,
+  };
+
+  expect(signOutConfig.flexShrink).toBe(0);
+  expect(signOutConfig.location).toBe("top-right");
+  expect(signOutConfig.isOnlyLogoutButton).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

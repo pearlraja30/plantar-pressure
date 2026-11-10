@@ -1266,3 +1266,64 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 256ms with 0 errors.
 - **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.63`.
+
+---
+
+## 39. Processing Parameters Permanent Persistence & Guaranteed Single Top-Right Sign Out Layout (v1.0.64)
+
+### 39.1 Top-Right Sign Out Button Guaranteed Visibility & Layout Optimization
+- **Problem & Root Cause**:
+  - The user instructed to keep the Sign Out button exclusively in the top-right corner and remove duplicate logout triggers from the bottom-left sidebar.
+  - On standard laptop/desktop display resolutions (1200px to 1366px) or resized browser windows, the combined horizontal width of the top-header elements (Title + 240px Search Bar + Synced Badge + EN Language Badge + 180px Hospital Badge + 220px User Badge + Sign Out Button) exceeded the available container width (`calc(100vw - 220px)`).
+  - Because `.podoload-main-content` enforces `overflow: hidden`, the right-most element (the Sign Out button) was pushed off-screen or clipped, showing only a 2px sliver (`[-`), causing users to believe the logout button had been removed.
+- **Architecture & Layout Engineering**:
+  - `src/components/podoload/podoload.css`:
+    - Updated `.podoload-top-header-row` to `gap: 0.5rem; width: 100%; min-width: 0; box-sizing: border-box;`.
+    - Converted `.podoload-global-search` from fixed `width: 240px; min-width: 140px;` to flexible `flex: 0 1 180px; min-width: 90px; max-width: 200px;`.
+    - Configured `.podoload-top-right-actions` with `flex-shrink: 0; margin-left: auto; gap: 0.45rem;`.
+    - Added dedicated class `.podoload-btn-signout`:
+      - Features `flex-shrink: 0; white-space: nowrap;` ensuring it can **never** be squished or pushed off the edge.
+      - Styled with high visual clarity: `#fff5f5` background, `#fca5a5` red border, `#dc2626` text, clear `LogOut` icon, and hover highlight (`#fee2e2`).
+    - Added responsive breakpoints:
+      - `@media (max-width: 1350px)`: Gracefully hides the non-essential `EN` language selector (`.podoload-lang-badge-header`) on compact viewports to prioritize clinical identity and logout controls.
+      - `@media (max-width: 1180px)`: Gracefully hides the search bar during active exam steps to guarantee the Sign Out button and role badges remain 100% visible.
+  - `src/components/podoload/PodoLoadHeader.tsx`:
+    - Active Hospital pill constrained to `maxWidth: '120px'` with clean ellipsis truncation.
+    - Role badge constrained to `maxWidth: '135px'` with clean ellipsis truncation.
+    - Language selector assigned `.podoload-lang-badge-header` for graceful responsive collapse.
+    - Sign Out button assigned `.podoload-btn-signout`, guaranteeing permanent single-location visibility across all viewports.
+
+### 39.2 Plantar Pressure Processing Parameters Permanent Persistence Engine
+- **Problem & Root Cause**:
+  - In `PodoLoadProcess.tsx`, processing parameters (`smoothingStrength`, `intensityLevels`, `colorMap`, `backgroundThreshold`, `flattenLighting`, `removePaperNoise`) were previously stored only in transient React component state (`useState(5)`, etc.).
+  - Whenever a user navigated between exam steps, registered a new patient, or refreshed the station, all parameter settings were wiped and reset to hardcoded defaults.
+  - On component mount, the reactive debounce hook triggered automatically after 250ms, resetting and recalculating heatmaps with reverted defaults ("changing automatically").
+  - In addition, asynchronous `new Image()` loading without cached completion checks or reject handlers could occasionally hang, leaving the heatmap displays stuck on "Processing Heatmap...".
+- **Implementation & Type Architecture**:
+  - `src/types/index.ts`:
+    - Defined `ProcessingParameters` interface (`smoothingStrength: number`, `intensityLevels: string`, `colorMap: string`, `backgroundThreshold: number`, `flattenLighting: boolean`, `removePaperNoise: boolean`).
+    - Extended `SystemSettings` with `processing?: ProcessingParameters`.
+  - `src/services/dbService.ts`:
+    - Added `LS_KEYS.PROCESSING_PARAMETERS = 'podopress_processing_parameters_v1'`.
+    - Added `DEFAULT_PROCESSING_PARAMETERS` (smoothing: 5, levels: '6 levels', colorMap: 'Jet', threshold: 12%, flatten: true, removeNoise: true).
+    - Implemented `getProcessingParametersSync(): ProcessingParameters`: loads saved parameters from storage/settings with fallback to clinical defaults.
+    - Implemented `saveProcessingParameters(params: ProcessingParameters): void`: saves and permanently persists parameters to `localStorage` and `SystemSettings`.
+  - `src/components/podoload/PodoLoadProcess.tsx`:
+    - State initialized synchronously from `dbService.getProcessingParametersSync()`.
+    - Created `loadImageSafe(src)` helper: sets `onload` and `onerror` event listeners before `src` assignment and immediately checks `img.complete && img.naturalWidth > 0`, completely preventing hangs.
+    - Handled fallback gracefully: if image processing pipeline encounters an issue, it falls back to the raw scan rather than stalling.
+    - Added `isFirstMount` ref to suppress automatic debounce re-execution on initial component mount when heatmaps already exist.
+    - Added real-time auto-persistence whenever a technician adjusts any slider or dropdown.
+    - Added explicit **`[💾 Save Setting]`** button with instant feedback banner (`✓ Parameters saved & persistent for all exams`).
+    - Added **`[↺ Reset]`** button to restore standard clinical defaults if required.
+    - Added visual **`✓ Persistent Settings`** badge in the `PROCESSING PARAMETERS` header card confirming that settings are locked and persistent across all future exams.
+
+### 39.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **87/87** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 32 verifying persistent processing parameters across exams and preventing automatic resetting.
+  - Added Section 32 verifying dedicated top-right Sign Out button layout, flex-shrink: 0, responsive breathing room (> 150px), and zero off-screen clipping.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 355ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced into Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.64`.
+

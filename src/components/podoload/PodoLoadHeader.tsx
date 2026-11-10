@@ -195,7 +195,7 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
           </button>
 
           {/* Language Selector */}
-          <div className="podoload-lang-badge" title="Language: English" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <div className="podoload-lang-badge podoload-lang-badge-header" title="Language: English" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
             <Globe className="w-3 h-3 mr-1 inline opacity-70" />
             <span>EN</span>
           </div>
@@ -217,9 +217,10 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                 color: '#166534',
                 fontWeight: 700,
                 fontSize: '0.72rem',
-                padding: '0.2rem 0.55rem',
-                maxWidth: '180px',
+                padding: '0.2rem 0.5rem',
+                maxWidth: '120px',
                 flexShrink: 1,
+                overflow: 'hidden',
               }}
             >
               <Building2 className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
@@ -261,8 +262,9 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                 onClick={onOpenUserSwitcher}
                 title={`Active: ${currentUser.title} (${currentUser.username}). Click to switch role.`}
                 style={{
-                  maxWidth: '220px',
+                  maxWidth: '135px',
                   flexShrink: 1,
+                  overflow: 'hidden',
                   ...(currentUser.role === 'superadmin' ? { backgroundColor: '#f3e8ff', color: '#7e22ce', borderColor: '#d8b4fe' } : {})
                 }}
               >
@@ -290,24 +292,9 @@ export const PodoLoadHeader: React.FC<PodoLoadHeaderProps> = ({
                   type="button"
                   onClick={onLogout}
                   title="Sign out of station and end current clinical session"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    padding: '0.3rem 0.65rem',
-                    borderRadius: '6px',
-                    border: '1px solid #fecaca',
-                    backgroundColor: '#fff5f5',
-                    color: '#dc2626',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                  }}
+                  className="podoload-btn-signout"
                 >
-                  <LogOut className="w-3.5 h-3.5 text-red-500" />
+                  <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>Sign Out</span>
                 </button>
               )}
