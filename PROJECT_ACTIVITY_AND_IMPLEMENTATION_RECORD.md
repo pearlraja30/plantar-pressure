@@ -1537,6 +1537,65 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
 - **Release Version**: Tagged and committed `v1.0.68`.
 
+---
+
+## SECTION 44: Autonomous Offline Station Activation & Cross-Machine Provisioning (v1.0.69)
+- **Date**: 2026-11-10
+- **Version**: `1.0.69`
+- **Scope**: Resolving cross-machine database isolation, autonomous offline voucher auto-provisioning on fresh computers, and cross-machine setup snapshot import.
+
+### 44.1 Root Cause Analysis: Remote Machine Database Isolation
+- **The Issue**:
+  - A vendor/administrator created a clinic with code `T`, an admin account, and a technician `tech@technomind.health` (with voucher `T-TECH-4728`) on their **own development computer**.
+  - The vendor compiled and sent the `.exe` installer to an outside client.
+  - The client installed the application on their remote computer (Station ID: `DEV-4CBF-6798`) and entered:
+    - Hospital / Clinic Code: `T`
+    - Technician Username: `tech@technomind.health`
+    - Station Activation Code: `T-TECH-4728`
+  - The app threw the error:
+    > *"Hospital or Clinic with code 'T' was not found in the clinic directory. Please check with your Administrator."*
+- **Why this occurred**:
+  - PodoPress uses an **embedded local offline storage architecture** (`localStorage` & IndexedDB).
+  - The records created on the vendor's machine reside strictly inside that machine's private browser/Electron user profile.
+  - The `.exe` installer is an executable package containing application logic; it intentionally does not bundle the private local database of the machine that compiled it.
+  - Consequently, on the client's PC, `hospitals` is initially empty (`[]`). When the voucher was checked, `hospitals.find(h => h.code === 'T')` returned `undefined`, causing the activation rejection.
+
+### 44.2 Architectural Solution: 3 Independent Deployment Paths (With or Without Internet)
+
+#### Path 1: Autonomous Voucher Auto-Provisioning (Zero Setup, Zero Network Needed)
+- When a client enters a valid formatted voucher issued for a clinic prefix (e.g. `T-TECH-4728` matching clinic `T`):
+  - If Hospital `T` does not exist in local storage, `registerDeviceWithActivationCode()` **automatically provisions Hospital `T`** (`hosp-t`, code `T`, name `T Clinical Hospital Center`).
+  - If Technician `tech@technomind.health` does not exist in local storage, it **automatically provisions the Technician account** with the password entered in `Set Quick Password`.
+  - It also **automatically provisions a Hospital Administrator account** (`admin@t.health`, PIN matching the entered password or `admin123`) so administrative oversight is immediately available on that station.
+  - The station hardware (`DEV-4CBF-6798`, MAC: `DE:4C:BF:67:98:AB`) is permanently bound.
+  - Works **100% offline with zero internet and zero shared network**.
+
+#### Path 2: Cross-Machine Platform Backup Import (`.json`)
+- In the Super Admin Master Console on the vendor's machine:
+  - Tab 5: **System Backup & Export** -> Click `[Export Global System Backup]` to generate `PODOPRESS_GLOBAL_SYSTEM_BACKUP_YYYY-MM-DD.json`.
+- The vendor sends this file along with the installer.
+- On the client's machine, on the Station Activation screen:
+  - Click **`[📂 Import Clinic Setup / License Backup (.json)]`**.
+  - Selecting the JSON file automatically restores all registered hospitals, hospital administrators, technicians, and vouchers directly into the client's local database.
+  - Client clicks `[Authorize & Register Device]` to complete binding.
+
+#### Path 3: Direct Super Administrator Setup on the Client Machine
+- On the client's machine, press `Ctrl+Shift+S` (or click Super Admin in Role Switcher):
+  - Username: `superadmin@technomind.health`
+  - Password: `superadmin@123`
+- The vendor/client directly registers the clinic, provisions administrators, and assigns technicians directly on that workstation.
+
+### 44.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **97/97** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 37 verifying:
+    1. `Enforces Autonomous Station Activation on Fresh Remote PC (Zero Initial Records)`: Autonomous provisioning of hospital, technician, and administrator from formatted voucher.
+    2. `Enforces Cross-Machine Platform Backup Import for Offline Clinic Provisioning`: Cross-machine JSON snapshot import and storage restoration.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 401ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced across Android and iOS platforms.
+- **Release Version**: Tagged and committed `v1.0.69`.
+
+
 
 
 

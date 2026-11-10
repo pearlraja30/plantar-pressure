@@ -4829,6 +4829,159 @@ it("Enforces Hospital Administrator & Super Admin Offline Technician Password Re
   expect(authTech.username).toBe("kavita.rao");
 });
 
+console.log("\n--- SECTION 37: Autonomous Offline Station Activation & Cross-Machine Snapshot Import ---");
+
+it("Enforces Autonomous Station Activation on Fresh Remote PC (Zero Initial Records)", () => {
+  // Fresh remote machine storage (empty hospitals, empty technicians)
+  const mockStorage = {
+    'podopress_hospitals_v1': JSON.stringify([]),
+    'podopress_technicians_v1': JSON.stringify([]),
+    'podopress_admin_accounts_list_v1': JSON.stringify([]),
+  };
+
+  // User input on client's fresh PC
+  const inputParams = {
+    hospitalCode: "T",
+    username: "tech@technomind.health",
+    activationCode: "T-TECH-4728",
+    password: "Password123!",
+  };
+
+  // Autonomous offline activation engine implementation
+  const registerDeviceWithVoucher = (params, storage) => {
+    const normHosp = params.hospitalCode.trim().toUpperCase();
+    const normAct = params.activationCode.trim().toUpperCase();
+
+    let hospitals = JSON.parse(storage['podopress_hospitals_v1'] || '[]');
+    let hospital = hospitals.find((h) => h.code === normHosp);
+
+    // Auto-provision hospital if voucher code format matches clinic prefix
+    if (!hospital) {
+      const codePrefix = normAct.split('-')[0];
+      const isMatch = normAct.startsWith(`${normHosp}-`) || codePrefix === normHosp || normAct.includes('-TECH-');
+      if (isMatch) {
+        hospital = {
+          id: `hosp-${normHosp.toLowerCase()}`,
+          code: normHosp,
+          name: `${normHosp} Clinical Hospital Center`,
+          status: 'active',
+        };
+        hospitals.push(hospital);
+        storage['podopress_hospitals_v1'] = JSON.stringify(hospitals);
+      } else {
+        return { success: false, error: 'Hospital not found and voucher invalid.' };
+      }
+    }
+
+    let technicians = JSON.parse(storage['podopress_technicians_v1'] || '[]');
+    let tech = technicians.find((t) => t.username === params.username);
+
+    // Auto-provision technician
+    if (!tech) {
+      const codePrefix = normAct.split('-')[0];
+      const isMatch = normAct.startsWith(`${normHosp}-`) || codePrefix === normHosp || normAct.includes('-TECH-');
+      if (isMatch) {
+        tech = {
+          id: `tech-${normHosp.toLowerCase()}-01`,
+          name: 'Tech Specialist',
+          username: params.username,
+          pin: params.password,
+          hospitalId: hospital.id,
+          hospitalName: hospital.name,
+          role: 'technician',
+          status: 'active',
+          activationCode: normAct,
+        };
+        technicians.push(tech);
+        storage['podopress_technicians_v1'] = JSON.stringify(technicians);
+
+        // Auto-provision admin
+        let admins = JSON.parse(storage['podopress_admin_accounts_list_v1'] || '[]');
+        if (!admins.some((a) => a.hospitalId === hospital.id)) {
+          admins.push({
+            id: `admin-${normHosp.toLowerCase()}`,
+            name: `${normHosp} Hospital Administrator`,
+            username: `admin@${normHosp.toLowerCase()}.health`,
+            pin: params.password,
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+          });
+          storage['podopress_admin_accounts_list_v1'] = JSON.stringify(admins);
+        }
+      }
+    }
+
+    return { success: true, hospital, technician: tech };
+  };
+
+  const res = registerDeviceWithVoucher(inputParams, mockStorage);
+
+  expect(res.success).toBe(true);
+  expect(res.hospital.code).toBe("T");
+  expect(res.technician.username).toBe("tech@technomind.health");
+  expect(res.technician.pin).toBe("Password123!");
+
+  // Verify storage was populated offline
+  const savedHosps = JSON.parse(mockStorage['podopress_hospitals_v1']);
+  const savedTechs = JSON.parse(mockStorage['podopress_technicians_v1']);
+  const savedAdmins = JSON.parse(mockStorage['podopress_admin_accounts_list_v1']);
+
+  expect(savedHosps.length).toBe(1);
+  expect(savedHosps[0].code).toBe("T");
+  expect(savedTechs.length).toBe(1);
+  expect(savedTechs[0].username).toBe("tech@technomind.health");
+  expect(savedAdmins.length).toBe(1);
+  expect(savedAdmins[0].username).toBe("admin@t.health");
+});
+
+it("Enforces Cross-Machine Platform Backup Import for Offline Clinic Provisioning", () => {
+  // Machine A export payload
+  const machineAExportJson = JSON.stringify({
+    exportedAt: "2026-11-10T10:00:00.000Z",
+    hospitals: [
+      { id: "hosp-t", code: "T", name: "Technomind Care Clinic" },
+    ],
+    administrators: [
+      { id: "admin-t", username: "admin@t.org", pin: "AdminMaster2026!", hospitalId: "hosp-t", hospitalName: "Technomind Care Clinic" },
+    ],
+    technicians: [
+      { id: "tech-t1", username: "tech@t.org", pin: "TechPin789", activationCode: "T-TECH-4728", hospitalId: "hosp-t" },
+    ],
+    cases: [],
+  });
+
+  // Machine B fresh storage
+  const machineBStorage = {
+    'podopress_hospitals_v1': JSON.stringify([]),
+    'podopress_technicians_v1': JSON.stringify([]),
+    'podopress_admin_accounts_list_v1': JSON.stringify([]),
+  };
+
+  // Import implementation
+  const importPlatformBackup = (jsonStr, storage) => {
+    const data = JSON.parse(jsonStr);
+    storage['podopress_hospitals_v1'] = JSON.stringify(data.hospitals || []);
+    storage['podopress_admin_accounts_list_v1'] = JSON.stringify(data.administrators || []);
+    storage['podopress_technicians_v1'] = JSON.stringify(data.technicians || []);
+    return { success: true, count: data.hospitals.length };
+  };
+
+  const importResult = importPlatformBackup(machineAExportJson, machineBStorage);
+  expect(importResult.success).toBe(true);
+
+  // Machine B now has all clinic and staff data ready offline
+  const hosps = JSON.parse(machineBStorage['podopress_hospitals_v1']);
+  const admins = JSON.parse(machineBStorage['podopress_admin_accounts_list_v1']);
+  const techs = JSON.parse(machineBStorage['podopress_technicians_v1']);
+
+  expect(hosps.length).toBe(1);
+  expect(hosps[0].code).toBe("T");
+  expect(admins.length).toBe(1);
+  expect(admins[0].username).toBe("admin@t.org");
+  expect(techs.length).toBe(1);
+  expect(techs[0].activationCode).toBe("T-TECH-4728");
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

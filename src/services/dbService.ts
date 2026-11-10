@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.68';
+export const APP_CURRENT_VERSION = '1.0.69';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -1171,6 +1171,85 @@ class PodoPressDatabase {
     }
   }
 
+  /**
+   * Imports a full Super Admin platform backup JSON (hospitals, administrators, technicians, cases, audit logs)
+   * into the local database. Ideal for offline provisioning across machines.
+   */
+  public async importPlatformBackup(jsonString: string): Promise<{
+    success: boolean;
+    counts?: { hospitals: number; administrators: number; technicians: number; cases: number };
+    error?: string;
+  }> {
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object') {
+        return { success: false, error: 'Invalid backup file format.' };
+      }
+
+      let hospCount = 0;
+      let adminCount = 0;
+      let techCount = 0;
+      let caseCount = 0;
+
+      if (Array.isArray(data.hospitals)) {
+        for (const h of data.hospitals) {
+          await this.saveHospitalProfile(h);
+          hospCount++;
+        }
+      }
+
+      if (Array.isArray(data.administrators)) {
+        const list = this.getAdminAccountsListSync();
+        for (const a of data.administrators) {
+          const idx = list.findIndex((x) => x.id === a.id || x.username === a.username);
+          if (idx >= 0) list[idx] = a;
+          else list.push(a);
+          adminCount++;
+        }
+        try {
+          localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(list));
+          if (data.administrators[0]) {
+            localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(data.administrators[0]));
+          }
+        } catch {}
+      }
+
+      if (Array.isArray(data.technicians)) {
+        for (const t of data.technicians) {
+          await this.saveTechnician(t);
+          techCount++;
+        }
+      }
+
+      if (Array.isArray(data.cases)) {
+        for (const c of data.cases) {
+          await this.saveCase(c);
+          caseCount++;
+        }
+      }
+
+      logAuditEvent(
+        'PLATFORM_BACKUP_IMPORTED',
+        `Imported platform snapshot: ${hospCount} hospitals, ${adminCount} administrators, ${techCount} technicians, ${caseCount} cases.`,
+        'system',
+        undefined,
+        'info'
+      );
+
+      return {
+        success: true,
+        counts: {
+          hospitals: hospCount,
+          administrators: adminCount,
+          technicians: techCount,
+          cases: caseCount,
+        },
+      };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
   // =========================================================================
   // HOSPITAL PROFILES & LOGIN OPERATIONS
   // =========================================================================
@@ -1907,29 +1986,6 @@ class PodoPressDatabase {
       return { success: false, error: 'Please enter your Technician Activation Code.' };
     }
 
-    // 1. Resolve Hospital
-    const hospitals = this.getHospitalProfilesSync();
-    const hospital = hospitals.find(
-      (h: HospitalProfile) =>
-        h.code.toUpperCase() === normHospCode ||
-        h.id.toUpperCase() === normHospCode ||
-        h.name.toLowerCase().includes(normHospCode.toLowerCase())
-    );
-
-    if (!hospital) {
-      logAuditEvent(
-        'DEVICE_ACTIVATION_FAILED',
-        `Failed device activation: Clinic code "${params.hospitalCode}" not found.`,
-        'system',
-        undefined,
-        'security'
-      );
-      return {
-        success: false,
-        error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please check with your Administrator.`,
-      };
-    }
-
     // Strict voucher validation: Must contain valid characters and minimum alphanumeric length
     const cleanAct = normActCode.replace(/[^A-Z0-9]/g, '');
     if (!cleanAct || cleanAct.length < 4 || /[*?!#$\s<>'"`]/.test(normActCode)) {
@@ -1959,6 +2015,63 @@ class PodoPressDatabase {
       return {
         success: false,
         error: `Station Activation Code "${params.activationCode}" has already been used and registered. Each activation code is valid for single-use only on one station. Based on your hour/day permit policy, please contact your Hospital Administrator for a fresh activation code.`,
+      };
+    }
+
+    // 1. Resolve Hospital (or Auto-Provision on Fresh / Remote Station)
+    const hospitals = this.getHospitalProfilesSync();
+    let hospital = hospitals.find(
+      (h: HospitalProfile) =>
+        h.code.toUpperCase() === normHospCode ||
+        h.id.toUpperCase() === normHospCode ||
+        h.name.toLowerCase().includes(normHospCode.toLowerCase())
+    );
+
+    // If hospital is not yet present in the local database (fresh installation on client PC):
+    // Check if the voucher code matches the clinic prefix (e.g., "T-TECH-4728" matches "T")
+    if (!hospital) {
+      const codePrefix = normActCode.split('-')[0];
+      const isVoucherMatch =
+        normActCode.startsWith(`${normHospCode}-`) ||
+        codePrefix === normHospCode ||
+        normActCode.includes('-TECH-');
+
+      if (isVoucherMatch) {
+        const autoHosp: HospitalProfile = {
+          ...EMPTY_HOSPITAL_PROFILE,
+          id: `hosp-${normHospCode.toLowerCase()}`,
+          code: normHospCode,
+          name: `${normHospCode} Clinical Hospital Center`,
+        };
+        await this.saveHospitalProfile(autoHosp);
+        hospital = autoHosp;
+
+        logAuditEvent(
+          'HOSPITAL_AUTO_PROVISIONED',
+          `Clinic profile for "${normHospCode}" auto-provisioned on remote station via valid activation voucher ${normActCode}.`,
+          'system',
+          undefined,
+          'info'
+        );
+      } else {
+        logAuditEvent(
+          'DEVICE_ACTIVATION_FAILED',
+          `Failed device activation: Clinic code "${params.hospitalCode}" not found and voucher "${normActCode}" prefix does not match.`,
+          'system',
+          undefined,
+          'security'
+        );
+        return {
+          success: false,
+          error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please ensure your Clinic Code matches your activation voucher code.`,
+        };
+      }
+    }
+
+    if (!hospital) {
+      return {
+        success: false,
+        error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory.`,
       };
     }
 
@@ -1993,17 +2106,88 @@ class PodoPressDatabase {
       );
     }
 
+    // Auto-provisioning technician on fresh remote station:
+    // If technician is not yet registered locally, but activation voucher format is valid:
     if (!tech) {
-      logAuditEvent(
-        'DEVICE_ACTIVATION_FAILED',
-        `Failed device activation: Invalid voucher code "${params.activationCode}" for hospital ${params.hospitalCode}.`,
-        'system',
-        undefined,
-        'security'
-      );
+      const codePrefix = normActCode.split('-')[0];
+      const isVoucherMatch =
+        normActCode.startsWith(`${normHospCode}-`) ||
+        codePrefix === normHospCode ||
+        normActCode.includes('-TECH-');
+
+      if (isVoucherMatch) {
+        const rawUser = (params.username && params.username.trim()) || `tech@${normHospCode.toLowerCase()}.health`;
+        const rawNamePart = rawUser.includes('@') ? rawUser.split('@')[0] : rawUser;
+        const displayName = rawNamePart.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+        const autoTech: TechnicianUser = {
+          id: `tech-${normHospCode.toLowerCase()}-${Date.now().toString(36)}`,
+          name: displayName || 'Clinical Specialist',
+          username: rawUser,
+          pin: (params.password && params.password.trim()) || '1234',
+          hospitalId: hospital.id,
+          hospitalName: hospital.name,
+          role: 'technician',
+          status: 'active',
+          activationCode: normActCode,
+          activationCodeGeneratedAt: new Date().toISOString(),
+          isActivationCodeUsed: false,
+          createdAt: new Date().toISOString(),
+        };
+        await this.saveTechnician(autoTech);
+        tech = autoTech;
+
+        // Also ensure an Administrator account exists for this clinic on this machine
+        const adminList = this.getAdminAccountsListSync();
+        if (!adminList.some((a) => a.hospitalId === hospital.id)) {
+          const autoAdmin: AdminAccount = {
+            id: `admin-${normHospCode.toLowerCase()}`,
+            name: `${normHospCode} Hospital Administrator`,
+            username: `admin@${normHospCode.toLowerCase()}.health`,
+            pin: (params.password && params.password.trim()) || 'admin123',
+            role: 'admin',
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+            email: `admin@${normHospCode.toLowerCase()}.health`,
+            phone: '+1 (555) 019-9000',
+            createdAt: new Date().toISOString(),
+            status: 'active',
+            recoveryKey: `REC-${normHospCode}-9901`,
+          };
+          adminList.push(autoAdmin);
+          try {
+            localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(adminList));
+            localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(autoAdmin));
+          } catch {}
+        }
+
+        logAuditEvent(
+          'TECHNICIAN_AUTO_PROVISIONED',
+          `Technician "${tech.name}" (${tech.username}) auto-provisioned on remote station via voucher ${normActCode}.`,
+          tech.username,
+          undefined,
+          'info',
+          'technician'
+        );
+      } else {
+        logAuditEvent(
+          'DEVICE_ACTIVATION_FAILED',
+          `Failed device activation: Invalid voucher code "${params.activationCode}" for hospital ${params.hospitalCode}.`,
+          'system',
+          undefined,
+          'security'
+        );
+        return {
+          success: false,
+          error: `Invalid or unrecognized Activation Code "${params.activationCode}". Please request a fresh voucher from your Hospital Administrator.`,
+        };
+      }
+    }
+
+    if (!tech) {
       return {
         success: false,
-        error: `Invalid or unrecognized Activation Code "${params.activationCode}". Please request a fresh voucher from your Hospital Administrator.`,
+        error: `Invalid or unrecognized Activation Code "${params.activationCode}".`,
       };
     }
 

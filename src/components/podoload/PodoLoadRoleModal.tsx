@@ -22,6 +22,7 @@ import {
   Building2,
   User,
   Laptop,
+  Upload,
 } from 'lucide-react';
 import { SystemUserSession, dbService, APP_CURRENT_VERSION } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
@@ -1870,6 +1871,56 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   </button>
                                 </div>
                               </div>
+                            </div>
+
+                            {/* Offline Clinic Setup / License Backup Import */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.25rem', borderTop: '1px dashed #cbd5e1' }}>
+                              <label
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.68rem',
+                                  color: '#0f766e',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  textDecoration: 'underline',
+                                }}
+                              >
+                                <Upload className="w-3.5 h-3.5 text-teal-600" />
+                                <span>📂 Import Clinic Setup / License Backup (.json)</span>
+                                <input
+                                  type="file"
+                                  accept=".json"
+                                  style={{ display: 'none' }}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    try {
+                                      const text = await file.text();
+                                      const res = await dbService.importPlatformBackup(text);
+                                      if (res.success && res.counts) {
+                                        setActSuccessMsg(`✓ Successfully imported clinic setup! (${res.counts.hospitals} clinics, ${res.counts.technicians} technicians loaded).`);
+                                        const hosps = dbService.getHospitalProfilesSync();
+                                        if (hosps[0]) {
+                                          setActHospitalCode(hosps[0].code);
+                                        }
+                                        const techs = dbService.getTechniciansSync();
+                                        if (techs[0]) {
+                                          setActUsername(techs[0].username);
+                                          if (techs[0].activationCode) {
+                                            setActActivationCode(techs[0].activationCode);
+                                          }
+                                        }
+                                      } else {
+                                        setPinError(res.error || 'Failed to import backup file.');
+                                      }
+                                    } catch (err) {
+                                      setPinError('Error reading backup file: ' + (err as Error).message);
+                                    }
+                                  }}
+                                />
+                              </label>
                             </div>
                           </div>
                         ) : (
