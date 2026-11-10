@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.71';
+export const APP_CURRENT_VERSION = '1.0.72';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -1327,6 +1327,11 @@ class PodoPressDatabase {
       };
       await this.saveSettings(settings);
     }
+
+    // Asynchronous background synchronization to Supabase Cloud
+    import('./cloudSyncService').then(({ cloudSyncService }) => {
+      cloudSyncService.pushHospitalProfilesToCloud([profile]).catch(() => {});
+    });
   }
 
   public async setActiveHospital(
@@ -1486,6 +1491,11 @@ class PodoPressDatabase {
         console.warn('PodoPress: Failed to save technician to IndexedDB:', err);
       }
     }
+
+    // Asynchronous background synchronization to Supabase Cloud
+    import('./cloudSyncService').then(({ cloudSyncService }) => {
+      cloudSyncService.pushTechniciansToCloud([tech]).catch(() => {});
+    });
   }
 
   public async deleteTechnician(id: string): Promise<void> {
@@ -2030,41 +2040,53 @@ class PodoPressDatabase {
     // If hospital is not yet present in the local database (fresh installation on client PC):
     // Check if the voucher code matches the clinic prefix (e.g., "T-TECH-4728" matches "T")
     if (!hospital) {
-      const codePrefix = normActCode.split('-')[0];
-      const isVoucherMatch =
-        normActCode.startsWith(`${normHospCode}-`) ||
-        codePrefix === normHospCode ||
-        normActCode.includes('-TECH-');
+      // 1a. Query Supabase Cloud first for registered clinic & voucher
+      try {
+        const { cloudSyncService } = await import('./cloudSyncService');
+        const remoteLookup = await cloudSyncService.lookupRemoteVoucher(normActCode);
+        if (remoteLookup.found && remoteLookup.hospital) {
+          hospital = remoteLookup.hospital;
+          await this.saveHospitalProfile(hospital);
+        }
+      } catch {}
 
-      if (isVoucherMatch) {
-        const autoHosp: HospitalProfile = {
-          ...EMPTY_HOSPITAL_PROFILE,
-          id: `hosp-${normHospCode.toLowerCase()}`,
-          code: normHospCode,
-          name: `${normHospCode} Clinical Hospital Center`,
-        };
-        await this.saveHospitalProfile(autoHosp);
-        hospital = autoHosp;
+      if (!hospital) {
+        const codePrefix = normActCode.split('-')[0];
+        const isVoucherMatch =
+          normActCode.startsWith(`${normHospCode}-`) ||
+          codePrefix === normHospCode ||
+          normActCode.includes('-TECH-');
 
-        logAuditEvent(
-          'HOSPITAL_AUTO_PROVISIONED',
-          `Clinic profile for "${normHospCode}" auto-provisioned on remote station via valid activation voucher ${normActCode}.`,
-          'system',
-          undefined,
-          'info'
-        );
-      } else {
-        logAuditEvent(
-          'DEVICE_ACTIVATION_FAILED',
-          `Failed device activation: Clinic code "${params.hospitalCode}" not found and voucher "${normActCode}" prefix does not match.`,
-          'system',
-          undefined,
-          'security'
-        );
-        return {
-          success: false,
-          error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please ensure your Clinic Code matches your activation voucher code.`,
-        };
+        if (isVoucherMatch) {
+          const autoHosp: HospitalProfile = {
+            ...EMPTY_HOSPITAL_PROFILE,
+            id: `hosp-${normHospCode.toLowerCase()}`,
+            code: normHospCode,
+            name: `${normHospCode} Clinical Hospital Center`,
+          };
+          await this.saveHospitalProfile(autoHosp);
+          hospital = autoHosp;
+
+          logAuditEvent(
+            'HOSPITAL_AUTO_PROVISIONED',
+            `Clinic profile for "${normHospCode}" auto-provisioned on remote station via valid activation voucher ${normActCode}.`,
+            'system',
+            undefined,
+            'info'
+          );
+        } else {
+          logAuditEvent(
+            'DEVICE_ACTIVATION_FAILED',
+            `Failed device activation: Clinic code "${params.hospitalCode}" not found and voucher "${normActCode}" prefix does not match.`,
+            'system',
+            undefined,
+            'security'
+          );
+          return {
+            success: false,
+            error: `Hospital or Clinic with code "${params.hospitalCode}" was not found in the clinic directory. Please ensure your Clinic Code matches your activation voucher code.`,
+          };
+        }
       }
     }
 
@@ -2104,6 +2126,18 @@ class PodoPressDatabase {
           (t.recoveryKey && t.recoveryKey.trim().toUpperCase() === normActCode) ||
           t.username.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanAct
       );
+    }
+
+    // Query Supabase Cloud for technician registered with this voucher
+    if (!tech) {
+      try {
+        const { cloudSyncService } = await import('./cloudSyncService');
+        const remoteLookup = await cloudSyncService.lookupRemoteVoucher(normActCode);
+        if (remoteLookup.found && remoteLookup.technician) {
+          tech = remoteLookup.technician;
+          await this.saveTechnician(tech);
+        }
+      } catch {}
     }
 
     // Auto-provisioning technician on fresh remote station:
@@ -2766,6 +2800,11 @@ class PodoPressDatabase {
     // Update active user session
     this.setActiveUser('admin', fullAccount.name, undefined, fullAccount.hospitalId, fullAccount.hospitalName);
 
+    // Asynchronous background synchronization to Supabase Cloud
+    import('./cloudSyncService').then(({ cloudSyncService }) => {
+      cloudSyncService.pushAdminAccountsToCloud([fullAccount]).catch(() => {});
+    });
+
     return fullAccount;
   }
 
@@ -3167,6 +3206,14 @@ class PodoPressDatabase {
       'info',
       'superadmin'
     );
+
+    // Asynchronous background synchronization to Supabase Cloud
+    import('./cloudSyncService').then(({ cloudSyncService }) => {
+      cloudSyncService.pushAdminAccountsToCloud([newAdmin]).catch(() => {});
+      if (!existingHosp) {
+        cloudSyncService.pushHospitalProfilesToCloud(hospitals).catch(() => {});
+      }
+    });
 
     return { success: true, account: newAdmin };
   }
@@ -3828,6 +3875,11 @@ class PodoPressDatabase {
     } catch {
       // Ignore
     }
+
+    // Asynchronous background synchronization to Supabase Cloud
+    import('./cloudSyncService').then(({ cloudSyncService }) => {
+      cloudSyncService.pushAdminAccountsToCloud([registered]).catch(() => {});
+    });
 
     return { success: true };
   }

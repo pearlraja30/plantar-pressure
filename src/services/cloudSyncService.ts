@@ -1,5 +1,13 @@
 // Cloud Synchronization & Remote Retrieval Service (FR-12, FR-13, IEC 62304)
-import { AnalysisCase, CloudBatchSyncPayload, CloudBatchSyncResult, DeviceAuthorizationToken } from '../types';
+import {
+  AnalysisCase,
+  CloudBatchSyncPayload,
+  CloudBatchSyncResult,
+  DeviceAuthorizationToken,
+  HospitalProfile,
+  AdminAccount,
+  TechnicianUser,
+} from '../types';
 import { logAuditEvent } from './auditService';
 
 export interface SupabaseConfig {
@@ -631,6 +639,131 @@ CREATE POLICY "Allow public upload to plantar-scans"
     ON storage.objects FOR INSERT
     TO anon, authenticated
     WITH CHECK (bucket_id = 'plantar-scans');
+
+-- 4. Create Hospital Profiles Table (Clinics & Facilities)
+CREATE TABLE IF NOT EXISTS public.hospital_profiles (
+    id TEXT PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT,
+    contact TEXT,
+    email TEXT,
+    website TEXT,
+    registration_no TEXT,
+    department TEXT,
+    default_doctor TEXT,
+    default_technician TEXT,
+    footer_text TEXT,
+    logo_url TEXT,
+    logo_position TEXT DEFAULT 'Left',
+    doctors JSONB DEFAULT '[]'::jsonb,
+    technicians JSONB DEFAULT '[]'::jsonb,
+    active_user JSONB,
+    status TEXT NOT NULL DEFAULT 'active',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_hospital_profiles_code ON public.hospital_profiles (code);
+
+ALTER TABLE public.hospital_profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon read hospital_profiles" ON public.hospital_profiles;
+CREATE POLICY "Allow anon read hospital_profiles"
+    ON public.hospital_profiles FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow anon upsert hospital_profiles" ON public.hospital_profiles;
+CREATE POLICY "Allow anon upsert hospital_profiles"
+    ON public.hospital_profiles FOR ALL
+    TO anon, authenticated
+    USING (true)
+    WITH CHECK (true);
+
+-- 5. Create Hospital Administrators Table
+CREATE TABLE IF NOT EXISTS public.admin_accounts (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    pin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    hospital_id TEXT NOT NULL,
+    hospital_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    status TEXT NOT NULL DEFAULT 'active',
+    recovery_key TEXT,
+    created_by TEXT,
+    max_stations_allowed INTEGER DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_accounts_user ON public.admin_accounts (username);
+CREATE INDEX IF NOT EXISTS idx_admin_accounts_hosp ON public.admin_accounts (hospital_id);
+
+ALTER TABLE public.admin_accounts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon read admin_accounts" ON public.admin_accounts;
+CREATE POLICY "Allow anon read admin_accounts"
+    ON public.admin_accounts FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow anon upsert admin_accounts" ON public.admin_accounts;
+CREATE POLICY "Allow anon upsert admin_accounts"
+    ON public.admin_accounts FOR ALL
+    TO anon, authenticated
+    USING (true)
+    WITH CHECK (true);
+
+-- 6. Create Clinical Technicians & Activation Vouchers Table
+CREATE TABLE IF NOT EXISTS public.technician_users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    pin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    hospital_id TEXT NOT NULL,
+    hospital_name TEXT,
+    role TEXT NOT NULL DEFAULT 'technician',
+    status TEXT NOT NULL DEFAULT 'active',
+    activation_code TEXT,
+    is_registered_on_device BOOLEAN DEFAULT false,
+    registered_device_id TEXT,
+    mac_address TEXT,
+    is_activation_code_used BOOLEAN DEFAULT false,
+    activation_code_used_at TIMESTAMPTZ,
+    activation_code_used_by_device_id TEXT,
+    permit_type TEXT DEFAULT 'standard',
+    permit_expiry TIMESTAMPTZ,
+    notes TEXT,
+    recovery_key TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_technician_users_user ON public.technician_users (username);
+CREATE INDEX IF NOT EXISTS idx_technician_users_hosp ON public.technician_users (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_technician_users_code ON public.technician_users (activation_code);
+
+ALTER TABLE public.technician_users ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon read technician_users" ON public.technician_users;
+CREATE POLICY "Allow anon read technician_users"
+    ON public.technician_users FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow anon upsert technician_users" ON public.technician_users;
+CREATE POLICY "Allow anon upsert technician_users"
+    ON public.technician_users FOR ALL
+    TO anon, authenticated
+    USING (true)
+    WITH CHECK (true);
 `;
   }
 
@@ -859,6 +992,599 @@ CREATE POLICY "Allow public upload to plantar-scans"
       failedCaseIds,
       serverTimestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Pushes all local hospital profiles to Supabase Cloud
+   */
+  public async pushHospitalProfilesToCloud(
+    profiles?: HospitalProfile[]
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const { dbService } = await import('./dbService');
+      const list = profiles || dbService.getHospitalProfilesSync();
+      if (list.length === 0) return { success: true, count: 0 };
+
+      const payload = list.map((h) => ({
+        id: h.id,
+        code: h.code,
+        name: h.name,
+        address: h.address || '',
+        contact: h.contact || '',
+        email: h.email || '',
+        website: h.website || '',
+        registration_no: h.registrationNo || '',
+        department: h.department || '',
+        default_doctor: h.defaultDoctor || '',
+        default_technician: h.defaultTechnician || '',
+        footer_text: h.footerText || '',
+        logo_url: h.logoUrl || null,
+        logo_position: h.logoPosition || 'Left',
+        doctors: h.doctors || [],
+        technicians: h.technicians || [],
+        active_user: h.activeUser || null,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      }));
+
+      const res = await fetch(`${config.url}/rest/v1/hospital_profiles`, {
+        method: 'POST',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      return { success: true, count: list.length };
+    } catch (err) {
+      return { success: false, count: 0, error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pulls hospital profiles from Supabase Cloud and hydrates local database
+   */
+  public async pullHospitalProfilesFromCloud(): Promise<{
+    success: boolean;
+    count: number;
+    profiles: HospitalProfile[];
+    error?: string;
+  }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, profiles: [], error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const res = await fetch(`${config.url}/rest/v1/hospital_profiles?select=*&order=updated_at.desc`, {
+        method: 'GET',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, profiles: [], error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return { success: true, count: 0, profiles: [] };
+      }
+
+      const { dbService } = await import('./dbService');
+      const imported: HospitalProfile[] = [];
+
+      for (const r of rows) {
+        const prof: HospitalProfile = {
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          address: r.address || '',
+          contact: r.contact || '',
+          email: r.email || '',
+          website: r.website || '',
+          registrationNo: r.registration_no || '',
+          department: r.department || '',
+          defaultDoctor: r.default_doctor || '',
+          defaultTechnician: r.default_technician || '',
+          footerText: r.footer_text || '',
+          logoUrl: r.logo_url || undefined,
+          logoPosition: r.logo_position || 'Left',
+          doctors: r.doctors || [],
+          technicians: r.technicians || [],
+          activeUser: r.active_user || undefined,
+        };
+        dbService.saveHospitalProfile(prof);
+        imported.push(prof);
+      }
+
+      return { success: true, count: imported.length, profiles: imported };
+    } catch (err) {
+      return { success: false, count: 0, profiles: [], error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pushes all local hospital administrators to Supabase Cloud
+   */
+  public async pushAdminAccountsToCloud(
+    admins?: AdminAccount[]
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const { dbService } = await import('./dbService');
+      const list = admins || dbService.getAdminAccountsListSync();
+      if (list.length === 0) return { success: true, count: 0 };
+
+      const payload = list.map((a) => ({
+        id: a.id,
+        username: a.username,
+        pin: a.pin,
+        name: a.name,
+        email: a.email || '',
+        phone: a.phone || '',
+        hospital_id: a.hospitalId,
+        hospital_name: a.hospitalName,
+        role: a.role,
+        status: a.status || 'active',
+        recovery_key: a.recoveryKey || '',
+        created_by: a.createdBy || 'superadmin',
+        max_stations_allowed: a.maxStationsAllowed || 1,
+        created_at: a.createdAt || new Date().toISOString(),
+        last_login_at: a.lastLoginAt || null,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const res = await fetch(`${config.url}/rest/v1/admin_accounts`, {
+        method: 'POST',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      return { success: true, count: list.length };
+    } catch (err) {
+      return { success: false, count: 0, error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pulls hospital administrators from Supabase Cloud and hydrates local database
+   */
+  public async pullAdminAccountsFromCloud(): Promise<{
+    success: boolean;
+    count: number;
+    admins: AdminAccount[];
+    error?: string;
+  }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, admins: [], error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const res = await fetch(`${config.url}/rest/v1/admin_accounts?select=*&order=updated_at.desc`, {
+        method: 'GET',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, admins: [], error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return { success: true, count: 0, admins: [] };
+      }
+
+      const { dbService } = await import('./dbService');
+      const imported: AdminAccount[] = [];
+
+      for (const r of rows) {
+        const acc: AdminAccount = {
+          id: r.id,
+          username: r.username,
+          pin: r.pin,
+          name: r.name,
+          email: r.email || '',
+          phone: r.phone || '',
+          hospitalId: r.hospital_id,
+          hospitalName: r.hospital_name,
+          role: 'admin',
+          status: r.status || 'active',
+          recoveryKey: r.recovery_key,
+          createdBy: r.created_by,
+          maxStationsAllowed: r.max_stations_allowed || 1,
+          createdAt: r.created_at,
+          lastLoginAt: r.last_login_at,
+        };
+        dbService.registerAdminAccount(acc);
+        imported.push(acc);
+      }
+
+      return { success: true, count: imported.length, admins: imported };
+    } catch (err) {
+      return { success: false, count: 0, admins: [], error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pushes clinical technicians and vouchers to Supabase Cloud
+   */
+  public async pushTechniciansToCloud(
+    technicians?: TechnicianUser[]
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const { dbService } = await import('./dbService');
+      const list = technicians || dbService.getTechniciansSync();
+      if (list.length === 0) return { success: true, count: 0 };
+
+      const payload = list.map((t) => ({
+        id: t.id,
+        username: t.username,
+        pin: t.pin,
+        name: t.name,
+        email: t.email || '',
+        phone: t.phone || '',
+        hospital_id: t.hospitalId,
+        hospital_name: t.hospitalName || '',
+        role: t.role || 'technician',
+        status: t.status || 'active',
+        activation_code: t.activationCode || null,
+        is_registered_on_device: Boolean(t.isRegisteredOnDevice),
+        registered_device_id: t.registeredDeviceId || null,
+        mac_address: t.macAddress || null,
+        is_activation_code_used: Boolean(t.isActivationCodeUsed),
+        activation_code_used_at: t.activationCodeUsedAt || null,
+        activation_code_used_by_device_id: t.activationCodeUsedByDeviceId || null,
+        permit_type: 'standard',
+        permit_expiry: t.permitExpiresAt || null,
+        notes: t.notes || '',
+        recovery_key: t.recoveryKey || '',
+        created_at: t.createdAt || new Date().toISOString(),
+        last_login_at: t.lastLoginAt || null,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const res = await fetch(`${config.url}/rest/v1/technician_users`, {
+        method: 'POST',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      return { success: true, count: list.length };
+    } catch (err) {
+      return { success: false, count: 0, error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pulls clinical technicians from Supabase Cloud and hydrates local database
+   */
+  public async pullTechniciansFromCloud(): Promise<{
+    success: boolean;
+    count: number;
+    technicians: TechnicianUser[];
+    error?: string;
+  }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, count: 0, technicians: [], error: 'Offline or Supabase not configured' };
+    }
+
+    try {
+      const res = await fetch(`${config.url}/rest/v1/technician_users?select=*&order=updated_at.desc`, {
+        method: 'GET',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, count: 0, technicians: [], error: `HTTP ${res.status}: ${res.statusText}` };
+      }
+
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return { success: true, count: 0, technicians: [] };
+      }
+
+      const { dbService } = await import('./dbService');
+      const imported: TechnicianUser[] = [];
+
+      for (const r of rows) {
+        const t: TechnicianUser = {
+          id: r.id,
+          username: r.username,
+          pin: r.pin,
+          name: r.name,
+          email: r.email || '',
+          phone: r.phone || '',
+          hospitalId: r.hospital_id,
+          hospitalName: r.hospital_name || '',
+          role: 'technician',
+          status: r.status || 'active',
+          activationCode: r.activation_code || undefined,
+          isRegisteredOnDevice: Boolean(r.is_registered_on_device),
+          registeredDeviceId: r.registered_device_id || undefined,
+          macAddress: r.mac_address || undefined,
+          isActivationCodeUsed: Boolean(r.is_activation_code_used),
+          activationCodeUsedAt: r.activation_code_used_at || undefined,
+          activationCodeUsedByDeviceId: r.activation_code_used_by_device_id || undefined,
+          permitExpiresAt: r.permit_expiry || undefined,
+          notes: r.notes || '',
+          recoveryKey: r.recovery_key || undefined,
+          createdAt: r.created_at,
+          lastLoginAt: r.last_login_at || undefined,
+        };
+        dbService.saveTechnician(t);
+        imported.push(t);
+      }
+
+      return { success: true, count: imported.length, technicians: imported };
+    } catch (err) {
+      return { success: false, count: 0, technicians: [], error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Pushes all local entities (Hospitals, Admins, Technicians) to Supabase Cloud in one unified call
+   */
+  public async pushAllEntitiesToCloud(): Promise<{ success: boolean; summary: string }> {
+    const hospRes = await this.pushHospitalProfilesToCloud();
+    const adminRes = await this.pushAdminAccountsToCloud();
+    const techRes = await this.pushTechniciansToCloud();
+
+    const parts = [
+      `${hospRes.count} Clinics`,
+      `${adminRes.count} Administrators`,
+      `${techRes.count} Technicians`,
+    ];
+
+    const allOk = hospRes.success && adminRes.success && techRes.success;
+    return {
+      success: allOk,
+      summary: allOk
+        ? `Successfully synced ${parts.join(', ')} to Supabase Cloud.`
+        : `Partial sync: ${hospRes.error || adminRes.error || techRes.error || 'Check network connection'}`,
+    };
+  }
+
+  /**
+   * Pulls all remote entities (Hospitals, Admins, Technicians) from Supabase Cloud in one unified call
+   */
+  public async pullAllEntitiesFromCloud(): Promise<{ success: boolean; summary: string }> {
+    const hospRes = await this.pullHospitalProfilesFromCloud();
+    const adminRes = await this.pullAdminAccountsFromCloud();
+    const techRes = await this.pullTechniciansFromCloud();
+
+    const parts = [
+      `${hospRes.count} Clinics`,
+      `${adminRes.count} Administrators`,
+      `${techRes.count} Technicians`,
+    ];
+
+    const allOk = hospRes.success && adminRes.success && techRes.success;
+    return {
+      success: allOk,
+      summary: allOk
+        ? `Successfully pulled ${parts.join(', ')} from Supabase Cloud.`
+        : `Partial pull: ${hospRes.error || adminRes.error || techRes.error || 'Check network connection'}`,
+    };
+  }
+
+  /**
+   * Looks up an activation voucher directly from Supabase Cloud for a fresh station installation
+   */
+  public async lookupRemoteVoucher(activationCode: string): Promise<{
+    found: boolean;
+    technician?: TechnicianUser;
+    hospital?: HospitalProfile;
+  }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) return { found: false };
+
+    try {
+      const codeClean = activationCode.trim().toUpperCase();
+      const res = await fetch(
+        `${config.url}/rest/v1/technician_users?activation_code=eq.${encodeURIComponent(codeClean)}&select=*`,
+        {
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`,
+          },
+        }
+      );
+
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          const tech: TechnicianUser = {
+            id: r.id,
+            username: r.username,
+            pin: r.pin,
+            name: r.name,
+            email: r.email || '',
+            phone: r.phone || '',
+            hospitalId: r.hospital_id,
+            hospitalName: r.hospital_name || '',
+            role: 'technician',
+            status: r.status || 'active',
+            activationCode: r.activation_code,
+            isRegisteredOnDevice: Boolean(r.is_registered_on_device),
+            registeredDeviceId: r.registered_device_id || undefined,
+            macAddress: r.mac_address || undefined,
+            isActivationCodeUsed: Boolean(r.is_activation_code_used),
+            permitExpiresAt: r.permit_expiry || undefined,
+            createdAt: r.created_at,
+          };
+
+          // Also pull the corresponding hospital profile
+          let hosp: HospitalProfile | undefined;
+          if (r.hospital_id) {
+            const hRes = await fetch(
+              `${config.url}/rest/v1/hospital_profiles?id=eq.${encodeURIComponent(r.hospital_id)}&select=*`,
+              {
+                headers: {
+                  apikey: config.anonKey,
+                  Authorization: `Bearer ${config.anonKey}`,
+                },
+              }
+            );
+            if (hRes.ok) {
+              const hRows = await hRes.json();
+              if (Array.isArray(hRows) && hRows.length > 0) {
+                const hr = hRows[0];
+                hosp = {
+                  id: hr.id,
+                  code: hr.code,
+                  name: hr.name,
+                  address: hr.address || '',
+                  contact: hr.contact || '',
+                  email: hr.email || '',
+                  website: hr.website || '',
+                  registrationNo: hr.registration_no || '',
+                  department: hr.department || '',
+                  defaultDoctor: hr.default_doctor || '',
+                  defaultTechnician: hr.default_technician || '',
+                  footerText: hr.footer_text || '',
+                  doctors: hr.doctors || [],
+                  technicians: hr.technicians || [],
+                };
+              }
+            }
+          }
+
+          return { found: true, technician: tech, hospital: hosp };
+        }
+      }
+      return { found: false };
+    } catch {
+      return { found: false };
+    }
+  }
+
+  /**
+   * Verifies credentials against Supabase Cloud when local database has zero records or user changed password remotely
+   */
+  public async verifyRemoteCredentials(params: {
+    role: 'admin' | 'technician';
+    username: string;
+    pin: string;
+  }): Promise<{ success: boolean; account?: AdminAccount | TechnicianUser; error?: string }> {
+    const config = this.getConfig();
+    if (!config.url || !config.anonKey || !this.isOnline) {
+      return { success: false, error: 'Cannot reach Supabase cloud service.' };
+    }
+
+    try {
+      const cleanUser = params.username.trim().toLowerCase();
+      const cleanPin = params.pin.trim();
+      const table = params.role === 'admin' ? 'admin_accounts' : 'technician_users';
+
+      const res = await fetch(
+        `${config.url}/rest/v1/${table}?username=ilike.${encodeURIComponent(cleanUser)}&select=*`,
+        {
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`,
+          },
+        }
+      );
+
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          if (r.pin && r.pin.trim() === cleanPin) {
+            const { dbService } = await import('./dbService');
+            if (params.role === 'admin') {
+              const acc: AdminAccount = {
+                id: r.id,
+                username: r.username,
+                pin: r.pin,
+                name: r.name,
+                email: r.email || '',
+                phone: r.phone || '',
+                hospitalId: r.hospital_id,
+                hospitalName: r.hospital_name,
+                role: 'admin',
+                status: r.status || 'active',
+                recoveryKey: r.recovery_key,
+                createdAt: r.created_at,
+              };
+              dbService.registerAdminAccount(acc);
+              return { success: true, account: acc };
+            } else {
+              const tech: TechnicianUser = {
+                id: r.id,
+                username: r.username,
+                pin: r.pin,
+                name: r.name,
+                email: r.email || '',
+                phone: r.phone || '',
+                hospitalId: r.hospital_id,
+                hospitalName: r.hospital_name || '',
+                role: 'technician',
+                status: r.status || 'active',
+                activationCode: r.activation_code,
+                createdAt: r.created_at,
+              };
+              dbService.saveTechnician(tech);
+              return { success: true, account: tech };
+            }
+          }
+        }
+      }
+      return { success: false, error: 'Remote authentication failed.' };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
   }
 
   /**

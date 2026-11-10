@@ -1694,6 +1694,50 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Web assets synced across Android, iOS, and Web platforms.
 - **Release Version**: Tagged and committed `v1.0.71`.
 
+---
+
+## SECTION 47: Bi-Directional Cloud Entity Sync, Remote Technician & Admin Management & Automated Onboarding (v1.0.72)
+- **Date**: 2026-11-10
+- **Version**: `1.0.72`
+- **Scope**: Complete bi-directional cloud synchronization via Supabase for all entities: Hospital/Clinic profiles, Hospital Administrators, Clinical Technicians & Vouchers, Workstation Activations, and Examination Reports. Enables full remote assistance, remote password resets, and automated onboarding on fresh installations.
+
+### 47.1 The End-to-End Remote Management Paradigm
+- **Problem**: Previously, while clinical examination reports and station beacons synced with Supabase, hospital profiles, administrator accounts, and technician vouchers were stored exclusively in edge local storage. Remote machines installed from fresh `.exe` installers had zero local records and could not authenticate users provisioned on other machines without manual voucher entry or JSON backup transfer. Furthermore, administrators could not remotely reset passwords or update credentials on outside machines.
+- **Solution & Architecture**:
+  1. **Comprehensive PostgreSQL / Supabase Cloud Schema**:
+     - Added tables with full Row Level Security (RLS) policies:
+       - `public.hospital_profiles`: Clinics, unique codes, addresses, departments, branding, and logos.
+       - `public.admin_accounts`: Hospital administrators, master passwords, hospital scoping, and workstation quotas.
+       - `public.technician_users`: Technicians, login credentials, assigned hospital, single-use activation vouchers, and device bindings.
+       - `public.station_activations`: Hardware fingerprints, MAC addresses, station names, and authorization statuses.
+       - `public.clinical_reports`: Biomechanical analyses, arch classifications, peak pressures, and report JSON payloads.
+  2. **Bi-Directional Synchronization Engine (`cloudSyncService.ts`)**:
+     - Implemented `pushHospitalProfilesToCloud()`, `pullHospitalProfilesFromCloud()`.
+     - Implemented `pushAdminAccountsToCloud()`, `pullAdminAccountsFromCloud()`.
+     - Implemented `pushTechniciansToCloud()`, `pullTechniciansFromCloud()`.
+     - Unified `pushAllEntitiesToCloud()` and `pullAllEntitiesFromCloud()` operations.
+  3. **Automated Onboarding on Fresh Installations**:
+     - On initial launch in `PodoLoadApp.tsx`, if a workstation is un-enrolled or has zero local technicians, it silently executes `cloudSyncService.pullAllEntitiesFromCloud()` in the background.
+     - When a user enters their Clinic Code & Activation Voucher on a fresh machine, `dbService.registerDeviceWithActivationCode()` queries `cloudSyncService.lookupRemoteVoucher()` directly against Supabase Cloud, resolving the genuine hospital and technician without requiring prior manual setup.
+  4. **Live Remote Assistance & Password Synchronization**:
+     - Implemented `cloudSyncService.verifyRemoteCredentials()`: If credentials entered on a workstation do not match local records (e.g. an administrator remotely reset the password from the master console), the station verifies against Supabase Cloud live, updates local storage, and logs in immediately.
+     - Integrated automatic background push in `dbService`: Creating or updating a hospital profile (`saveHospitalProfile`), technician (`saveTechnician`, `updateTechnicianPassword`), or administrator (`registerAdminAccount`, `recoverAdminPassword`) automatically broadcasts changes to Supabase Cloud.
+  5. **Super Admin Central Command Console (`PodoLoadSuperAdmin.tsx`)**:
+     - Added prominent **`[☁️ Push All to Cloud]`** and **`[⬇️ Pull All from Cloud]`** buttons in the header action bar with real-time feedback toast notifications.
+     - In Tab 5 (Export & Cloud Hub), added a dedicated **Supabase Cloud Database & Remote Sync Hub** card with a 1-click **`[📋 Copy Supabase SQL Schema Script]`** button to set up the entire cloud database in seconds.
+
+### 47.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **103/103** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 40 verifying:
+    1. Schema generation for all 5 core cloud entities (`station_activations`, `clinical_reports`, `hospital_profiles`, `admin_accounts`, `technician_users`).
+    2. Remote voucher resolution on fresh station installations (0 local records).
+    3. Remote password synchronization and remote assistance.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled in 390ms with 0 errors.
+- **Capacitor Synchronization**: Web assets synced across Android, iOS, and Web platforms.
+- **Release Version**: Tagged and committed `v1.0.72`.
+
+
 
 
 

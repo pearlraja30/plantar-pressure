@@ -31,6 +31,8 @@ import {
   Activity,
   Globe,
   Stethoscope,
+  Cloud,
+  Upload,
 } from 'lucide-react';
 import { dbService } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
@@ -125,6 +127,49 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
       navigator.clipboard.writeText(pin);
       setCopiedPinAdminId(adminId);
       setTimeout(() => setCopiedPinAdminId(null), 2500);
+    }
+  };
+
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<string | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  const handlePushAllToCloud = async () => {
+    setIsCloudSyncing(true);
+    setCloudSyncStatus('Pushing clinics, administrators, and technicians to Supabase Cloud...');
+    try {
+      const res = await cloudSyncService.pushAllEntitiesToCloud();
+      setCloudSyncStatus(res.summary);
+      await refreshAllData();
+    } catch (err) {
+      setCloudSyncStatus(`Push failed: ${(err as Error).message}`);
+    } finally {
+      setIsCloudSyncing(false);
+      setTimeout(() => setCloudSyncStatus(null), 6000);
+    }
+  };
+
+  const handlePullAllFromCloud = async () => {
+    setIsCloudSyncing(true);
+    setCloudSyncStatus('Pulling latest clinics, administrators, and technicians from Supabase Cloud...');
+    try {
+      const res = await cloudSyncService.pullAllEntitiesFromCloud();
+      setCloudSyncStatus(res.summary);
+      await refreshAllData();
+    } catch (err) {
+      setCloudSyncStatus(`Pull failed: ${(err as Error).message}`);
+    } finally {
+      setIsCloudSyncing(false);
+      setTimeout(() => setCloudSyncStatus(null), 6000);
+    }
+  };
+
+  const handleCopySqlSchema = () => {
+    const sql = cloudSyncService.getSupabaseSchemaSql();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(sql);
+      setSqlCopied(true);
+      setTimeout(() => setSqlCopied(false), 3000);
     }
   };
 
@@ -463,6 +508,30 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
           <button
             type="button"
             className="podoload-btn-secondary podoload-btn-sm"
+            onClick={handlePushAllToCloud}
+            disabled={isCloudSyncing}
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.3)' }}
+            title="Push all local hospital profiles, administrators, and technicians to Supabase Cloud"
+          >
+            <Cloud className="w-3.5 h-3.5 mr-1 inline text-teal-300" />
+            <span>{isCloudSyncing ? 'Syncing...' : '☁️ Push All to Cloud'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="podoload-btn-secondary podoload-btn-sm"
+            onClick={handlePullAllFromCloud}
+            disabled={isCloudSyncing}
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.16)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.3)' }}
+            title="Pull latest hospital profiles, administrators, and technicians from Supabase Cloud"
+          >
+            <Download className="w-3.5 h-3.5 mr-1 inline text-cyan-300" />
+            <span>⬇️ Pull All from Cloud</span>
+          </button>
+
+          <button
+            type="button"
+            className="podoload-btn-secondary podoload-btn-sm"
             onClick={refreshAllData}
             style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)' }}
           >
@@ -481,6 +550,37 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Cloud Sync Status Notification */}
+      {cloudSyncStatus && (
+        <div
+          style={{
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #86efac',
+            borderRadius: '8px',
+            padding: '0.6rem 1rem',
+            marginBottom: '1rem',
+            fontSize: '0.78rem',
+            color: '#166534',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Cloud className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{cloudSyncStatus}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCloudSyncStatus(null)}
+            style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', fontWeight: 800 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Global Telemetry KPI Cards */}
       <div
@@ -1549,6 +1649,97 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
               <Download className="w-4 h-4" />
               <span>Download Full System Archive (JSON)</span>
             </button>
+          </div>
+
+          {/* Supabase Cloud Database Schema & Remote Synchronization Hub */}
+          <div className="podoload-card" style={{ padding: '1.5rem', marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    padding: '0.75rem',
+                    borderRadius: '10px',
+                  }}
+                >
+                  <Cloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0c2328' }}>
+                    Supabase Cloud Database & Remote Sync Hub
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
+                    Centralized database for remote technician & admin provisioning, report archiving, and station telemetry.
+                  </p>
+                </div>
+              </div>
+              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.68rem' }}>
+                ● Active Cloud: yqfbhxtvrpfyzygzuqts.supabase.co
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, marginBottom: '1rem' }}>
+              When a client installs PodoPress anywhere in the world on a new PC or tablet, it automatically connects to this cloud database to pull authorized clinic profiles, administrator accounts, and technician credentials. Remote password resets or clinic changes you make here are instantly pushed to all workstations.
+            </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={handlePushAllToCloud}
+                disabled={isCloudSyncing}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.15rem' }}
+              >
+                <Cloud className="w-4 h-4" />
+                <span>{isCloudSyncing ? 'Syncing...' : '☁️ Push All Local Data to Supabase'}</span>
+              </button>
+
+              <button
+                type="button"
+                className="podoload-btn-secondary"
+                onClick={handlePullAllFromCloud}
+                disabled={isCloudSyncing}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.15rem' }}
+              >
+                <Download className="w-4 h-4" />
+                <span>⬇️ Pull Remote Data from Supabase</span>
+              </button>
+
+              <button
+                type="button"
+                className="podoload-btn-secondary"
+                onClick={handleCopySqlSchema}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.15rem' }}
+              >
+                {sqlCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                <span>{sqlCopied ? '✓ SQL Copied to Clipboard!' : '📋 Copy Supabase SQL Schema Script'}</span>
+              </button>
+            </div>
+
+            {/* Cloud Tables Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.65rem' }}>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e' }}>🏥 hospital_profiles</div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Multi-hospital network, codes, branding & logos</div>
+              </div>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e' }}>🛡️ admin_accounts</div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Hospital administrators, master passwords & quotas</div>
+              </div>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e' }}>🔬 technician_users</div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Technician logins, vouchers & device bindings</div>
+              </div>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e' }}>💻 station_activations</div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Discovered hardware fingerprints & MAC bindings</div>
+              </div>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e' }}>📋 clinical_reports</div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Aggregated foot pressure scans & patient reports</div>
+              </div>
+            </div>
           </div>
         </div>
       )}

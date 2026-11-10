@@ -114,6 +114,11 @@ export function PodoLoadApp() {
     // Send immediate first-launch / bootup device discovery beacon to Supabase Cloud
     cloudSyncService.sendDeviceDiscoveryBeacon().catch(() => {});
 
+    // On fresh or un-enrolled stations, silently pull clinics, admins, and technicians in background
+    if (!dbService.isDeviceAuthorized() || dbService.getTechniciansSync().length === 0) {
+      cloudSyncService.pullAllEntitiesFromCloud().catch(() => {});
+    }
+
     hardwareScannerService.enumerateAttachedScanners().then((list) => {
       setActiveScanners(list);
     });

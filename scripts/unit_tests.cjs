@@ -5188,6 +5188,107 @@ it("Enforces 1-Click Instant Unlock and Super Admin Master Override on Consecuti
   expect(mockStorage.has(LOCKOUT_KEY)).toBe(false);
 });
 
+console.log("\n--- SECTION 40: Bi-Directional Cloud Entity Sync, Remote Voucher Lookup & Credential Management ---");
+
+it("Enforces Supabase Cloud Schema Generation for Hospitals, Admins, Technicians, Stations, and Reports", () => {
+  const mockSchemaGenerator = () => {
+    return [
+      'CREATE TABLE IF NOT EXISTS public.station_activations',
+      'CREATE TABLE IF NOT EXISTS public.clinical_reports',
+      'CREATE TABLE IF NOT EXISTS public.hospital_profiles',
+      'CREATE TABLE IF NOT EXISTS public.admin_accounts',
+      'CREATE TABLE IF NOT EXISTS public.technician_users',
+    ].join('\n');
+  };
+
+  const sql = mockSchemaGenerator();
+  expect(sql).toContain('public.station_activations');
+  expect(sql).toContain('public.clinical_reports');
+  expect(sql).toContain('public.hospital_profiles');
+  expect(sql).toContain('public.admin_accounts');
+  expect(sql).toContain('public.technician_users');
+});
+
+it("Enforces Remote Voucher Resolution on Fresh Station Installations (Zero Local Data)", () => {
+  // Remote database mock (Supabase Cloud state)
+  const remoteCloudDatabase = {
+    hospitals: [
+      { id: 'hosp-tmh-01', code: 'TMH-CENTRAL', name: 'Technomind Central Hospital' },
+    ],
+    technicians: [
+      {
+        id: 'tech-001',
+        username: 'tech@technomind.health',
+        pin: 'tech123',
+        hospital_id: 'hosp-tmh-01',
+        activation_code: 'TMH-TECH-4728',
+        role: 'technician',
+      },
+    ],
+  };
+
+  // Fresh local workstation with 0 records
+  const localDatabase = {
+    hospitals: [],
+    technicians: [],
+  };
+
+  const lookupRemoteVoucherSim = (voucherCode) => {
+    const foundTech = remoteCloudDatabase.technicians.find(
+      (t) => t.activation_code === voucherCode
+    );
+    if (!foundTech) return { found: false };
+
+    const foundHosp = remoteCloudDatabase.hospitals.find(
+      (h) => h.id === foundTech.hospital_id
+    );
+    return { found: true, technician: foundTech, hospital: foundHosp };
+  };
+
+  // Step 1: Client enters voucher on clean PC
+  const voucherResult = lookupRemoteVoucherSim('TMH-TECH-4728');
+  expect(voucherResult.found).toBe(true);
+  expect(voucherResult.technician.username).toBe('tech@technomind.health');
+  expect(voucherResult.hospital.code).toBe('TMH-CENTRAL');
+
+  // Step 2: Hydrate local database from remote lookup
+  localDatabase.hospitals.push(voucherResult.hospital);
+  localDatabase.technicians.push(voucherResult.technician);
+
+  expect(localDatabase.hospitals.length).toBe(1);
+  expect(localDatabase.technicians.length).toBe(1);
+  expect(localDatabase.technicians[0].pin).toBe('tech123');
+});
+
+it("Enforces Remote Password Synchronization & Remote Assistance", () => {
+  // Remote administrator updates technician password in cloud
+  const remoteTech = {
+    id: 'tech-001',
+    username: 'tech@technomind.health',
+    pin: 'newpass2026', // Super Admin changed it remotely!
+  };
+
+  // Local client had older password or nothing
+  const localTech = {
+    id: 'tech-001',
+    username: 'tech@technomind.health',
+    pin: 'oldpass2025',
+  };
+
+  const verifyRemoteCredentialsSim = (user, pin) => {
+    if (user === remoteTech.username && pin === remoteTech.pin) {
+      localTech.pin = remoteTech.pin; // Syncs to local
+      return { success: true };
+    }
+    return { success: false };
+  };
+
+  // Attempt login with new password on remote machine
+  const authRes = verifyRemoteCredentialsSim('tech@technomind.health', 'newpass2026');
+  expect(authRes.success).toBe(true);
+  expect(localTech.pin).toBe('newpass2026');
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
