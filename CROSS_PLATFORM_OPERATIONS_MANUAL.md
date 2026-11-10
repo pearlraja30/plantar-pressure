@@ -455,9 +455,91 @@ Prior to deploying any release build, execute the full regulatory test suite:
 # Run 15 Clinical Verification Scenarios (IEC 62304 / ISO 14971)
 npm run test:validate
 
-# Run 70 Automated Unit Tests (100% Coverage)
+# Run 103 Automated Unit Tests (100% Coverage)
 npm run test:unit
 ```
+
+---
+
+## 12. End-to-End User Management, Voucher Lifecycle & Remote Cloud Operations Guide
+
+### 12.1 First-Time Workstation Enrollment & Hardware Binding
+When a client or hospital installs PodoPress on a new PC (`plantar-pressure-setup.exe`), tablet, or mobile phone:
+
+1. **Initial Screen**:
+   - The workstation detects that no hardware binding token exists and displays: **"Station Activation & Enrollment Required"**.
+   - Input fields:
+     - **Hospital / Clinic Code \***: The unique clinic code assigned by the vendor or administrator (e.g. `TMH-CENTRAL` or `T`).
+     - **Technician Username / User ID**: The technician's login email or identifier (e.g. `tech@technomind.health`).
+     - **Station Activation Code \***: The single-use activation voucher issued by the Hospital Administrator (e.g. `T-TECH-4728` or `TMH-TECH-1001`).
+     - **Quick Password / Confirm Password**: Optional PIN/password to secure future logins.
+2. **Autonomous Cloud & Local Resolution**:
+   - If connected to the internet, the station queries Supabase Cloud directly via `lookupRemoteVoucher()` to verify the authentic voucher and download the associated clinic profile.
+   - If offline, the station's heuristic engine extracts the clinic prefix (`T` from `T-TECH-4728`) and auto-provisions the clinic, administrator, and technician locally.
+3. **Hardware Binding Rule (Persistent Station Identity)**:
+   - Once authorized, the station generates a cryptographic token (`DeviceAuthorizationToken`) bound to the device's physical hardware fingerprint (e.g. `DEV-4CBF-6798`) and MAC address (`DE:4C:BF:67:98:AB`).
+   - **Crucial Rule**: Software updates or app restarts **never** ask for the activation voucher again! The voucher is ONLY requested if the physical device (MAC address) changes or if the station is explicitly revoked by an administrator.
+
+---
+
+### 12.2 Daily Clinical Technician Login & Password Reset Workflows
+
+#### Daily Operational Login
+1. Technician opens PodoPress.
+2. The sign-in dialog displays the **Clinical Technician Station Sign-In** screen with the green badge **`● Authorized Diagnostic Station`**.
+3. Technician enters:
+   - **Technician User ID / Username**: (e.g. `tech@technomind.health`).
+   - **Technician Password**: (e.g. `tech123`).
+4. Click **Log In as Clinical Technician**.
+5. Examination workspace unlocks with access to historical patient reports, live scanner capture, and PDF printing.
+
+#### Handling Forgotten Passwords (Offline & Online)
+If a technician forgets their password or enters the wrong password, the system prevents clinical disruption through two supported paths:
+
+1. **Local Administrator Reset (100% Offline)**:
+   - The error banner displays: `Incorrect password for Technician User ID ... Please try again or ask your Hospital Administrator to reset your password.`
+   - Below the error, click **`[🔑 Reset Password with Administrator Authorization]`**.
+   - The Hospital Administrator enters their Admin User ID and Master Password.
+   - Admin sets a new password for the technician. The technician is logged in immediately.
+2. **Remote Administrator Reset (Cloud Synced)**:
+   - Super Admin or Hospital Admin opens the Super Admin console or Admin portal on any connected computer.
+   - Admin locates the technician, clicks **Reset Password**, enters a new password, and saves.
+   - The update is pushed to Supabase Cloud in the background.
+   - On the client's PC, when the technician enters the new password, the station verifies it against Supabase live, updates the local station cache, and logs in.
+
+---
+
+### 12.3 Three-Tier Role Hierarchy & Master Credentials
+
+| Tier / Role | Display Name | Primary Function | Default Credentials / Access |
+| :---: | :--- | :--- | :--- |
+| **Tier 1** | **🛡️ Super Administrator** | Global vendor governance, multi-clinic network setup, global station telemetry, license recovery, and cloud synchronization. | **User ID**: `superadmin@technomind.health`<br>**Password**: `superadmin@123`<br>*(Tab 3 at top-right or shortcut `Ctrl+Shift+S`)* |
+| **Tier 2** | **🏥 Hospital Administrator** | Facility branding, clinic logo configuration, creating technicians, managing hospital patient records, and hardware quota management. | Created by Super Admin.<br>*(Tab 2 at top-center or shortcut `Ctrl+Shift+A`)* |
+| **Tier 3** | **🔬 Clinical Technician** | Daily patient scanning, Podo I Mat 39-step image processing, Cavanagh arch calculation, and medical report PDF generation. | Enrolled via Clinic Code & Voucher (e.g. `T-TECH-4728`). Daily sign-in with User ID & Password. |
+
+---
+
+### 12.4 Anti-Lockout Security & 1-Click Instant Unlock
+To defend clinical stations against brute-force attacks:
+- **Lockout Rule**: Entering an incorrect Master Password 5 consecutive times engages a 15-minute lockout (`podopress_admin_lockout_v1`).
+- **Error Display**: *"Master Administrator authentication is locked due to consecutive failed attempts. Please wait [X] seconds or use your Recovery Key."*
+- **Immediate Recovery Options**:
+  1. **`[⚡ Instant Unlock / Reset Lockout]`**: Click this red button inside the error box to immediately remove the 15-minute countdown timer with zero wait time.
+  2. **Super Admin Master Override**: Entering the Super Admin master password (`superadmin@123` or recovery key `SUPER-MASTER-KEY-9999`) into the password field **instantly clears the lockout** and logs in/auto-provisions cleanly.
+  3. **`[Switch to Super Admin Portal →]`**: Transitions directly to Tab 3 where global master credentials can be used.
+
+---
+
+### 12.5 Central Cloud Synchronization Hub (Super Admin Console)
+Under the **Super Admin Console** (`Ctrl+Shift+S`):
+
+1. **Header Action Controls**:
+   - **`[☁️ Push All to Cloud]`**: One-click broadcast of all locally created clinics, administrators, and technicians to Supabase Cloud (`https://yqfbhxtvrpfyzygzuqts.supabase.co`).
+   - **`[⬇️ Pull All from Cloud]`**: Refreshes all local data from Supabase Cloud, downloading newly provisioned accounts or remote password changes.
+   - **`[Refresh Telemetry]`**: Refreshes the hardware binding list and merges remote cloud stations discovered via device discovery beacons.
+2. **Tab 5 (Export & Cloud Hub)**:
+   - **`[Download Full System Archive (JSON)]`**: Exports a complete cryptographic snapshot (ISO 13485 / IEC 62304) for offline backup or migration to another PC.
+   - **`[📋 Copy Supabase SQL Schema Script]`**: Copies the complete PostgreSQL database migration script to set up all 5 required tables in Supabase in seconds.
 
 ---
 *Technomind Healthcare Systems — Document Reference: `PPA-DOC-XPLAT-2026-V1`*

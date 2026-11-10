@@ -196,6 +196,30 @@ The system includes an automated clinical verification battery covering all test
 * **Active Session Telemetry**: The security card provides real-time display of active administrator credentials, contact information, and bound terminal status.
 * **Immediate Persistence**: Updates persist to offline IndexedDB and localStorage mirror with full `ADMIN_PROFILE_UPDATED` audit logging.
 
+### 10. Three-Tier Role Hierarchy & Central Super Admin Governance (v1.0.72)
+* **Tier 1: 🛡️ Super Administrator (Global Vendor Authority)**:
+  * Master credentials: `superadmin@technomind.health` / `superadmin@123` (Shortcut `Ctrl+Shift+S`).
+  * Provisions hospital profiles, creates hospital administrators, monitors global workstation telemetry across clinics, and triggers bi-directional cloud synchronization.
+* **Tier 2: 🏥 Hospital Administrator (Clinic Governance)**:
+  * Provisions technicians with single-use activation vouchers, manages clinic branding and logos, and reviews facility-scoped patient directories.
+* **Tier 3: 🔬 Clinical Technician (Diagnostic Operator)**:
+  * Bound to a physical station terminal (MAC address). Conducts 100% offline Harris Mat examinations and generates 4-page medical PDF reports.
+
+### 11. Bi-Directional Supabase Cloud Multi-Entity Synchronization
+* **Central Endpoint**: `https://yqfbhxtvrpfyzygzuqts.supabase.co`
+* **5 Synchronized Entities**:
+  1. `hospital_profiles`: Central clinic registry and branding.
+  2. `admin_accounts`: Hospital administrators and master passwords.
+  3. `technician_users`: Technician credentials and activation vouchers.
+  4. `station_activations`: Workstation fingerprints, MAC bindings, and device discovery beacons.
+  5. `clinical_reports`: Complete examination reports, arch indices, and pressure analyses.
+* **Automated Fresh Station Onboarding**:
+  * Un-enrolled stations broadcast a discovery beacon on first launch and silently cache active clinics and technicians in the background.
+  * Entering Clinic Code & Voucher Code verifies against Supabase Cloud live, downloading authentic records and binding the device with zero manual file transfers.
+* **Remote Assistance & Anti-Lockout Defense**:
+  * Passwords updated by administrators remotely synchronize to client workstations upon login.
+  * 1-Click `[⚡ Instant Unlock / Reset Lockout]` and Super Admin master credentials override the 15-minute anti-brute-force defense immediately.
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps

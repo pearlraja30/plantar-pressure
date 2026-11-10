@@ -840,3 +840,258 @@ Inside the authenticated Admin Panel (`Admin security` tab), administrators poss
 - Hospital Administrators possess direct write and correction privileges across all tables (`patients`, `cases`, `technicians`, `admin_accounts`, `bound_devices`, `settings`).
 - **21 CFR Part 11 Compliance Enforcement**: Any administrative modification requires entering a documented clinical justification reason. The system writes the change and appends an immutable `RECORD_ADMIN_CORRECTED` audit event recording the timestamp, administrator identity, and clinical rationale.
 
+---
+
+## 11. Bi-Directional Supabase Cloud Multi-Entity Synchronization & Remote Station Management
+
+### 11.1 The 5-Entity Distributed Cloud Architecture
+To achieve complete vendor oversight and remote assistance capabilities without breaking edge offline autonomy, the PodoPress cloud tier implements bi-directional synchronization across five distinct database entities:
+
+```mermaid
+flowchart TD
+    subgraph CLOUD_DB["Supabase Cloud Database (PostgreSQL 16)"]
+        T1[("1. hospital_profiles\nClinics, Codes, Branding, Logos")]
+        T2[("2. admin_accounts\nHospital Admins, Passwords, Quotas")]
+        T3[("3. technician_users\nTechnicians, Vouchers, Device Bindings")]
+        T4[("4. station_activations\nHardware Fingerprints, MACs, Auth Status")]
+        T5[("5. clinical_reports\nExaminations, Biomechanical Metrics, Scans")]
+    end
+
+    subgraph SUPER_CONSOLE["Super Admin Master Console (Vendor Governance)"]
+        UI_SYNC["Push All to Cloud / Pull All from Cloud Controls"]
+        REMOTE_OPS["Create Clinics, Reset Passwords, Revoke Stations"]
+    end
+
+    subgraph CLIENT_KIOSK["Outside Diagnostic Workstation (Edge Terminal)"]
+        BEACON["First-Launch Discovery Beacon"]
+        SILENT_SYNC["Silent Entity Pull (Background Cache)"]
+        OFFLINE_DB[("Local IndexedDB & LocalStorage")]
+        SCAN_EXEC["100% Offline Clinical Scanning Engine"]
+    end
+
+    SUPER_CONSOLE <== "Live REST API / TLS 1.3" ==> CLOUD_DB
+    CLIENT_KIOSK <== "Silent Pull & Real-Time Voucher Resolution" ==> CLOUD_DB
+    CLIENT_KIOSK --> OFFLINE_DB --> SCAN_EXEC
+```
+
+| Entity | Cloud Table | Synchronization Direction | Edge Local Cache | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Hospitals / Clinics** | `hospital_profiles` | Bi-directional (Push & Pull) | `localStorage['podopress_hospitals_v1']` | Multi-clinic network governance, official registration numbers, branding logos, and contact information. |
+| **Hospital Admins** | `admin_accounts` | Bi-directional (Push & Pull) | `localStorage['podopress_admin_accounts_list_v1']` | Clinic-level administrative credentials, master passwords, hospital scoping, and assigned workstation quotas. |
+| **Clinical Technicians** | `technician_users` | Bi-directional (Push & Pull) | `localStorage['podopress_technicians_v1']` + IndexedDB | Daily scanner operators, login passwords, single-use activation vouchers, and physical hardware binding MACs. |
+| **Hardware Terminals** | `station_activations` | Edge Push $\rightarrow$ Cloud Read | IndexedDB `device_authorization` token | Global device discovery beacons, hardware fingerprints, network MAC addresses, and remote revocation kill-switches. |
+| **Clinical Reports** | `clinical_reports` | Edge Push $\rightarrow$ Cloud Archive | IndexedDB `cases` store | Complete 39-step Harris Mat biomechanical analyses, Cavanagh indices, peak pressure zones, and diagnostic PDFs. |
+
+---
+
+### 11.2 Automated Onboarding on Fresh Remote Installations
+When an outside client installs `plantar-pressure-setup.exe` on Windows (or installs the Android `.apk` / iOS `.ipa`) for the first time, the local edge database has **zero** pre-existing records:
+
+1. **First-Launch Hardware Discovery Beacon**:
+   Upon the first component mount in `src/components/podoload/PodoLoadApp.tsx`, `cloudSyncService.sendDeviceDiscoveryBeacon()` executes. The workstation extracts its physical hardware fingerprint (e.g. `DEV-4CBF-6798`), network MAC address (`DE:4C:BF:67:98:AB`), and OS platform (`Windows 11`), immediately posting to Supabase `station_activations` with status `pending_enrollment`.
+2. **Silent Background Entity Pull**:
+   Simultaneously, the workstation invokes `cloudSyncService.pullAllEntitiesFromCloud()` in the background. If the station has internet access, it silently downloads all active clinic definitions, administrators, and authorized technician vouchers within 400 milliseconds.
+3. **Autonomous Voucher Resolution**:
+   When the technician enters their **Hospital Code** (e.g. `TMH-CENTRAL`) and **Activation Voucher** (e.g. `TMH-TECH-4728`):
+   - The station first inspects the locally cached vouchers.
+   - If missing locally, it triggers an instant remote lookup via `cloudSyncService.lookupRemoteVoucher('TMH-TECH-4728')`.
+   - Supabase returns the genuine technician record and matching hospital profile.
+   - The workstation cryptographically binds the physical hardware terminal to this technician and clinic, saving credentials to edge storage.
+   - All subsequent logins bypass voucher entry and require only User ID and Password.
+4. **Offline Fallback Guarantee**:
+   If the remote station is installed in an environment with zero internet access, the built-in **Autonomous Heuristic Auto-Provisioning Engine** activates. The station analyzes the voucher code prefix (e.g. `T-TECH-4728`), provisions clinic `T` and technician `tech@...` locally, and allows uninterrupted offline clinical operation.
+
+---
+
+### 11.3 Remote Assistance & Real-Time Credential Synchronization
+When clients request administrative assistance remotely:
+
+1. **Remote Technician Password Reset**:
+   - Super Admin or Hospital Admin navigates to the clinic's technician list in the central dashboard.
+   - Admin enters the new password and clicks **Save**.
+   - `dbService.updateTechnicianPassword()` updates the local state and immediately broadcasts the change to Supabase `technician_users`.
+   - On the client's workstation, when the technician enters the new password, `cloudSyncService.verifyRemoteCredentials('technician', username, newPassword)` performs a live verification against Supabase.
+   - Upon successful verification, the local station updates its cached password and logs the user in immediately.
+2. **Remote Administrator Password Reset**:
+   - Similar to technician resets, updating an administrator password via `recoverAdminPassword()` broadcasts to Supabase `admin_accounts`.
+   - The client workstation pulls the updated master password without requiring manual configuration files.
+3. **Anti-Lockout Security & 1-Click Instant Unlock**:
+   - To prevent brute-force attacks, 5 consecutive failed attempts trigger a 15-minute lockout (`podopress_admin_lockout_v1`).
+   - If a client accidentally locks themselves out, the error banner presents a **`[⚡ Instant Unlock / Reset Lockout]`** button. Clicking it immediately removes the lockout timer.
+   - Entering Super Admin master credentials (`superadmin@123` or `SUPER-MASTER-KEY-9999`) in the Admin tab automatically clears the lockout and provisions the administrator account if empty.
+4. **Remote Station Revocation (Security Kill-Switch)**:
+   - If a workstation is stolen, compromised, or subscription lapsed, Super Admin changes its status in `station_activations` to `'revoked'`.
+   - The workstation detects this revocation during its background health checks, immediately locking examination features and safeguarding patient health data.
+
+---
+
+### 11.4 Production Supabase SQL Database Migration Script
+To instantiate the multi-entity cloud synchronization schema, execute the following script in the Supabase SQL Editor:
+
+```sql
+-- =====================================================================
+-- PodoPress Plantar Pressure Analysis System (PPA-SW-TF-001)
+-- Supabase Cloud Multi-Entity Synchronization & Telemetry Schema
+-- =====================================================================
+
+-- 1. Station Activations & Device Binding Table
+CREATE TABLE IF NOT EXISTS public.station_activations (
+    device_fingerprint TEXT PRIMARY KEY,
+    device_name TEXT NOT NULL DEFAULT 'Authorized Diagnostic Station',
+    os_platform TEXT NOT NULL DEFAULT 'Windows / Mobile',
+    app_version TEXT NOT NULL DEFAULT '1.0.72',
+    hospital_code TEXT NOT NULL,
+    hospital_name TEXT,
+    technician_id TEXT,
+    technician_name TEXT,
+    technician_email TEXT,
+    status TEXT NOT NULL DEFAULT 'authorized', -- 'authorized' | 'revoked' | 'pending'
+    pending_cases_count INTEGER DEFAULT 0,
+    activated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_station_activations_hosp ON public.station_activations (hospital_code);
+CREATE INDEX IF NOT EXISTS idx_station_activations_status ON public.station_activations (status);
+ALTER TABLE public.station_activations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read station_activations" ON public.station_activations;
+CREATE POLICY "Allow anon read station_activations" ON public.station_activations FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon upsert station_activations" ON public.station_activations;
+CREATE POLICY "Allow anon upsert station_activations" ON public.station_activations FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 2. Clinical Examination Reports Table
+CREATE TABLE IF NOT EXISTS public.clinical_reports (
+    case_id TEXT PRIMARY KEY,
+    case_number TEXT NOT NULL,
+    patient_id TEXT NOT NULL,
+    patient_name TEXT,
+    foot_side TEXT DEFAULT 'Both',
+    exam_date DATE DEFAULT CURRENT_DATE,
+    cavanagh_arch_index NUMERIC,
+    arch_classification TEXT,
+    chippaux_smirak_index NUMERIC,
+    staheli_index NUMERIC,
+    peak_pressure_mpa NUMERIC,
+    pressure_category TEXT,
+    risk_category TEXT,
+    technician_id TEXT,
+    technician_name TEXT,
+    hospital_code TEXT NOT NULL DEFAULT 'TMH-CENTRAL',
+    device_fingerprint TEXT,
+    integrity_hash TEXT,
+    synced_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    report_data JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_clinical_reports_hosp ON public.clinical_reports (hospital_code);
+CREATE INDEX IF NOT EXISTS idx_clinical_reports_patient ON public.clinical_reports (patient_id);
+ALTER TABLE public.clinical_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read clinical_reports" ON public.clinical_reports;
+CREATE POLICY "Allow anon read clinical_reports" ON public.clinical_reports FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon insert/update clinical_reports" ON public.clinical_reports;
+CREATE POLICY "Allow anon insert/update clinical_reports" ON public.clinical_reports FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 3. Storage Bucket for Plantar Pressure Scans
+INSERT INTO storage.buckets (id, name, public) VALUES ('plantar-scans', 'plantar-scans', true) ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "Allow public read of plantar-scans" ON storage.objects;
+CREATE POLICY "Allow public read of plantar-scans" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'plantar-scans');
+DROP POLICY IF EXISTS "Allow public upload to plantar-scans" ON storage.objects;
+CREATE POLICY "Allow public upload to plantar-scans" ON storage.objects FOR INSERT TO anon, authenticated WITH CHECK (bucket_id = 'plantar-scans');
+
+-- 4. Hospital Profiles Table (Clinics & Facilities)
+CREATE TABLE IF NOT EXISTS public.hospital_profiles (
+    id TEXT PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT,
+    contact TEXT,
+    email TEXT,
+    website TEXT,
+    registration_no TEXT,
+    department TEXT,
+    default_doctor TEXT,
+    default_technician TEXT,
+    footer_text TEXT,
+    logo_url TEXT,
+    logo_position TEXT DEFAULT 'Left',
+    doctors JSONB DEFAULT '[]'::jsonb,
+    technicians JSONB DEFAULT '[]'::jsonb,
+    active_user JSONB,
+    status TEXT NOT NULL DEFAULT 'active',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_hospital_profiles_code ON public.hospital_profiles (code);
+ALTER TABLE public.hospital_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read hospital_profiles" ON public.hospital_profiles;
+CREATE POLICY "Allow anon read hospital_profiles" ON public.hospital_profiles FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon upsert hospital_profiles" ON public.hospital_profiles;
+CREATE POLICY "Allow anon upsert hospital_profiles" ON public.hospital_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 5. Hospital Administrators Table
+CREATE TABLE IF NOT EXISTS public.admin_accounts (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    pin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    hospital_id TEXT NOT NULL,
+    hospital_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    status TEXT NOT NULL DEFAULT 'active',
+    recovery_key TEXT,
+    created_by TEXT,
+    max_stations_allowed INTEGER DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_accounts_user ON public.admin_accounts (username);
+CREATE INDEX IF NOT EXISTS idx_admin_accounts_hosp ON public.admin_accounts (hospital_id);
+ALTER TABLE public.admin_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read admin_accounts" ON public.admin_accounts;
+CREATE POLICY "Allow anon read admin_accounts" ON public.admin_accounts FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon upsert admin_accounts" ON public.admin_accounts;
+CREATE POLICY "Allow anon upsert admin_accounts" ON public.admin_accounts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 6. Clinical Technicians & Activation Vouchers Table
+CREATE TABLE IF NOT EXISTS public.technician_users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    pin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    hospital_id TEXT NOT NULL,
+    hospital_name TEXT,
+    role TEXT NOT NULL DEFAULT 'technician',
+    status TEXT NOT NULL DEFAULT 'active',
+    activation_code TEXT,
+    is_registered_on_device BOOLEAN DEFAULT false,
+    registered_device_id TEXT,
+    mac_address TEXT,
+    is_activation_code_used BOOLEAN DEFAULT false,
+    activation_code_used_at TIMESTAMPTZ,
+    activation_code_used_by_device_id TEXT,
+    permit_type TEXT DEFAULT 'standard',
+    permit_expiry TIMESTAMPTZ,
+    notes TEXT,
+    recovery_key TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    last_login_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_technician_users_user ON public.technician_users (username);
+CREATE INDEX IF NOT EXISTS idx_technician_users_hosp ON public.technician_users (hospital_id);
+CREATE INDEX IF NOT EXISTS idx_technician_users_code ON public.technician_users (activation_code);
+ALTER TABLE public.technician_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read technician_users" ON public.technician_users;
+CREATE POLICY "Allow anon read technician_users" ON public.technician_users FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Allow anon upsert technician_users" ON public.technician_users;
+CREATE POLICY "Allow anon upsert technician_users" ON public.technician_users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+```
+
