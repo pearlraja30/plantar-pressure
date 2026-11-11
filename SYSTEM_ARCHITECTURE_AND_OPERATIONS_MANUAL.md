@@ -559,12 +559,32 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
 3. **Clinical Error Message Sanitization**:
    - Replaces raw shell execution strings with clean, user-friendly diagnostic guidance (e.g., *"Scanner 'EPSON L3210 Series' is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready."*).
 
-### 16.5 Regulatory Verification & Conformance Status (v1.0.75)
-- **Automated Unit Tests**: **109/109** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.5 Dual-Architecture WIA Minidriver Automation & Diagnostic Fallback (v1.0.76)
+1. **64-bit and 32-bit SysWOW64 Dual Architecture**:
+   - Solves the Windows 64-bit PowerShell driver blindness when communicating with 32-bit WIA minidrivers installed by Epson, Canon, and HP all-in-one printers (`C:\Windows\twain_32\escndv`).
+   - `runPowerShell()` in `electron/main.cjs` automatically detects when 64-bit WIA returns no devices and re-executes in 32-bit SysWOW64 PowerShell (`C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`).
+2. **Decoupled WIA CommonDialog Fallback**:
+   - Decoupled `WIA.CommonDialog` from `$errMsg`. Whenever programmatic acquisition does not return an image, Windows native `ShowAcquireImage(1)` automatically engages as a fail-safe.
+3. **All-in-One Printer-Cum-Scanner Diagnostics**:
+   - Clear, actionable guidance when a printer is detected as "Ready" but its scanner driver is offline (e.g. prompt to launch "Epson Scan 2").
+
+### 16.6 Step 11 Anatomical Foot Bounding Box Crop, Viewport Auto-Fit & Multi-Mode Background (v1.0.77)
+1. **Step 11 Anatomical Foot Bounding Box Crop**:
+   - Adhering to the verified reference algorithm [`scripts/harris_jet_v1.py`](file:///Users/rajasekaran/Projects/plantar-pressure/scripts/harris_jet_v1.py), the output canvas is tightly cropped to the foot impression (`minX, maxX, minY, maxY`) with balanced proportional padding (`pad = Math.round(Math.max(16, Math.min(width, height) * 0.035))`).
+   - Completely eliminates blank flatbed paper margins and standardizes scale and centering across all uploads and scans, regardless of paper placement on the scanner bed.
+2. **Responsive Auto-Fit Viewport**:
+   - Replaced rigid height constraints (`min-height: 310px`) with dynamic viewport sizing (`height: calc(100vh - 290px)`, min 260px, max 430px) and `object-fit: contain; object-position: center;`.
+   - Ensures the entire footprint from toes to heel is 100% visible on any screen resolution (1080p, 900p, 768p) without clipping.
+3. **Clinical Multi-Mode Background Selector**:
+   - Clinicians can toggle between **⬛ Black (`#000000`)** (default, maximum dynamic range contrast with subtle glow), **🌑 Slate (`#0f172a`)** (low-glare dark mode), and **⬜ White (`#ffffff`)** (paper simulation).
+   - Setting persists in `localStorage` across all exams and page transitions.
+
+### 16.7 Regulatory Verification & Conformance Status (v1.0.77)
+- **Automated Unit Tests**: **118/118** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~285ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~341ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.75`.
+- **Release Version**: Tagged and committed `v1.0.77`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

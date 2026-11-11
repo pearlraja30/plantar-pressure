@@ -107,7 +107,7 @@ For the complete, in-depth architectural and operational manual, refer to:
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **79 / 79 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, and cloud sync engines.
+* **118 / 118 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -247,11 +247,22 @@ The system includes an automated clinical verification battery covering all test
 ### 14. Streamlined Clean Sign-In Experience (v1.0.73)
 * Eliminated unnecessary regulatory footer banners (`IEC 62304 Class B SaMD · 21 CFR Part 11 Audit Trail Active · Zero Stale Data Guarantee`) and verbose feature bullet points from the station sign-in modal, delivering a modern, clutter-free clinical user interface.
 
+### 15. Dual-Architecture WIA Minidriver Automation & Diagnostic Fallback (v1.0.76)
+* **64-bit and 32-bit SysWOW64 PowerShell Execution**: Overcomes Windows 64-bit PowerShell driver blindness when communicating with 32-bit WIA minidrivers installed by Epson, Canon, and HP all-in-one printers (`C:\Windows\twain_32\escndv`).
+* **Decoupled WIA CommonDialog Fallback**: If programmatic WIA connection encounters driver stalls, the native Windows acquisition dialog (`WIA.CommonDialog`) automatically engages as a fail-safe.
+* **All-in-One Printer-Cum-Scanner Diagnostics**: Clear, actionable guidance when a printer is detected as "Ready" but its scanner driver is offline (e.g. prompt to launch "Epson Scan 2").
+
+### 16. Step 11 Foot Bounding Box Crop, Viewport Auto-Fit & Multi-Mode Background (v1.0.77)
+* **Step 11 Anatomical Bounding Box Crop**: Adhering to the verified reference algorithm [`scripts/harris_jet_v1.py`](file:///Users/rajasekaran/Projects/plantar-pressure/scripts/harris_jet_v1.py), the output canvas is tightly cropped to the foot impression (`minX, maxX, minY, maxY`) with balanced proportional padding. Completely eliminates blank paper margins and standardizes scale and centering across all uploads and scans.
+* **Responsive Auto-Fit Viewport**: Replaced rigid height constraints with dynamic viewport sizing (`height: calc(100vh - 290px)`, min 260px, max 430px) and `object-fit: contain; object-position: center;`. Ensures the entire footprint from toes to heel is 100% visible on any screen resolution without clipping.
+* **Clinical Multi-Mode Background Selector**: Clinicians can toggle between **⬛ Black (`#000000`)** (default, maximum dynamic range contrast with subtle glow), **🌑 Slate (`#0f172a`)** (low-glare dark mode), and **⬜ White (`#ffffff`)** (paper simulation). Setting persists in `localStorage` across all exams.
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps
 
 For detailed clinical, architectural, and developer references, consult the following comprehensive manuals:
+* 📄 [**`CHANGELOG.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CHANGELOG.md) — **Master End-to-End Changes History & Architectural Rationale**: Exhaustive version-by-version log detailing why each change was suggested, technical root causes, end-to-end data flows, files modified, and verification evidence.
 * 📄 [**`CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md) — **Master Enterprise Cloud Segregation & Offline Sync Plan**: 3-Tier cloud segregation (Frontend CDN/Native Shells, Backend Microservices on AWS ECS/EKS, Aurora PostgreSQL 16+ & S3), 100% offline-first working strategy across Windows `.exe`, Android `.apk`, and iOS `.ipa`, and technician-based online batch synchronization protocol for later-stage execution.
 * 📄 [**`CROSS_PLATFORM_OPERATIONS_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CROSS_PLATFORM_OPERATIONS_MANUAL.md) — Complete cross-platform operations guide covering Microsoft Windows Desktop (`.exe`), Google Android (`.apk`), and Apple iOS iPhone/iPad (`.ipa`), hardware scanners, mobile camera gyros, discreet admin routing, and packaging.
 * 📄 [**`POSTGRESQL_3TIER_MIGRATION_PLAN.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/POSTGRESQL_3TIER_MIGRATION_PLAN.md) — 3-Tier Distributed Architecture (Multi-platform Clients, Microservices, PostgreSQL 16+ & Cloud S3 Object Storage) with complete DDL schemas, migration scripts, and sync protocols.
