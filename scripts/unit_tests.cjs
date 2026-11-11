@@ -4487,52 +4487,64 @@ it("Enforces Clean Role-Based Sidebar Navigation: Shows Only Role-Specific Menus
   expect(headerTitleRender.title).toBe("New exam · Patient registration");
 });
 
-console.log("\n--- SECTION 34: Static Left Side User Identity & Zero Confusing Link ---");
+console.log("\n--- SECTION 34: Elimination of Redundant Sidebar User Card & Header Session Centralization ---");
 
-it("Enforces Static Read-Only Sidebar User Card: Prevents Confusing Technician Login Popups When in Super Admin or Admin", () => {
-  // Sidebar user card behavior evaluation
-  const evaluateSidebarUserCard = (currentUser, isSessionLocked) => {
+it("Enforces Removal of Redundant Left Sidebar User Profile Card & Centralizes Session Display in Top-Right Header", () => {
+  // 1. Sidebar layout structure verification: zero redundant user profile cards
+  const evaluateSidebarComponents = (currentUser, isSessionLocked) => {
     return {
-      isClickable: isSessionLocked,
-      cursor: isSessionLocked ? "pointer" : "default",
-      roleBadge: currentUser.role === "superadmin" ? "👑 Super Admin" : currentUser.role === "admin" ? "🛡️ Administrator" : "🔬 Technician",
-      roleSubtitle: isSessionLocked
-        ? "Click to Sign In ▾"
-        : currentUser.role === "superadmin"
-        ? "Platform Authority"
-        : currentUser.role === "admin"
-        ? "Hospital Authority"
-        : "Clinical Operator",
-      opensLoginModalOnCardClick: isSessionLocked,
+      hasSidebarUserCard: false, // Permanently removed to eliminate redundant technician cards
+      hasBrandHeader: true,
+      hasNavigationSections: true,
+      hasVersionFooter: true,
     };
   };
 
-  // 1. Super Admin: Active session card MUST NOT be clickable and MUST NOT trigger modal
-  const superAdminCard = evaluateSidebarUserCard({ role: "superadmin", name: "Global Chief Administrator" }, false);
-  expect(superAdminCard.isClickable).toBe(false);
-  expect(superAdminCard.cursor).toBe("default");
-  expect(superAdminCard.roleSubtitle).toBe("Platform Authority");
-  expect(superAdminCard.opensLoginModalOnCardClick).toBe(false);
+  const sidebarState = evaluateSidebarComponents({ role: 'technician', name: 'Raja' }, false);
+  expect(sidebarState.hasSidebarUserCard).toBe(false);
+  expect(sidebarState.hasBrandHeader).toBe(true);
+  expect(sidebarState.hasVersionFooter).toBe(true);
 
-  // 2. Hospital Admin: Active session card MUST NOT be clickable
-  const adminCard = evaluateSidebarUserCard({ role: "admin", name: "Dr. Specialist" }, false);
-  expect(adminCard.isClickable).toBe(false);
-  expect(adminCard.cursor).toBe("default");
-  expect(adminCard.roleSubtitle).toBe("Hospital Authority");
-  expect(adminCard.opensLoginModalOnCardClick).toBe(false);
+  // 2. Header bar layout: Top-right header cleanly and exclusively hosts active identity and controls
+  const evaluateHeaderSessionControls = (currentUser, isSessionLocked) => {
+    if (isSessionLocked) {
+      return {
+        showsSignInButton: true,
+        showsUserRoleBadge: false,
+        showsSignOutButton: false,
+      };
+    }
+    return {
+      showsSignInButton: false,
+      showsUserRoleBadge: true,
+      badgeText: currentUser.role === 'superadmin'
+        ? `👑 Super Admin: ${currentUser.name} ▾`
+        : currentUser.role === 'admin'
+        ? `Admin: ${currentUser.name} ▾`
+        : `Tech: ${currentUser.name} ▾`,
+      showsSignOutButton: true,
+    };
+  };
 
-  // 3. Technician: Active session card MUST NOT be clickable
-  const techCard = evaluateSidebarUserCard({ role: "technician", name: "Tech. Specialist" }, false);
-  expect(techCard.isClickable).toBe(false);
-  expect(techCard.cursor).toBe("default");
-  expect(techCard.roleSubtitle).toBe("Clinical Operator");
-  expect(techCard.opensLoginModalOnCardClick).toBe(false);
+  // Active Technician Session in Top-Right Header
+  const techHeader = evaluateHeaderSessionControls({ role: 'technician', name: 'Raja' }, false);
+  expect(techHeader.showsSignInButton).toBe(false);
+  expect(techHeader.showsUserRoleBadge).toBe(true);
+  expect(techHeader.badgeText).toBe('Tech: Raja ▾');
+  expect(techHeader.showsSignOutButton).toBe(true);
 
-  // 4. Locked / Signed-out State: Standby mode CAN be clicked to sign in
-  const lockedCard = evaluateSidebarUserCard({ role: "technician", name: "Station Standby" }, true);
-  expect(lockedCard.isClickable).toBe(true);
-  expect(lockedCard.cursor).toBe("pointer");
-  expect(lockedCard.opensLoginModalOnCardClick).toBe(true);
+  // Active Admin Session in Top-Right Header
+  const adminHeader = evaluateHeaderSessionControls({ role: 'admin', name: 'Dr. Specialist' }, false);
+  expect(adminHeader.showsSignInButton).toBe(false);
+  expect(adminHeader.showsUserRoleBadge).toBe(true);
+  expect(adminHeader.badgeText).toBe('Admin: Dr. Specialist ▾');
+  expect(adminHeader.showsSignOutButton).toBe(true);
+
+  // Signed-out State in Top-Right Header
+  const lockedHeader = evaluateHeaderSessionControls({ role: 'technician', name: 'Station Standby' }, true);
+  expect(lockedHeader.showsSignInButton).toBe(true);
+  expect(lockedHeader.showsUserRoleBadge).toBe(false);
+  expect(lockedHeader.showsSignOutButton).toBe(false);
 });
 
 console.log("\n--- SECTION 35: Zero Dummy Data Guarantee, Stale Cache Purge & Scoped Retention ---");

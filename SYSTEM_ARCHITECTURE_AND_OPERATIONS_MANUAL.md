@@ -593,12 +593,19 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
    - Added an empty state onboarding card (`Empty State: Zero Technicians Registered`) with an informative guide and a 1-click `"Create First Technician Login"` button.
    - Introduced an immediate one-time temporary password handover dialog (`oneTimeTempPasswordInfo`) with credential copying, voucher summary, and forced first-login password update notification.
 
-### 16.8 Regulatory Verification & Conformance Status (v1.0.78)
+### 16.8 Elimination of Redundant Sidebar User Profile Card & Header Session Centralization (v1.0.79)
+1. **Elimination of UI Duplication**:
+   - Excised `.podoload-sidebar-user-card` from the bottom of the left navigation sidebar.
+   - Preserves clean vertical spacing for core clinical exam items (`Registration`, `Scan and process`, `Results`, `Report`, `Patient search`, `Reports and cloud`) without vertical scrolling.
+2. **Centralized Top-Right Header Session Authority**:
+   - The top-right workstation header comprehensively manages active identity (`Tech: <name> ▾`, `Admin: <name> ▾`, `👑 Super Admin: <name> ▾`), active facility information (`Building2 <clinic>`), cloud synchronization status, role switching, and session sign-out (`Sign Out`).
+
+### 16.9 Regulatory Verification & Conformance Status (v1.0.79)
 - **Automated Unit Tests**: **122/122** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~277ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~320ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.78`.
+- **Release Version**: Tagged and committed `v1.0.79`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

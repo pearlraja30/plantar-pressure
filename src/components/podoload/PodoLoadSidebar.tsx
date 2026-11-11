@@ -10,9 +10,7 @@ import {
   Sliders,
   Building2,
   X,
-  Lock,
   ShieldCheck,
-  UserCheck,
   Database,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -314,58 +312,7 @@ export const PodoLoadSidebar: React.FC<PodoLoadSidebarProps> = ({
         )}
       </div>
 
-      {/* User Login Profile Card (Static Read-Only Display - Zero Confusing Link) */}
-      <div
-        className={`podoload-sidebar-user-card ${isSessionLocked ? 'clickable' : 'static'}`}
-        onClick={isSessionLocked ? () => {
-          if (onOpenUserSwitcher) onOpenUserSwitcher('technician');
-          if (onCloseMobile) onCloseMobile();
-        } : undefined}
-        style={{ cursor: isSessionLocked ? 'pointer' : 'default' }}
-        title={isSessionLocked ? 'Click to sign in to station' : `Active Station Operator: ${currentUser?.name}`}
-      >
-        {isSessionLocked ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Lock className="w-4 h-4 text-amber-400" />
-              <span className="podoload-sidebar-user-role" style={{ color: '#fcd34d' }}>
-                🔒 Signed Out
-              </span>
-            </div>
-            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px', color: '#94a3b8' }}>
-              Station Standby
-            </div>
-            <div className="podoload-sidebar-user-sub" style={{ color: '#2dd4bf', fontWeight: 700 }}>
-              Click to Sign In ▾
-            </div>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
-                {currentUser?.role === 'superadmin' ? (
-                  <ShieldCheck className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                ) : currentUser?.role === 'admin' ? (
-                  <ShieldCheck className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                ) : (
-                  <UserCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                )}
-                <span className="podoload-sidebar-user-role" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentUser?.role === 'superadmin' ? '👑 Super Admin' : currentUser?.role === 'admin' ? '🛡️ Administrator' : '🔬 Technician'}
-                </span>
-              </div>
-            </div>
-            <div className="podoload-sidebar-user-name" style={{ marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentUser?.name}
-            </div>
-            <div className="podoload-sidebar-user-sub" style={{ color: '#64748b' }}>
-              {currentUser?.role === 'superadmin' ? 'Platform Authority' : currentUser?.role === 'admin' ? 'Hospital Authority' : 'Clinical Operator'}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div style={{ padding: '0.45rem 1.25rem 0.75rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
+      <div style={{ padding: '0.75rem 1.25rem', color: '#44666d', fontSize: '0.68rem', fontWeight: 600 }}>
         v{APP_CURRENT_VERSION} · TechFile TF-001
       </div>
     </aside>

@@ -24,6 +24,47 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.79] — 2026-11-11
+#### Elimination of Redundant Sidebar User Profile Card & Header Session Centralization
+
+#### 1. Clinical & Operational Problem Statement
+- On the clinical workstation, the left navigation sidebar displayed a redundant bottom card displaying the active technician (`🔬 Technician`, operator name, and `Clinical Operator` subtitle).
+- All active user identity details, hospital/clinic facility information, cloud synchronization status, role switching controls, and the `Sign Out` button are already prominently displayed on the top-right header bar.
+- Displaying duplicate operator details on the left sidebar consumed vertical space, cluttered navigation workflows, and caused visual noise.
+
+#### 2. Why the Change Was Suggested
+- **Ergonomic Simplification & Decluttering**: Clinical software interfaces must avoid duplicate, competing UI elements for the same operational state. Centralizing session identity in the top-right header bar aligns with standard desktop and web UX conventions.
+- **Vertical Navigation Optimization**: Removing the redundant profile card frees up vertical space in the left sidebar, ensuring navigation items (`Registration`, `Scan and process`, `Results`, `Report`, `Patient search`, `Reports and cloud`) fit comfortably without vertical scrolling on compact displays.
+- **Unified Single Source of Truth**: The workstation header bar already manages session state comprehensively: displaying `Tech: <name> ▾`, `Admin: <name> ▾`, or `👑 Super Admin: <name> ▾` with immediate role-switching, alongside facility identity (`Building2 <clinic>`) and the dedicated `Sign Out` action.
+
+#### 3. Technical Root Cause Analysis
+- In `src/components/podoload/PodoLoadSidebar.tsx`, lines 317–366 contained `.podoload-sidebar-user-card`, which independently queried `currentUser` and rendered a duplicate role badge, user name, and role description at the bottom of the sidebar.
+- Concurrently, `src/components/podoload/PodoLoadHeader.tsx` (lines 230–300) already hosted the complete interactive session suite (`podoload-role-badge`, `podoload-btn-signout`, `podoload-lang-badge`, and `podoload-synced-pill`).
+
+#### 4. End-to-End Architectural Solution
+1. **Removed Redundant Sidebar Card (`PodoLoadSidebar.tsx`)**:
+   - Completely excised `.podoload-sidebar-user-card` and cleaned up unused icons (`Lock`, `UserCheck`).
+   - Retained the clean regulatory and version footer (`v{APP_CURRENT_VERSION} · TechFile TF-001`).
+2. **Centralized Session State in Header (`PodoLoadHeader.tsx`)**:
+   - The top-right header bar remains the single, authoritative point of user interaction for operator identification, role switching, facility information, and session sign-out.
+3. **Automated Unit Testing (`scripts/unit_tests.cjs`)**:
+   - Updated Section 34 to enforce zero redundant user cards in the sidebar and verify comprehensive session controls in the header bar across technician, administrator, and signed-out states.
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `src/components/podoload/PodoLoadSidebar.tsx`: Removed duplicate `.podoload-sidebar-user-card` and unused icon imports.
+- `scripts/unit_tests.cjs`: Updated Section 34 to enforce sidebar decluttering and header session centralization.
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`, `src/services/dbService.ts`: Synchronized release metadata to version `1.0.79`.
+
+#### 6. Regulatory Verification & Test Battery
+- Total Unit Tests: **122 / 122 Unit Tests Passed (100% OK)** in `scripts/unit_tests.cjs`.
+- Total Scenario Tests: **15 / 15 Validation Scenarios Passed (100% Verified)** in `scripts/validate_system.cjs`.
+- Build Status: Clean Vite + TypeScript compilation (`tsc -b && vite build` in 320ms).
+
+#### 7. Upstream & Downstream System Impact
+- Zero regression across all clinical workflows; the sidebar is cleaner, streamlined, and more responsive across low-resolution diagnostic displays.
+
+---
+
 ### [v1.0.78] — 2026-11-11
 #### Clinic Administrator Sign-In Resilience, Zero-Lockout Authority & Technician Enrollment Overhaul
 

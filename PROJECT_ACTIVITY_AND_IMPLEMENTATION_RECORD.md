@@ -1956,6 +1956,38 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
 - **Release Version**: Tagged and committed `v1.0.78`.
 
+---
+
+## 54. ACTIVITY: ELIMINATION OF REDUNDANT SIDEBAR USER CARD & HEADER SESSION CENTRALIZATION (v1.0.79)
+- **Date**: 2026-11-11
+- **Version**: `1.0.79`
+- **Scope**: Remove the redundant left sidebar user profile card (`.podoload-sidebar-user-card`). Centralize all active session identity, facility name, role-switching, and sign-out controls strictly in the top-right header bar to eliminate duplicate UI elements, declutter clinical navigation, and optimize vertical space on diagnostic displays.
+
+### 54.1 Clinical & Operational Rationale
+1. **Elimination of Confusing UI Duplication**:
+   - The clinical workstation previously displayed active technician details in two separate locations: at the bottom of the left navigation sidebar and in the top-right header bar.
+   - Clinical operators noted that the sidebar card was redundant and unnecessary because the top-right header already provides comprehensive session identity (`Tech: <name> ▾`, `Admin: <name> ▾`), active facility information (`Building2 <clinic>`), sync status, and direct sign-out.
+2. **Vertical Sidebar Ergonomics**:
+   - Removing the user card from the left sidebar increases usable vertical space, preventing menu items from being compressed or pushed off-screen on lower resolution displays (e.g. 768p, 800p, or 1080p at 125%/150% scaling).
+
+### 54.2 Technical Solution Implemented
+1. **Sidebar Excised (`PodoLoadSidebar.tsx`)**:
+   - Removed `.podoload-sidebar-user-card` (lines 317–366).
+   - Removed unused icon imports (`Lock`, `UserCheck`).
+   - Retained the clean version and regulatory footer: `v{APP_CURRENT_VERSION} · TechFile TF-001`.
+2. **Centralized Header Session Authority (`PodoLoadHeader.tsx`)**:
+   - Confirmed that all session operations (role switching, station sign-in, session sign-out, facility profile, cloud sync) are fully accessible in the top-right header bar.
+3. **Automated Unit Testing (`scripts/unit_tests.cjs`)**:
+   - Updated Section 34 to verify zero redundant user cards in the sidebar and validate header session controls across technician, administrator, and signed-out states.
+
+### 54.3 Quality Verification & Conformance
+- **Unit Test Battery**: Maintained **122/122** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled cleanly with 0 errors in 320ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
+- **Release Version**: Tagged and committed `v1.0.79`.
+
+
 
 
 

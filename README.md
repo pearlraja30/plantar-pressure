@@ -263,6 +263,10 @@ The system includes an automated clinical verification battery covering all test
 * **Zero-Lockout Administrative Authority**: Diagnostic terminal seat caps never lock out clinic administrators from accessing the management console to configure staff, vouchers, or reports.
 * **Technician Enrollment Validation & One-Time Handover**: Inline validation banners prevent silent alert failures on native kiosks, prevents duplicate User IDs, provides a zero-technician empty state guide, and delivers immediate temporary password handover dialogs.
 
+### 18. Redundant Sidebar Profile Card Elimination & Header Session Centralization (v1.0.79)
+* **Decluttered Left Navigation**: Removed the redundant user profile card from the bottom of the left sidebar, preserving vertical space for clinical exam and records navigation.
+* **Centralized Header Session Authority**: All active user details (`Tech: <name> ▾`, `Admin: <name> ▾`), active facility information (`Building2 <clinic>`), cloud sync status, role switching, and session sign-out are unified exclusively in the top-right workstation header bar.
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps
