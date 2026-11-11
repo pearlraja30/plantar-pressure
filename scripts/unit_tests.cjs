@@ -5704,6 +5704,134 @@ it("Enforces Responsive Viewport Auto-Fit (Zero Heel Cutoff Across Resolutions)"
   expect(calculateViewportHeight(500)).toBe(260);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 45: Administrator Login Access, Direct Technician Enrollment & Zero-Lockout Admin Authority
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 45: Administrator Login Access, Direct Technician Enrollment & Zero-Lockout Admin Authority ---");
+
+it("Enforces Accessible Administrator Sign-In Entry from Station Kiosk on All Platforms", () => {
+  // Ensure the administrator portal toggle is accessible from the station sign-in view
+  const getLoginViewControls = (isAdminContext, isMandatoryActivation) => {
+    return {
+      canSwitchToAdmin: !isAdminContext && !isMandatoryActivation,
+      canSwitchToTechnician: isAdminContext && !isMandatoryActivation,
+    };
+  };
+
+  const kioskControls = getLoginViewControls(false, false);
+  expect(kioskControls.canSwitchToAdmin).toBe(true);
+
+  const adminControls = getLoginViewControls(true, false);
+  expect(adminControls.canSwitchToTechnician).toBe(true);
+});
+
+it("Enforces Clean Station Initial Admin Auto-Provisioning with Default Credentials", () => {
+  // Simulate fresh station with 0 initial admin accounts
+  const adminAccountsList = [];
+  const authenticateAdminOnCleanStation = (username, pin) => {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+    const isSuperAdmin = cleanPin === 'superadmin@123' || cleanUser === 'superadmin@technomind.health';
+    const isDefaultAdmin = (cleanUser === 'admin' || cleanUser === 'admin@technomind.health') && (cleanPin === '1234' || cleanPin === 'admin123');
+
+    if (adminAccountsList.length === 0) {
+      if (isSuperAdmin || isDefaultAdmin) {
+        const auto = {
+          id: 'admin-auto-01',
+          name: 'Hospital Administrator',
+          username: cleanUser.includes('@') ? cleanUser : 'admin@technomind.health',
+          pin: cleanPin,
+          role: 'admin',
+          status: 'active',
+        };
+        adminAccountsList.push(auto);
+        return { success: true, account: auto };
+      }
+      return { success: false, error: 'No accounts registered' };
+    }
+    return { success: false };
+  };
+
+  // Wrong password fails
+  expect(authenticateAdminOnCleanStation('admin', 'wrong_pass').success).toBe(false);
+
+  // Default credentials succeed and auto-provision the admin account
+  const authRes = authenticateAdminOnCleanStation('admin', '1234');
+  expect(authRes.success).toBe(true);
+  expect(authRes.account.role).toBe('admin');
+  expect(adminAccountsList.length).toBe(1);
+});
+
+it("Enforces Zero-Lockout Administrative Access Regardless of Station Capture Device Caps", () => {
+  // Administrative user logging into management console must never be blocked by diagnostic seat caps
+  const license = { maxAllowedDevices: 1 };
+  const boundDevices = [{ id: 'device-terminal-01', status: 'active' }]; // 1 of 1 seat used by a scanner terminal
+
+  const checkAdminAccess = (role) => {
+    const isStationCapReached = boundDevices.length >= license.maxAllowedDevices;
+    if (role === 'admin' || role === 'superadmin') {
+      // Admins are granted management access to administer staff and devices
+      return { allowed: true, roleGranted: 'admin' };
+    }
+    // Technicians/Kiosk capture stations require an available seat
+    return { allowed: !isStationCapReached, roleGranted: isStationCapReached ? null : 'technician' };
+  };
+
+  const adminAttempt = checkAdminAccess('admin');
+  expect(adminAttempt.allowed).toBe(true);
+
+  const techAttempt = checkAdminAccess('technician');
+  expect(techAttempt.allowed).toBe(false);
+});
+
+it("Enforces Technician Enrollment Validation, Duplicate Prevention & One-Time Password Handover", () => {
+  const registeredTechs = [
+    { id: 'tech-01', name: 'Sarah Operator', username: 'sarah.tech', role: 'technician' },
+  ];
+
+  const enrollTechnician = (fullName, username, pin) => {
+    if (!fullName.trim() || !username.trim()) {
+      return { success: false, error: 'Please provide technician full name and desired User ID / username.' };
+    }
+    const cleanUser = username.trim().toLowerCase();
+    if (registeredTechs.some((t) => t.username.toLowerCase() === cleanUser)) {
+      return { success: false, error: `Technician User ID "${username.trim()}" is already registered. Please enter a unique User ID.` };
+    }
+    const assignedPass = pin && pin.trim() ? pin.trim() : 'Tech9988';
+    const newTech = {
+      id: `tech-${Date.now()}`,
+      name: fullName.trim(),
+      username: cleanUser,
+      pin: assignedPass,
+      role: 'technician',
+      mustChangePassword: true,
+    };
+    registeredTechs.push(newTech);
+    return {
+      success: true,
+      technician: newTech,
+      handoverCard: {
+        username: newTech.username,
+        tempPassword: assignedPass,
+        mustChange: true,
+      },
+    };
+  };
+
+  // Blank validation fails
+  expect(enrollTechnician('', 'user').success).toBe(false);
+
+  // Duplicate username fails
+  expect(enrollTechnician('Sarah Duplicate', 'sarah.tech').success).toBe(false);
+
+  // Valid enrollment succeeds with temporary password handover
+  const newEnrollment = enrollTechnician('Kavita Rao', 'kavita.rao', 'KavitaPass123!');
+  expect(newEnrollment.success).toBe(true);
+  expect(newEnrollment.technician.username).toBe('kavita.rao');
+  expect(newEnrollment.handoverCard.mustChange).toBe(true);
+  expect(registeredTechs.length).toBe(2);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

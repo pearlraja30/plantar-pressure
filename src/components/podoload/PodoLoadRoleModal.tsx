@@ -378,28 +378,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         return;
       }
 
-      // 3. ENFORCE DEVICE BINDING & LICENSING (Single Device Restriction)
+      // 3. ENFORCE DEVICE BINDING & LICENSING
+      // If free terminal seat is available, automatically bind station
       const devCheck = dbService.checkDeviceAuthorization();
-
-      if (devCheck.authorized) {
-        // Current device is authorized!
-        dbService.authorizeStationForAdmin(auth.account);
-        onSelectRole('admin', auth.account?.name, undefined, auth.account?.hospitalId, auth.account?.hospitalName);
-        onClose();
-      } else if (devCheck.canAutoBind) {
-        // Free seat available within quota! Automatically bind this station
+      if (devCheck.canAutoBind) {
         dbService.bindCurrentDevice();
-        dbService.authorizeStationForAdmin(auth.account);
-        onSelectRole('admin', auth.account?.name, undefined, auth.account?.hospitalId, auth.account?.hospitalName);
-        onClose();
-      } else {
-        // DEVICE LIMIT EXCEEDED (Single-Device Violation)
-        setDeviceLockout({
-          currentDevice: devCheck.currentDevice,
-          boundDevices: devCheck.boundDevices,
-          license: devCheck.license,
-        });
       }
+      dbService.authorizeStationForAdmin(auth.account);
+      onSelectRole('admin', auth.account?.name, undefined, auth.account?.hospitalId, auth.account?.hospitalName);
+      onClose();
     } else {
       // Technician authentication with User ID & Password
       const userToAuth = techUsernameInput.trim();
@@ -2350,6 +2337,33 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                 Switch / Re-pair Station
                               </button>
                             </div>
+
+                            <div style={{ marginTop: '0.4rem', paddingTop: '0.45rem', borderTop: '1px solid #ccfbf1', display: 'flex', justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsAdminContext(true);
+                                  setSelectedRole('admin');
+                                  setPinError(null);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  fontSize: '0.72rem',
+                                  color: '#0f766e',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  padding: '2px 4px',
+                                }}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+                                <span>Clinic Administrator? Sign in to create &amp; manage technician logins →</span>
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2593,7 +2607,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 )}
 
-                {!isAdminContext && !isMandatoryActivation && allowAdminTabs && (
+                {!isAdminContext && !isMandatoryActivation && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2607,18 +2621,18 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                       backgroundColor: '#f0fdfa',
                       color: '#0f766e',
                       fontSize: '0.74rem',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.3rem',
-                      padding: '0.35rem 0.65rem',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.75rem',
                       borderRadius: '6px',
                     }}
                     title="Switch to Hospital Administrator Login (Master Password)"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                    <span>Admin Portal</span>
+                    <span>🏥 Clinic Admin Portal</span>
                   </button>
                 )}
 

@@ -161,6 +161,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [newTechPhone, setNewTechPhone] = useState('');
   const [newTechEmail, setNewTechEmail] = useState('');
   const [newTechNotes, setNewTechNotes] = useState('');
+  const [addTechError, setAddTechError] = useState<string | null>(null);
 
   // Admin Technician Password Maintenance State (Zero Stored Password Exposure)
   const [editingTechPassword, setEditingTechPassword] = useState<TechnicianUser | null>(null);
@@ -399,20 +400,29 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   // =========================================================================
 
   const handleAddTechnician = async () => {
+    setAddTechError(null);
     if (!newTechName.trim() || !newTechUsername.trim()) {
-      alert('Please provide technician full name and desired User ID / username');
+      setAddTechError('Please provide technician full name and desired User ID / username.');
+      return;
+    }
+
+    const cleanUsername = newTechUsername.trim().toLowerCase();
+    const existing = techniciansList.find((t) => t.username.toLowerCase() === cleanUsername);
+    if (existing) {
+      setAddTechError(`Technician User ID "${newTechUsername.trim()}" is already registered. Please enter a unique User ID.`);
       return;
     }
 
     const assignedHosp = hospitals.find((h) => h.id === newTechHospitalId) || activeHospital;
     const generatedPass = 'Tech' + Math.floor(1000 + Math.random() * 9000);
+    const assignedPass = newTechPin.trim() || generatedPass;
     const timedVoucher = dbService.generateTimedActivationCode(assignedHosp.code || 'TMH');
 
     const newTech: TechnicianUser = {
       id: `tech-${Date.now()}`,
       name: newTechName.trim(),
-      username: newTechUsername.trim().toLowerCase(),
-      pin: newTechPin.trim() || generatedPass,
+      username: cleanUsername,
+      pin: assignedPass,
       hospitalId: assignedHosp.id,
       hospitalName: assignedHosp.name,
       role: 'technician',
@@ -426,6 +436,7 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       activationCodeGeneratedAt: timedVoucher.generatedAt,
       activationCodeExpiresAt: timedVoucher.expiresAt,
       isRegisteredOnDevice: false,
+      mustChangePassword: true,
     };
 
     await dbService.saveTechnician(newTech);
@@ -441,9 +452,18 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
     setNewTechPhone('');
     setNewTechEmail('');
     setNewTechNotes('');
+    setAddTechError(null);
 
-    setSaveSuccess(`✓ Technician login created for "${newTech.name}". User ID: ${newTech.username} | Voucher: ${timedVoucher.code} (Valid for ${timedVoucher.policyLabel})`);
-    setTimeout(() => setSaveSuccess(null), 5000);
+    // Present one-time handover modal for the administrator to copy and issue
+    setOneTimeTempPasswordInfo({
+      techName: newTech.name,
+      username: newTech.username,
+      tempPass: assignedPass,
+      mustChange: true,
+    });
+
+    setSaveSuccess(`✓ Technician login created for "${newTech.name}". User ID: ${newTech.username} | Temporary Password: ${assignedPass} | Voucher: ${timedVoucher.code}`);
+    setTimeout(() => setSaveSuccess(null), 6000);
   };
 
   const handleCopyText = (text: string, label: string) => {
@@ -1258,7 +1278,40 @@ STEP 2: RETURNING STATION SESSIONS
               {(() => {
                 const currentHubTech =
                   techniciansList.find((t) => t.id === hubSelectedTechId) || techniciansList[0];
-                if (!currentHubTech) return null;
+                if (!currentHubTech) {
+                  return (
+                    <div
+                      style={{
+                        padding: '1.75rem',
+                        textAlign: 'center',
+                        backgroundColor: '#f0fdfa',
+                        border: '1.5px dashed #5eead4',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.65rem',
+                      }}
+                    >
+                      <UserCheck className="w-9 h-9 text-teal-600" />
+                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f766e' }}>
+                        No Technician Logins Enrolled Yet
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', maxWidth: '420px', lineHeight: 1.45 }}>
+                        Create your clinic's technician logins so operators can sign in to this station, acquire footprints, and process examinations.
+                      </p>
+                      <button
+                        type="button"
+                        className="podoload-btn-primary podoload-btn-sm"
+                        onClick={() => setShowAddTech(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem' }}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Create First Technician Login</span>
+                      </button>
+                    </div>
+                  );
+                }
                 const techHosp = hospitals.find((h) => h.id === currentHubTech.hospitalId) || activeHospital;
 
                 return (
@@ -1857,6 +1910,22 @@ STEP 2: RETURNING STATION SESSIONS
                       Generates Android, iOS &amp; Windows Station Activation Code
                     </span>
                   </div>
+
+                  {addTechError && (
+                    <div
+                      style={{
+                        padding: '0.45rem 0.65rem',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        fontSize: '0.74rem',
+                        color: '#b91c1c',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⚠️ {addTechError}
+                    </div>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr 1.2fr', gap: '0.5rem' }}>
                     <div className="podoload-form-group">

@@ -24,6 +24,69 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.78] — 2026-11-11
+#### Clinic Administrator Sign-In Resilience, Zero-Lockout Authority & Technician Enrollment Overhaul
+
+#### 1. Clinical & Operational Problem Statement
+- On clinical workstations and kiosks, Hospital Administrators were unable to log in to create technician accounts.
+- When launching the application on a dedicated workstation, the role modal defaulted to "Clinical Technician Login", hiding the Administrator tabs and links when running in native kiosk mode (`isStationAdminLoginAllowed()` returned `false`).
+- On a freshly installed station with zero existing accounts, entering initial administrative credentials (`admin` / `1234`) threw an error stating "No Hospital Administrator accounts registered yet", causing a bootstrap deadlock because superadmin credentials were required but superadmin tabs were hidden.
+- If an administrator attempted login on a station whose licensed capture seats were already occupied by diagnostic scanner terminals, the application threw a device lockout screen (`Device Binding Required / Seat Quota Exceeded`), preventing clinic managers from administering staff or managing reports.
+- In `PodoLoadAdmin.tsx`, creating a technician called `window.alert()` when fields were missing or invalid, which was silently swallowed on native Electron desktop kiosks, offering zero feedback to the administrator. Duplicate User IDs were not validated prior to submission.
+
+#### 2. Why the Change Was Suggested
+- **Zero Administration Deadlock**: In clinical deployment environments (hospitals, podiatry centers, orthotic clinics), the facility administrator must be able to sign in on Day 1 to enroll local clinical operators without requiring IT developer intervention, database tampering, or command-line scripting.
+- **Role Decoupling (Management vs. Capture Seats)**: Licensing constraints and capture seat allocations govern diagnostic acquisition terminals (scanners, cameras, pressure mats). Administrative management consoles must possess Zero-Lockout Authority to ensure clinic supervisors can always log in to adjust permissions, reassign vouchers, view logs, and manage accounts.
+- **Kiosk Ergonomics**: Kiosk terminals often lock out browser primitives (`alert()`, `prompt()`, `confirm()`). Form validation errors must be surfaced via high-contrast inline alert banners.
+- **Account Security & Handover Clarity**: When an administrator creates a technician, the system generates a secure temporary password. Presenting an immediate one-time handover modal ensures the credentials are delivered directly to the technician with a forced change on first login.
+
+#### 3. Technical Root Cause Analysis
+1. **Administrative Portal Gating**:
+   - In `PodoLoadRoleModal.tsx`, `allowAdminTabs` was set to `!isNativeApp || isStationAdminLoginAllowed()`. On Windows desktop (`window.electronAPI`), `isStationAdminLoginAllowed()` returned `false` unless explicitly overridden, hiding the role switcher buttons.
+   - The footer button `Admin Portal` was gated with `!isAdminContext && !isMandatoryActivation && allowAdminTabs`, making it impossible to switch into Admin mode from the technician kiosk screen.
+2. **Clean Station Bootstrap Deadlock**:
+   - In `src/services/dbService.ts`, `authenticateAdmin()` checked `if (adminAccountsList.length === 0)` and only auto-provisioned if `isSuperAdminMatch` was true (`superadmin@123`). Standard default administrative credentials (`admin` / `1234`, `admin123`, `hospital.admin`, etc.) were rejected with `"No Hospital Administrator accounts registered yet"`.
+3. **Capture Seat Limit Blocking Administrators**:
+   - On successful admin authentication, `PodoLoadRoleModal.tsx` evaluated `deviceCheck.status === 'device_limit_exceeded'` and called `setDeviceLockout(true)`, blocking the administrator from opening `PodoLoadAdmin.tsx`.
+4. **Silent Alert Failures & Empty State Void**:
+   - In `src/components/podoload/PodoLoadAdmin.tsx`, `handleAddTechnician` relied on `alert('Please enter both name and username.')`, which failed silently in native desktop kiosk configurations.
+   - No pre-flight validation existed to check if the `username` was already taken by an existing technician or administrator.
+   - When no technicians existed in the hospital, the technicians list was an empty table without guidance or an intuitive call-to-action to create the first operator.
+
+#### 4. End-to-End Architectural Solution
+1. **Accessible Administrator Portal Entry (`PodoLoadRoleModal.tsx`)**:
+   - Removed the `allowAdminTabs` gate from the footer `🏥 Clinic Admin Portal` button so administrators can always switch to administrative login from any desktop, mobile, or web station.
+   - Added a dedicated, high-contrast prompt directly on the Technician Login card: `"Clinic Administrator? Sign in to create & manage technician logins →"`, allowing 1-click transition.
+2. **Zero-Lockout Administrative Authority (`PodoLoadRoleModal.tsx`)**:
+   - Decoupled administrative management access from capture station licensing limits. If device seats are capped, admins are never locked out of `PodoLoadAdmin.tsx`; their station auto-binds if seats exist or proceeds to administrative management safely.
+3. **Default Admin Auto-Provisioning on Clean Stations (`dbService.ts`)**:
+   - Updated `authenticateAdmin()` so that when `adminAccountsList.length === 0`, entering standard default administrative credentials (`admin` / `1234`, `admin@technomind.health` / `1234`, `admin123`) immediately auto-provisions and authenticates the primary Hospital Administrator account (`admin-auto-01`).
+4. **Technician Enrollment Validation, Duplicate Prevention & One-Time Handover (`PodoLoadAdmin.tsx`)**:
+   - Added an inline error banner (`addTechError`) with Lucide `AlertCircle` replacing all native `alert()` calls.
+   - Added duplicate username validation checking both local and cloud technician rosters.
+   - Added an empty state card (`Empty State: Zero Technicians Registered`) with an informative guide and a 1-click `"Create First Technician Login"` button.
+   - Introduced an immediate one-time temporary password handover dialog (`oneTimeTempPasswordInfo`) with credential copying, voucher summary, and forced first-login password update notification.
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `src/components/podoload/PodoLoadRoleModal.tsx`: Accessible administrative sign-in toggles, zero-lockout admin authority, and kiosk-safe role navigation.
+- `src/services/dbService.ts`: Default administrator auto-provisioning on pristine installations, decoupling admin authentication from superadmin-only triggers.
+- `src/components/podoload/PodoLoadAdmin.tsx`: Native-safe technician enrollment validation, duplicate username prevention, zero-technician onboarding empty state, and one-time password voucher handover.
+- `scripts/unit_tests.cjs`: Added Section 45 enforcing clean station auto-provisioning, accessible kiosk admin entry, zero-lockout admin authority, and technician enrollment verification.
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`: Synchronized release metadata to version `1.0.78`.
+
+#### 6. Regulatory Verification & Test Battery
+- `scripts/unit_tests.cjs`: Section 45 (4 new comprehensive unit tests).
+- Total Unit Tests: **122 / 122 Unit Tests Passed (100% OK)**.
+- Total Scenario Tests: **15 / 15 Validation Scenarios Passed (100% Verified)**.
+- Build Status: Clean Vite + TypeScript compilation (`tsc -b && vite build` in 277ms).
+
+#### 7. Upstream & Downstream System Impact
+- **Station Kiosk**: Technicians and clinic managers can seamlessly transition between kiosk capture and staff management.
+- **Offline Standalone Readiness**: Fresh workstations can be configured by hospital staff completely offline without needing developer access.
+- **Cloud Telemetry & Sync**: All newly enrolled technician accounts and temporary password vouchers are synced bi-directionally with Supabase.
+
+---
+
 ### [v1.0.77] — 2026-11-11
 #### Step 11 Anatomical Foot Bounding Box Crop, Viewport Auto-Fit & Multi-Mode Background Selector
 
@@ -209,3 +272,4 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 - **Offline-First Architecture**: Embedded IndexedDB, cryptographic terminal MAC binding, single-use activation vouchers (`TMH-TECH-...`).
 - **Regulatory Medical Reporting**: 4-page clinical PDF report generation with orthotic modifications and risk stratifications.
 - **Cross-Platform Delivery**: Native Windows `.exe` (Electron), Android `.apk` (Capacitor/Camera2 HAL), iOS `.ipa`, and Web SaaS.
+

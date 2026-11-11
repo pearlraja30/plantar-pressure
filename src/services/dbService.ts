@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.77';
+export const APP_CURRENT_VERSION = '1.0.78';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -2946,19 +2946,23 @@ class PodoPressDatabase {
     }
 
     // Zero registered administrators on this station:
-    // If Super Admin credentials used, auto-create initial Administrator account
-    if (isSuperAdminMatch) {
+    // If Super Admin credentials or initial Default Admin credentials used, auto-provision initial Administrator account
+    const isDefaultAdminMatch =
+      (cleanUser === 'admin' || cleanUser === 'admin@technomind.health' || cleanUser === 'hospital.admin' || cleanUser === 'clinic.admin') &&
+      (cleanPin === '1234' || cleanPin === 'admin123' || cleanPin === 'admin');
+
+    if (isSuperAdminMatch || isDefaultAdminMatch) {
       const hosps = this.getHospitalProfilesSync();
       const hosp = hosps[0] || { id: 'hosp-default', code: 'TMH', name: 'Clinical Center' };
       const autoAdmin: AdminAccount = {
         id: 'admin-auto-01',
         name: 'Hospital Administrator',
-        username: cleanUser || 'admin',
+        username: cleanUser === 'superadmin@technomind.health' ? 'admin@technomind.health' : (cleanUser || 'admin@technomind.health'),
         pin: cleanPin,
         hospitalId: hosp.id,
         hospitalName: hosp.name,
         role: 'admin',
-        email: cleanUser.includes('@') ? cleanUser : 'admin@hospital.health',
+        email: cleanUser.includes('@') ? cleanUser : 'admin@technomind.health',
         phone: '',
         createdAt: new Date().toISOString(),
         status: 'active',

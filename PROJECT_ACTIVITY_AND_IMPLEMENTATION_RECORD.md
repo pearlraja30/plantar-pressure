@@ -1918,6 +1918,45 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
 - **Release Version**: Tagged and committed `v1.0.77`.
 
+---
+
+## 53. ACTIVITY: CLINIC ADMINISTRATOR SIGN-IN RESILIENCE, ZERO-LOCKOUT AUTHORITY & DIRECT TECHNICIAN ENROLLMENT (v1.0.78)
+- **Date**: 2026-11-11
+- **Version**: `1.0.78`
+- **Scope**: Resolve administrator sign-in obstacles and technician creation failures on clinical workstations and kiosks. Ensure seamless access to the Clinic Admin Portal from native kiosk screens, guarantee initial admin auto-provisioning with default credentials, establish Zero-Lockout Authority for administrators against station capture device quotas, replace failing native alerts with inline error alerts, enforce duplicate technician username prevention, and provide an intuitive zero-technician onboarding empty state with one-time temporary password handover.
+
+### 53.1 Clinical & Operational Rationale
+1. **Administrative Access on Dedicated Kiosks**:
+   - In production deployments (kiosks and workstations running the packaged Electron binary), the application defaulted to "Clinical Technician Login" and concealed the administrative navigation controls (`allowAdminTabs = false`), making it impossible for hospital supervisors to reach the Admin Portal.
+2. **Clean-Station Bootstrap Deadlock**:
+   - On pristine, freshly deployed workstations with 0 local accounts, attempting to log in as administrator with default credentials (`admin` / `1234`) was rejected with `"No Hospital Administrator accounts registered yet"`. Superadmin credentials were required to create the first admin, but the Superadmin tab was also hidden, locking clinic staff out of initial setup.
+3. **Capture Seat Licensing Independence**:
+   - Diagnostic hardware capture seat quotas (e.g. 1 active terminal license per clinic) must govern diagnostic acquisition (scanners, cameras, pressure mats). When all capture seats were bound, administrators logging in to manage accounts or review reports were hit with a device lockout modal, paralyzing administrative tasks.
+4. **Kiosk-Safe Error Reporting & Technician Creation Ergonomics**:
+   - Native browser primitives (`alert()`) are disabled or ignored in Electron kiosk mode, leaving administrators with zero feedback if fields were blank. Furthermore, administrators creating new technicians required instant temporary password handover and duplicate username prevention.
+
+### 53.2 Technical Solution Implemented
+1. **Accessible Administrator Portal Entry (`PodoLoadRoleModal.tsx`)**:
+   - Removed the `allowAdminTabs` restriction from the footer `🏥 Clinic Admin Portal` button so administrators can access administrative login on any native desktop kiosk, mobile tablet, or web browser.
+   - Added a prominent call-to-action button directly on the Technician Login card: `"Clinic Administrator? Sign in to create & manage technician logins →"`, enabling 1-click transition to administrative sign-in.
+2. **Clean Station Initial Administrator Auto-Provisioning (`dbService.ts`)**:
+   - Updated `authenticateAdmin()` so that when `adminAccountsList.length === 0`, entering standard default credentials (`admin` / `1234`, `admin@technomind.health` / `1234`, or `admin123`) immediately auto-provisions and authenticates the primary Administrator account (`admin-auto-01`).
+3. **Zero-Lockout Administrative Authority (`PodoLoadRoleModal.tsx`)**:
+   - Decoupled administrative management login from hardware capture terminal seat caps. Administrators are never blocked by `setDeviceLockout`; if a free capture seat is available, the station auto-binds; otherwise, administrative privileges proceed safely without interruption.
+4. **Technician Enrollment Validation, Duplicate Prevention & One-Time Handover (`PodoLoadAdmin.tsx`)**:
+   - Replaced `alert()` calls with an inline, high-contrast error banner (`addTechError`) with Lucide `AlertCircle`.
+   - Implemented duplicate username validation across both local IndexedDB and cloud technician rosters.
+   - Designed an empty state card (`Empty State: Zero Technicians Registered`) with an informative guide and a 1-click `"Create First Technician Login"` button.
+   - Introduced an immediate one-time temporary password handover dialog (`oneTimeTempPasswordInfo`) with credential copying, voucher summary, and forced first-login password update notification.
+
+### 53.3 Quality Verification & Conformance
+- **Unit Test Battery**: Added Section 45, expanding to **122/122** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled cleanly with 0 errors in 277ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
+- **Release Version**: Tagged and committed `v1.0.78`.
+
+
 
 
 

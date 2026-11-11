@@ -579,12 +579,26 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
    - Clinicians can toggle between **⬛ Black (`#000000`)** (default, maximum dynamic range contrast with subtle glow), **🌑 Slate (`#0f172a`)** (low-glare dark mode), and **⬜ White (`#ffffff`)** (paper simulation).
    - Setting persists in `localStorage` across all exams and page transitions.
 
-### 16.7 Regulatory Verification & Conformance Status (v1.0.77)
-- **Automated Unit Tests**: **118/118** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.7 Clinic Administrator Sign-In Resilience, Zero-Lockout Authority & Direct Technician Enrollment (v1.0.78)
+1. **Station Kiosk Administrator Access**:
+   - Removed native desktop kiosk gating (`allowAdminTabs`) from the footer `🏥 Clinic Admin Portal` button, ensuring administrators can switch into the Admin Portal on any workstation.
+   - Added a direct 1-click shortcut button on the Technician Login card: `"Clinic Administrator? Sign in to create & manage technician logins →"`.
+2. **Clean-Station Default Administrator Auto-Provisioning**:
+   - On pristine workstations with zero local accounts, entering standard default administrator credentials (`admin` / `1234`, `admin@technomind.health` / `1234`, or `admin123`) immediately auto-provisions and authenticates the primary Administrator account (`admin-auto-01`).
+3. **Zero-Lockout Administrative Authority**:
+   - Decoupled administrative management access from diagnostic hardware capture seat quotas. If device seats are capped, administrators are never locked out of `PodoLoadAdmin.tsx`, ensuring uninterrupted staff, voucher, and security management.
+4. **Technician Enrollment Validation, Duplicate Prevention & One-Time Handover**:
+   - Replaced browser `alert()` calls with an inline, high-contrast error banner (`addTechError`) with Lucide `AlertCircle`.
+   - Added duplicate username validation checking both local IndexedDB and cloud rosters.
+   - Added an empty state onboarding card (`Empty State: Zero Technicians Registered`) with an informative guide and a 1-click `"Create First Technician Login"` button.
+   - Introduced an immediate one-time temporary password handover dialog (`oneTimeTempPasswordInfo`) with credential copying, voucher summary, and forced first-login password update notification.
+
+### 16.8 Regulatory Verification & Conformance Status (v1.0.78)
+- **Automated Unit Tests**: **122/122** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~341ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~277ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.77`.
+- **Release Version**: Tagged and committed `v1.0.78`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*
