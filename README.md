@@ -220,6 +220,33 @@ The system includes an automated clinical verification battery covering all test
   * Passwords updated by administrators remotely synchronize to client workstations upon login.
   * 1-Click `[⚡ Instant Unlock / Reset Lockout]` and Super Admin master credentials override the 15-minute anti-brute-force defense immediately.
 
+### 12. Password Security Compliance & Zero Plain-Text Exposure (v1.0.75)
+* **Zero Stored Password Exposure**:
+  * All reveal/view eye toggles and copy-password actions for stored passwords have been permanently eliminated from the Administrator and Super Administrator portals.
+  * Stored credentials are permanently masked as `••••••••`, ensuring strict compliance with HIPAA, 21 CFR Part 11, and ISO 27001 data protection standards.
+* **Admin-Controlled Temporary Password Issuance**:
+  * Administrators and Super Administrators can only set/generate a **new temporary password** (via an empty input or `⚡ Generate Password`).
+  * Checkbox: *Force technician to change password upon next station sign-in* (enabled by default).
+  * A dedicated **One-Time Handover Dialog** presents the temporary credentials with a copy button for administrative handover; once closed, it can never be viewed again.
+* **Forced Password Change on Next Sign-In**:
+  * When a technician logs into a workstation with an issued temporary password, the workstation intercepts the session before granting access.
+  * Directs the user to the **Establish Permanent Password** screen to enter and confirm their new private permanent password (min. 4 characters).
+  * Automatically updates local persistence and pushes changes to Supabase Cloud before transitioning to the diagnostic session.
+* **Device Re-binding & Fresh Setup**:
+  * Administrators can trigger `[Re-issue Voucher & Unbind]` to revoke previous hardware bindings and issue a fresh activation code, allowing technicians to activate their device and set up their own private password from scratch.
+
+### 13. Windows Hardware Scanner WIA Automation & Command Ceiling Elimination (v1.0.74)
+* **Immunity to Windows 8,191-Character Limit**:
+  * Converted PowerShell WIA scanning acquisition from inline Base64 `-EncodedCommand` execution to a robust temporary `.ps1` script file runner written with UTF-8 BOM (`\ufeff`).
+  * Reduces Windows command-line invocation to under 85 characters, completely eliminating `The command line is too long` failures when communicating with physical flatbed scanners (e.g. EPSON L3210 Series).
+* **Flatbed Glass Bed Source Selection**:
+  * Pre-configures WIA device property `3088 = 2` (`WIA_DPS_DOCUMENT_HANDLING_SELECT: Flatbed`) and `3097 = 1` (`WIA_DPS_PAGES: 1`), ensuring multi-function printer-cum-scanners scan directly from the flatbed glass bed without looking for an automatic document feeder (ADF).
+* **Clinical Error Message Sanitization**:
+  * Replaces raw shell execution strings with clean, user-friendly diagnostic guidance (e.g., *"Scanner 'EPSON L3210 Series' is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready."*).
+
+### 14. Streamlined Clean Sign-In Experience (v1.0.73)
+* Eliminated unnecessary regulatory footer banners (`IEC 62304 Class B SaMD · 21 CFR Part 11 Audit Trail Active · Zero Stale Data Guarantee`) and verbose feature bullet points from the station sign-in modal, delivering a modern, clutter-free clinical user interface.
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps

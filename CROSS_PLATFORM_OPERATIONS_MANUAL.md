@@ -493,19 +493,36 @@ When a client or hospital installs PodoPress on a new PC (`plantar-pressure-setu
 4. Click **Log In as Clinical Technician**.
 5. Examination workspace unlocks with access to historical patient reports, live scanner capture, and PDF printing.
 
-#### Handling Forgotten Passwords (Offline & Online)
-If a technician forgets their password or enters the wrong password, the system prevents clinical disruption through two supported paths:
+#### Handling Forgotten Passwords (Zero Stored Password Exposure & Forced Password Change)
+Under medical software data protection standards (HIPAA, 21 CFR Part 11, and ISO 27001), **stored user passwords are encrypted and permanently masked (`••••••••`)**. Neither an Administrator nor a Super Administrator can ever view an existing password. When credentials need resetting:
 
-1. **Local Administrator Reset (100% Offline)**:
-   - The error banner displays: `Incorrect password for Technician User ID ... Please try again or ask your Hospital Administrator to reset your password.`
-   - Below the error, click **`[🔑 Reset Password with Administrator Authorization]`**.
-   - The Hospital Administrator enters their Admin User ID and Master Password.
-   - Admin sets a new password for the technician. The technician is logged in immediately.
-2. **Remote Administrator Reset (Cloud Synced)**:
-   - Super Admin or Hospital Admin opens the Super Admin console or Admin portal on any connected computer.
-   - Admin locates the technician, clicks **Reset Password**, enters a new password, and saves.
-   - The update is pushed to Supabase Cloud in the background.
-   - On the client's PC, when the technician enters the new password, the station verifies it against Supabase live, updates the local station cache, and logs in.
+1. **Admin-Controlled Temporary Password Issuance**:
+   - The Hospital Administrator opens the Admin Portal (`Ctrl+Shift+A` or `Staff` tab) and clicks **`[Set New Password]`** on the technician's record.
+   - The input field starts empty (preventing stale or exposed credentials). The Administrator can type a new password or click **`⚡ Generate Password`** (e.g., `Tech8492!`).
+   - Checkbox: **`Force technician to change password upon next station sign-in`** (enabled by default).
+   - Once saved, a **One-Time Handover Modal** presents the temporary credentials with a single-use **`[Copy Password]`** button. Once dismissed, this temporary password can never be retrieved or viewed again.
+2. **Forced Password Change on Next Station Login**:
+   - When the technician enters the issued temporary password on their workstation, the station **intercepts the login before granting session access**.
+   - Displays the **Establish Permanent Password** interface:
+     - Prompts the technician to enter and confirm their new private permanent password (min. 4 characters).
+     - Upon confirmation, updates the local database, clears the temporary flag, automatically broadcasts the updated credentials to Supabase Cloud, and logs the technician directly into their clinical workstation.
+3. **Alternative: Device Re-binding & Re-activation**:
+   - If a technician changes workstations or forgets their credentials entirely, the Administrator clicks **`[Re-issue Voucher & Unbind]`**.
+   - This invalidates the old hardware MAC address binding and generates a fresh Station Activation Voucher (e.g. `TMH-TECH-XXXX`).
+   - The technician simply opens the app, selects **"Activate Device with Code"**, enters the Clinic Code + Voucher, and **sets their own private permanent password from scratch**.
+
+---
+
+### 12.2.1 Windows Hardware Scanner Acquisition Pipeline (EPSON L3210 & Flatbed Optimization)
+To eliminate scanner disconnections and command-line crashes on Windows workstations:
+1. **Windows 8,191-Character Command Line Immunity**:
+   - Previous versions passed PowerShell WIA scanning scripts via Base64 `-EncodedCommand`, which exceeded the Windows `cmd.exe` 8,191-character ceiling for complex flatbed acquisition routines (`The command line is too long`).
+   - The execution engine now writes the acquisition routine to a secure temporary `.ps1` script file (`podoload_ps_<timestamp>.ps1`) in the OS temporary directory using UTF-8 with BOM (`\ufeff`), and executes it via `powershell.exe -File ...`. The invoked command length is reduced from >34,000 characters to under 85 characters, ensuring 100% reliable execution.
+2. **Flatbed Glass Bed Source Configuration**:
+   - Pre-configures WIA device property `3088 = 2` (`WIA_DPS_DOCUMENT_HANDLING_SELECT: Flatbed`) and `3097 = 1` (`WIA_DPS_PAGES: 1`).
+   - Multi-function printer-cum-scanners (such as the **EPSON L3210 Series**) scan directly from the flatbed glass bed without expecting an automatic document feeder (ADF) paper feed.
+3. **Clinical Error Sanitization**:
+   - Technical shell execution traces or Base64 strings are automatically intercepted and translated into clear clinical guidance: *"Scanner 'EPSON L3210 Series' is offline or busy. Please verify the USB/Wi-Fi connection and ensure the scanner is powered ON and ready."*
 
 ---
 

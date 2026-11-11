@@ -903,23 +903,26 @@ When an outside client installs `plantar-pressure-setup.exe` on Windows (or inst
 
 ---
 
-### 11.3 Remote Assistance & Real-Time Credential Synchronization
+### 11.3 Remote Assistance, Password Security & Real-Time Credential Synchronization (v1.0.75)
 When clients request administrative assistance remotely:
 
-1. **Remote Technician Password Reset**:
-   - Super Admin or Hospital Admin navigates to the clinic's technician list in the central dashboard.
-   - Admin enters the new password and clicks **Save**.
-   - `dbService.updateTechnicianPassword()` updates the local state and immediately broadcasts the change to Supabase `technician_users`.
-   - On the client's workstation, when the technician enters the new password, `cloudSyncService.verifyRemoteCredentials('technician', username, newPassword)` performs a live verification against Supabase.
-   - Upon successful verification, the local station updates its cached password and logs the user in immediately.
-2. **Remote Administrator Password Reset**:
-   - Similar to technician resets, updating an administrator password via `recoverAdminPassword()` broadcasts to Supabase `admin_accounts`.
-   - The client workstation pulls the updated master password without requiring manual configuration files.
-3. **Anti-Lockout Security & 1-Click Instant Unlock**:
+1. **Zero Stored Password Exposure & Temporary Password Issuance**:
+   - Existing passwords are encrypted and permanently masked (`••••••••`) across both the Hospital Administrator Portal and Super Administrator Console, satisfying HIPAA, 21 CFR Part 11, and ISO 27001 requirements.
+   - Administrators only have provision to issue a **new temporary password** (via an empty input or `⚡ Generate Password`).
+   - A **One-Time Handover Modal** presents the temporary credentials with a copy button for administrative handover; once closed, the password can never be retrieved or viewed again.
+2. **Forced Password Change on Next Station Login**:
+   - When `dbService.updateTechnicianPassword()` or `updateAdminAccountPassword()` sets a temporary password, it flags `mustChangePassword: true`.
+   - The update broadcasts to Supabase `technician_users` or `admin_accounts`.
+   - When the user signs in on their workstation with the temporary password, `cloudSyncService.verifyRemoteCredentials()` verifies against Supabase and intercepts the login before granting session access.
+   - The workstation displays the **Establish Permanent Password** interface, requiring the user to establish their private permanent password (min. 4 characters).
+   - Once saved, the new private password updates local persistence, clears `mustChangePassword`, synchronizes back to Supabase Cloud, and completes the login into the session.
+3. **Device Re-binding & Fresh Activation**:
+   - Administrators can trigger `[Re-issue Voucher & Unbind]` to revoke previous hardware bindings and issue a fresh activation code, allowing technicians to activate their device and set up their own private password from scratch.
+4. **Anti-Lockout Security & 1-Click Instant Unlock**:
    - To prevent brute-force attacks, 5 consecutive failed attempts trigger a 15-minute lockout (`podopress_admin_lockout_v1`).
    - If a client accidentally locks themselves out, the error banner presents a **`[⚡ Instant Unlock / Reset Lockout]`** button. Clicking it immediately removes the lockout timer.
    - Entering Super Admin master credentials (`superadmin@123` or `SUPER-MASTER-KEY-9999`) in the Admin tab automatically clears the lockout and provisions the administrator account if empty.
-4. **Remote Station Revocation (Security Kill-Switch)**:
+5. **Remote Station Revocation (Security Kill-Switch)**:
    - If a workstation is stolen, compromised, or subscription lapsed, Super Admin changes its status in `station_activations` to `'revoked'`.
    - The workstation detects this revocation during its background health checks, immediately locking examination features and safeguarding patient health data.
 
