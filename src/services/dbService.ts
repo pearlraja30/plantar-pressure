@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.74';
+export const APP_CURRENT_VERSION = '1.0.75';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -3925,18 +3925,50 @@ class PodoPressDatabase {
     }
 
     tech.pin = newPassword.trim();
+    tech.mustChangePassword = true;
+    tech.isTemporaryPassword = true;
+    tech.passwordResetAt = new Date().toISOString();
+    tech.passwordResetBy = isAdminPassword ? 'admin' : isSuperAdminPassword ? 'superadmin' : 'recovery_key';
     this.saveTechnician(tech);
     return { success: true };
   }
 
-  public async updateTechnicianPassword(technicianId: string, newPassword: string): Promise<boolean> {
+  public async updateTechnicianPassword(
+    technicianId: string,
+    newPassword: string,
+    mustChangePassword: boolean = false
+  ): Promise<boolean> {
     const list = this.getTechniciansSync();
     const tech = list.find((t) => t.id === technicianId);
     if (!tech) return false;
 
     tech.pin = newPassword.trim();
+    tech.mustChangePassword = mustChangePassword;
+    tech.isTemporaryPassword = mustChangePassword;
+    tech.passwordResetAt = new Date().toISOString();
     await this.saveTechnician(tech);
     return true;
+  }
+
+  public updateAdminAccountPassword(
+    adminId: string,
+    newPassword: string,
+    mustChangePassword: boolean = false
+  ): boolean {
+    const res = this.updateHospitalAdmin(adminId, {
+      pin: newPassword.trim(),
+      mustChangePassword,
+      isTemporaryPassword: mustChangePassword,
+      passwordResetAt: new Date().toISOString(),
+    });
+
+    try {
+      import('./cloudSyncService').then(({ cloudSyncService }) => {
+        cloudSyncService.pushAdminAccountsToCloud().catch(() => {});
+      });
+    } catch {}
+
+    return res.success;
   }
 
   // =========================================================================

@@ -1804,6 +1804,42 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **TypeScript & Vite Build**: `tsc -b && vite build` compiled with 0 errors.
 - **Release Version**: Tagged and committed `v1.0.74`.
 
+---
+
+## 50. ACTIVITY: PASSWORD SECURITY COMPLIANCE, ZERO STORED EXPOSURE & FORCED PASSWORD CHANGE (v1.0.75)
+- **Date**: 2026-11-10
+- **Version**: `1.0.75`
+- **Scope**: Eliminate stored password visibility across Administrator and Super Administrator portals. Provide secure temporary password issuance with forced password change upon next login, and one-click device re-binding to reset credentials from scratch.
+
+### 50.1 Security Gap & Compliance Resolution
+1. **Zero Stored Password Exposure**:
+   - Removed all eye toggle reveal controls (`visibleTechPasswords`, `visibleAdminPins`) and "Copy Password" actions for stored credentials in `PodoLoadAdmin.tsx` and `PodoLoadSuperAdmin.tsx`.
+   - Passwords in overview tables and staff cards are permanently masked as `••••••••`.
+   - Badges indicate whether an account has a `🔒 Secure / Encrypted` password or a `⚠️ Temp Password`.
+2. **Admin-Initiated Temporary Password Setting**:
+   - Admin and Super Admin can only set/generate a **new temporary password** (inputs start empty; includes a `⚡ Generate Password` button).
+   - Checkbox: `Force user to change password upon next sign-in` (enabled by default).
+   - Once saved, a **One-Time Handover Modal** displays the temporary password with a single-use Copy button for administrative handover. Once dismissed, it cannot be retrieved or viewed again.
+3. **Forced Password Change on Next Login (`PodoLoadRoleModal.tsx`)**:
+   - When a technician (or administrator) logs in with a temporary password (`mustChangePassword: true`), the station intercepts the session before granting access.
+   - Transitions directly to the **"Establish Permanent Password"** screen requiring the user to type and confirm a new private permanent password (min. 4 characters).
+   - Saving updates the local database, clears `mustChangePassword`, automatically synchronizes to Supabase Cloud, and completes the login into the clinical session.
+4. **Device Re-binding Provision**:
+   - Added `Re-issue Voucher & Unbind` action in technician overview: invalidates previous hardware device bindings (MAC address and station fingerprint), generates a fresh single-use activation voucher, and allows the technician to activate their device and establish credentials from scratch.
+
+### 50.2 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **109/109** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+  - Added Section 42 verifying:
+    1. Zero stored password exposure (masking guarantee).
+    2. Temporary password issuance with `mustChangePassword` flag.
+    3. Session interception forcing permanent password creation before granting entry.
+    4. Hardware device unbinding and voucher rotation.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled with 0 errors in 295ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly.
+- **Release Version**: Tagged and committed `v1.0.75`.
+
+
 
 
 

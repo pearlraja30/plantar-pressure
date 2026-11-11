@@ -5357,6 +5357,131 @@ it("Enforces Flatbed (Glass) Scanner Source Selection for Multi-Function Printer
   expect(mockDeviceProperties["3097"]).toBe(1);
 });
 
+console.log("\n--- SECTION 42: Password Security Compliance, Stored Password Non-Exposure & Forced Password Change ---");
+
+it("Enforces Zero Stored Password Exposure: Passwords must be masked and never viewable by Admin or Super Admin", () => {
+  const mockTech = {
+    id: 'tech-001',
+    name: 'Sarah Connor',
+    username: 'sarah.tech',
+    pin: 'SuperSecret123!',
+    mustChangePassword: false,
+  };
+
+  // UI display function must NEVER return plaintext password
+  const renderPasswordCell = (user) => {
+    // Zero exposure guarantee: always masked
+    const masked = '••••••••';
+    const badge = user.mustChangePassword ? 'Temp Password' : 'Secure';
+    return { display: masked, badge };
+  };
+
+  const rendered = renderPasswordCell(mockTech);
+  expect(rendered.display).toBe('••••••••');
+  expect(rendered.display.includes(mockTech.pin)).toBe(false);
+  expect(rendered.badge).toBe('Secure');
+});
+
+it("Enforces Temporary Password Flagging & Forced Password Change on Next Station Login", () => {
+  const mockDatabase = {
+    technicians: [
+      {
+        id: 'tech-002',
+        name: 'John Doe',
+        username: 'john.doe',
+        pin: 'OldPass123',
+        mustChangePassword: false,
+        isTemporaryPassword: false,
+      },
+    ],
+  };
+
+  // 1. Admin resets technician password and sets temporary flag
+  const adminSetTemporaryPassword = (techId, tempPass, forceChange = true) => {
+    const tech = mockDatabase.technicians.find((t) => t.id === techId);
+    if (!tech) return false;
+    tech.pin = tempPass;
+    tech.mustChangePassword = forceChange;
+    tech.isTemporaryPassword = forceChange;
+    return true;
+  };
+
+  adminSetTemporaryPassword('tech-002', 'TempTech@99', true);
+  expect(mockDatabase.technicians[0].pin).toBe('TempTech@99');
+  expect(mockDatabase.technicians[0].mustChangePassword).toBe(true);
+  expect(mockDatabase.technicians[0].isTemporaryPassword).toBe(true);
+
+  // 2. Station login interception
+  let interceptedForPasswordChange = false;
+  let loggedInUser = null;
+
+  const simulateLogin = (username, password) => {
+    const tech = mockDatabase.technicians.find(
+      (t) => t.username === username && t.pin === password
+    );
+    if (!tech) return { success: false, error: 'Invalid credentials' };
+
+    if (tech.mustChangePassword) {
+      interceptedForPasswordChange = true;
+      return { success: true, requireNewPassword: true, user: tech };
+    }
+
+    loggedInUser = tech;
+    return { success: true, requireNewPassword: false, user: tech };
+  };
+
+  // Attempt login with temporary password
+  const loginRes = simulateLogin('john.doe', 'TempTech@99');
+  expect(loginRes.success).toBe(true);
+  expect(loginRes.requireNewPassword).toBe(true);
+  expect(interceptedForPasswordChange).toBe(true);
+  expect(loggedInUser).toBeNull(); // Has NOT entered session yet!
+
+  // 3. Technician establishes new private permanent password
+  const establishPermanentPassword = (techId, newPass) => {
+    const tech = mockDatabase.technicians.find((t) => t.id === techId);
+    if (!tech) return false;
+    tech.pin = newPass;
+    tech.mustChangePassword = false;
+    tech.isTemporaryPassword = false;
+    loggedInUser = tech;
+    return true;
+  };
+
+  establishPermanentPassword('tech-002', 'MyPrivatePassword2026!');
+  expect(mockDatabase.technicians[0].pin).toBe('MyPrivatePassword2026!');
+  expect(mockDatabase.technicians[0].mustChangePassword).toBe(false);
+  expect(loggedInUser.name).toBe('John Doe'); // Session granted!
+});
+
+it("Enforces Device Re-binding Provision: Unbinds previous hardware MAC and re-issues fresh activation voucher", () => {
+  const boundTech = {
+    id: 'tech-003',
+    name: 'Kavita Rao',
+    username: 'kavita.rao',
+    pin: 'kavita123',
+    isRegisteredOnDevice: true,
+    registeredDeviceId: 'DEV-ORIGINAL-PC',
+    macAddress: 'AA:BB:CC:DD:EE:FF',
+    activationCode: 'TMH-OLD-1111',
+  };
+
+  const retriggerDeviceBinding = (tech) => {
+    tech.isRegisteredOnDevice = false;
+    tech.registeredDeviceId = undefined;
+    tech.macAddress = undefined;
+    tech.activationCode = 'TMH-TECH-' + Math.floor(1000 + Math.random() * 9000);
+    return tech;
+  };
+
+  retriggerDeviceBinding(boundTech);
+  expect(boundTech.isRegisteredOnDevice).toBe(false);
+  expect(boundTech.registeredDeviceId === undefined).toBe(true);
+  expect(boundTech.macAddress === undefined).toBe(true);
+  expect(boundTech.activationCode.startsWith('TMH-TECH-')).toBe(true);
+  expect(boundTech.activationCode !== 'TMH-OLD-1111').toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

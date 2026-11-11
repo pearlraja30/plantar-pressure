@@ -240,6 +240,55 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const [showTransferPassword, setShowTransferPassword] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
+  // Forced Password Change State (When Temporary Password was issued)
+  const [mustChangePasswordUser, setMustChangePasswordUser] = useState<{
+    id: string;
+    name: string;
+    username: string;
+    hospitalId?: string;
+    hospitalName?: string;
+    role: 'technician' | 'admin';
+  } | null>(null);
+  const [newPermanentPassword, setNewPermanentPassword] = useState('');
+  const [confirmPermanentPassword, setConfirmPermanentPassword] = useState('');
+  const [showPermanentPassword, setShowPermanentPassword] = useState(false);
+  const [permanentPasswordError, setPermanentPasswordError] = useState<string | null>(null);
+  const [isSavingPermanentPassword, setIsSavingPermanentPassword] = useState(false);
+
+  const handleSavePermanentPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPermanentPasswordError(null);
+
+    if (!mustChangePasswordUser) return;
+    if (!newPermanentPassword || newPermanentPassword.length < 4) {
+      setPermanentPasswordError('New permanent password must be at least 4 characters long.');
+      return;
+    }
+    if (newPermanentPassword !== confirmPermanentPassword) {
+      setPermanentPasswordError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsSavingPermanentPassword(true);
+    try {
+      if (mustChangePasswordUser.role === 'technician') {
+        await dbService.updateTechnicianPassword(mustChangePasswordUser.id, newPermanentPassword, false);
+        onSelectRole('technician', mustChangePasswordUser.name, mustChangePasswordUser.id, mustChangePasswordUser.hospitalId, mustChangePasswordUser.hospitalName);
+      } else {
+        dbService.updateAdminAccountPassword(mustChangePasswordUser.id, newPermanentPassword, false);
+        onSelectRole('admin', mustChangePasswordUser.name, undefined, mustChangePasswordUser.hospitalId, mustChangePasswordUser.hospitalName);
+      }
+      setMustChangePasswordUser(null);
+      setNewPermanentPassword('');
+      setConfirmPermanentPassword('');
+      onClose();
+    } catch (err: any) {
+      setPermanentPasswordError(err.message || 'Failed to save permanent password.');
+    } finally {
+      setIsSavingPermanentPassword(false);
+    }
+  };
+
   // Prevent accidental Escape routing & support Ctrl+Shift+A for Admin Portal
   useEffect(() => {
     if (!isOpen) return;
@@ -315,6 +364,20 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         return;
       }
 
+      // Check if Administrator was issued a temporary password by Super Admin
+      if (auth.account?.mustChangePassword) {
+        setMustChangePasswordUser({
+          id: auth.account.id,
+          name: auth.account.name,
+          username: auth.account.username,
+          hospitalId: auth.account.hospitalId,
+          hospitalName: auth.account.hospitalName,
+          role: 'admin',
+        });
+        setPinError(null);
+        return;
+      }
+
       // 3. ENFORCE DEVICE BINDING & LICENSING (Single Device Restriction)
       const devCheck = dbService.checkDeviceAuthorization();
 
@@ -364,6 +427,20 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         } else {
           setPinError(`Incorrect password for Technician User ID "${userToAuth}". Please try again or ask your Hospital Administrator to reset your password.`);
         }
+        return;
+      }
+
+      // Check if Technician was issued a temporary password by Admin
+      if (authTech.mustChangePassword) {
+        setMustChangePasswordUser({
+          id: authTech.id,
+          name: authTech.name,
+          username: authTech.username,
+          hospitalId: authTech.hospitalId,
+          hospitalName: authTech.hospitalName,
+          role: 'technician',
+        });
+        setPinError(null);
         return;
       }
 
@@ -1175,6 +1252,165 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 </div>
               </form>
+            ) : mustChangePasswordUser ? (
+              /* VIEW 3A: FORCED PERMANENT PASSWORD CREATION (TEMPORARY PASSWORD DETECTED) */
+              <div style={{ padding: '0.25rem 0' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    marginBottom: '0.85rem',
+                    backgroundColor: '#fef3c7',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #fde68a',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      backgroundColor: '#fef08a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#b45309',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#92400e' }}>
+                      Establish Permanent Password
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#b45309', lineHeight: 1.35 }}>
+                      A temporary password was issued for this account. For medical compliance and privacy, please set your private permanent password.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: '0.85rem',
+                    fontSize: '0.72rem',
+                    color: '#334155',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <strong>User:</strong> {mustChangePasswordUser.name} (<code>{mustChangePasswordUser.username}</code>)
+                  </div>
+                  <span className="podo-badge podo-badge-neutral" style={{ fontSize: '0.62rem' }}>
+                    {mustChangePasswordUser.role === 'technician' ? 'Clinical Technician' : 'Hospital Admin'}
+                  </span>
+                </div>
+
+                <form onSubmit={handleSavePermanentPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div>
+                    <label className="podoload-label" style={{ fontSize: '0.72rem' }}>
+                      New Permanent Password *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPermanentPassword ? 'text' : 'password'}
+                        className="podoload-input"
+                        value={newPermanentPassword}
+                        onChange={(e) => {
+                          setNewPermanentPassword(e.target.value);
+                          setPermanentPasswordError(null);
+                        }}
+                        placeholder="Enter new private password (min. 4 chars)"
+                        style={{ fontSize: '0.76rem', paddingRight: '2rem' }}
+                        autoFocus
+                        required
+                        minLength={4}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPermanentPassword(!showPermanentPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                        }}
+                      >
+                        {showPermanentPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="podoload-label" style={{ fontSize: '0.72rem' }}>
+                      Confirm Permanent Password *
+                    </label>
+                    <input
+                      type={showPermanentPassword ? 'text' : 'password'}
+                      className="podoload-input"
+                      value={confirmPermanentPassword}
+                      onChange={(e) => {
+                        setConfirmPermanentPassword(e.target.value);
+                        setPermanentPasswordError(null);
+                      }}
+                      placeholder="Re-enter new private password"
+                      style={{ fontSize: '0.76rem' }}
+                      required
+                      minLength={4}
+                    />
+                  </div>
+
+                  {permanentPasswordError && (
+                    <div
+                      style={{
+                        color: '#b91c1c',
+                        fontSize: '0.72rem',
+                        backgroundColor: '#fef2f2',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '4px',
+                        border: '1px solid #fecaca',
+                      }}
+                    >
+                      {permanentPasswordError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="podoload-btn-secondary podoload-btn-sm"
+                      onClick={() => {
+                        setMustChangePasswordUser(null);
+                        setNewPermanentPassword('');
+                        setConfirmPermanentPassword('');
+                        setPermanentPasswordError(null);
+                      }}
+                    >
+                      ← Back to Login
+                    </button>
+                    <button
+                      type="submit"
+                      className="podoload-btn-primary"
+                      disabled={isSavingPermanentPassword}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{isSavingPermanentPassword ? 'Saving Password...' : 'Save & Enter Station'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             ) : (
               /* VIEW 3: THREE-TIER ROLE HIERARCHY (Super Admin -> Admin -> Technician) */
               <>

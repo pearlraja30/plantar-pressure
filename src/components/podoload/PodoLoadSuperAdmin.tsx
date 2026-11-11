@@ -5,6 +5,7 @@ import {
   Users,
   Laptop,
   FileText,
+  Key,
   KeyRound,
   Download,
   Plus,
@@ -115,20 +116,16 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
   const [createAdminSuccess, setCreateAdminSuccess] = useState<string | null>(null);
   const [showNewPin, setShowNewPin] = useState(false);
 
-  // Edit / Reset Password Modal state
+  // Edit / Reset Password Modal state (Zero Stored Password Exposure)
   const [selectedAdminForAction, setSelectedAdminForAction] = useState<AdminAccount | null>(null);
   const [resetPinInput, setResetPinInput] = useState('');
-  const [resetPinSuccess, setResetPinSuccess] = useState<string | null>(null);
-  const [visibleAdminPins, setVisibleAdminPins] = useState<Record<string, boolean>>({});
-  const [copiedPinAdminId, setCopiedPinAdminId] = useState<string | null>(null);
-
-  const handleCopyAdminPin = (pin: string, adminId: string) => {
-    if (navigator.clipboard && pin) {
-      navigator.clipboard.writeText(pin);
-      setCopiedPinAdminId(adminId);
-      setTimeout(() => setCopiedPinAdminId(null), 2500);
-    }
-  };
+  const [forceAdminChangePassword, setForceAdminChangePassword] = useState(true);
+  const [oneTimeAdminTempPass, setOneTimeAdminTempPass] = useState<{
+    adminName: string;
+    username: string;
+    tempPass: string;
+    mustChange: boolean;
+  } | null>(null);
 
   const [cloudSyncStatus, setCloudSyncStatus] = useState<string | null>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
@@ -400,14 +397,26 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
       return;
     }
 
-    dbService.updateHospitalAdmin(selectedAdminForAction.id, { pin: resetPinInput.trim() });
-    setResetPinSuccess(`Password for ${selectedAdminForAction.name} successfully updated to "${resetPinInput.trim()}".`);
-    setTimeout(() => {
-      setSelectedAdminForAction(null);
-      setResetPinInput('');
-      setResetPinSuccess(null);
-      refreshAllData();
-    }, 1400);
+    const newPass = resetPinInput.trim();
+    const willForce = forceAdminChangePassword;
+
+    dbService.updateHospitalAdmin(selectedAdminForAction.id, {
+      pin: newPass,
+      mustChangePassword: willForce,
+      isTemporaryPassword: willForce,
+      passwordResetAt: new Date().toISOString(),
+    });
+
+    setOneTimeAdminTempPass({
+      adminName: selectedAdminForAction.name,
+      username: selectedAdminForAction.username,
+      tempPass: newPass,
+      mustChange: willForce,
+    });
+
+    setSelectedAdminForAction(null);
+    setResetPinInput('');
+    refreshAllData();
   };
 
   const handleRevokeDevice = async (deviceId: string, techName: string) => {
@@ -1211,7 +1220,7 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                       </code>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <code
                           style={{
                             fontSize: '0.74rem',
@@ -1219,30 +1228,35 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                             border: '1px solid #e2e8f0',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            letterSpacing: visibleAdminPins[adm.id] ? 'normal' : '0.12em',
-                            color: visibleAdminPins[adm.id] ? '#0f766e' : '#64748b',
-                            fontWeight: visibleAdminPins[adm.id] ? 700 : 500,
+                            letterSpacing: '0.12em',
+                            color: '#64748b',
+                            fontWeight: 600,
                           }}
                         >
-                          {visibleAdminPins[adm.id] ? (adm.pin || '••••••••') : '••••••••'}
+                          ••••••••
                         </code>
-                        <button
-                          type="button"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
-                          onClick={() => setVisibleAdminPins((prev) => ({ ...prev, [adm.id]: !prev[adm.id] }))}
-                          title={visibleAdminPins[adm.id] ? 'Hide password' : 'View admin password'}
-                        >
-                          {visibleAdminPins[adm.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                        {adm.mustChangePassword ? (
+                          <span className="podo-badge podo-badge-amber" style={{ fontSize: '0.62rem' }}>
+                            ⚠️ Temp
+                          </span>
+                        ) : (
+                          <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
+                            🔒 Secure
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="podoload-btn-secondary"
                           style={{ fontSize: '0.62rem', padding: '0.15rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                          onClick={() => handleCopyAdminPin(adm.pin, adm.id)}
-                          title="Copy password to clipboard"
+                          onClick={() => {
+                            setSelectedAdminForAction(adm);
+                            setResetPinInput('');
+                            setForceAdminChangePassword(true);
+                          }}
+                          title="Reset or issue a temporary password for this administrator"
                         >
-                          <Copy className="w-3 h-3 text-teal-600" />
-                          <span>{copiedPinAdminId === adm.id ? '✓ Copied' : 'Copy'}</span>
+                          <Key className="w-3 h-3 text-teal-600" />
+                          <span>Set New</span>
                         </button>
                       </div>
                     </td>
@@ -2458,29 +2472,46 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
             </div>
 
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
-              Enter a new Master Password for Administrator <strong>{selectedAdminForAction.name}</strong> ({selectedAdminForAction.username}).
+              Set a new temporary Master Password for Administrator <strong>{selectedAdminForAction.name}</strong> ({selectedAdminForAction.username}).
             </p>
-
-            {resetPinSuccess && (
-              <div style={{ padding: '0.65rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#166534', fontSize: '0.78rem', marginBottom: '1rem' }}>
-                {resetPinSuccess}
-              </div>
-            )}
 
             <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div>
-                <label className="podoload-label">New Master Password *</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label className="podoload-label">New Master Password *</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const gen = 'Admin' + Math.floor(1000 + Math.random() * 9000) + '!';
+                      setResetPinInput(gen);
+                    }}
+                    style={{ background: 'none', border: 'none', fontSize: '0.68rem', color: '#7e22ce', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    ⚡ Generate Password
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
                   minLength={4}
                   className="podoload-input"
-                  placeholder="Enter new password"
+                  placeholder="Enter new master password"
                   value={resetPinInput}
                   onChange={(e) => setResetPinInput(e.target.value)}
                   autoFocus
                 />
               </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.74rem', color: '#334155', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={forceAdminChangePassword}
+                  onChange={(e) => setForceAdminChangePassword(e.target.checked)}
+                />
+                <span style={{ fontWeight: 600 }}>
+                  Force Administrator to change password upon next portal sign-in (Recommended)
+                </span>
+              </label>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button
@@ -2491,10 +2522,111 @@ export const PodoLoadSuperAdmin: React.FC<PodoLoadSuperAdminProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="podoload-btn-primary podoload-btn-sm">
-                  Update Password
+                  Save &amp; Issue Temporary Password
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* One-Time Administrator Temporary Password Modal */}
+      {oneTimeAdminTempPass && (
+        <div className="podoload-modal-overlay">
+          <div className="podoload-modal-card" style={{ maxWidth: '440px', width: '92%' }}>
+            <div className="podoload-modal-header" style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#f3e8ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#7e22ce',
+                  }}
+                >
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#0c2328' }}>
+                    Temporary Admin Password Established
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                    Handover credentials for {oneTimeAdminTempPass.adminName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="podoload-modal-close-btn"
+                onClick={() => setOneTimeAdminTempPass(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div
+                style={{
+                  backgroundColor: '#faf5ff',
+                  border: '1px solid #e9d5ff',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  fontSize: '0.74rem',
+                  color: '#6b21a8',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ marginBottom: '0.4rem' }}>
+                  <strong>Administrator User ID:</strong> <code>{oneTimeAdminTempPass.username}</code>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div>
+                    <strong>Temporary Password:</strong>{' '}
+                    <code style={{ fontSize: '0.95rem', fontWeight: 800, color: '#7e22ce', backgroundColor: '#ffffff', padding: '2px 6px', borderRadius: '4px', border: '1px solid #d8b4fe' }}>
+                      {oneTimeAdminTempPass.tempPass}
+                    </code>
+                  </div>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(oneTimeAdminTempPass.tempPass);
+                      alert('✓ Temporary password copied to clipboard!');
+                    }}
+                    style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  >
+                    <Copy className="w-3 h-3 text-purple-600" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                <p style={{ margin: '0 0 0.4rem 0' }}>
+                  🔒 <strong>Clinical Security Guarantee:</strong> Passwords are never shown again in any administrator table or overview.
+                </p>
+                {oneTimeAdminTempPass.mustChange && (
+                  <p style={{ margin: 0, color: '#7e22ce', fontWeight: 600 }}>
+                    ✓ <strong>Forced Password Change Active:</strong> The Hospital Administrator will be required to create a new permanent master password immediately upon their next login.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="podoload-modal-footer">
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={() => setOneTimeAdminTempPass(null)}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Done / Handover Complete
+              </button>
+            </div>
           </div>
         </div>
       )}

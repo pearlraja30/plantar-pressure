@@ -326,6 +326,10 @@ export interface TechnicianUser {
   isRegisteredOnDevice?: boolean;
   authorizedAt?: string;
   permitExpiresAt?: string; // Station license permit expiration timestamp
+  mustChangePassword?: boolean; // Forces password update upon next station login
+  isTemporaryPassword?: boolean; // Flagged when admin issues a temporary password
+  passwordResetAt?: string;
+  passwordResetBy?: string;
 }
 
 export type VoucherExpiryUnit = 'minutes' | 'hours' | 'days';
@@ -413,6 +417,9 @@ export interface AdminAccount {
   isInitialSetupCompleted?: boolean;
   createdBy?: string; // Created by Super Admin (e.g. 'superadmin')
   maxStationsAllowed?: number; // Allocated workstation quota
+  mustChangePassword?: boolean; // Forces password update upon next admin portal login
+  isTemporaryPassword?: boolean; // Flagged when superadmin issues a temporary password
+  passwordResetAt?: string;
 }
 
 export interface BoundDevice {

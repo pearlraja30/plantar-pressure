@@ -162,12 +162,18 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const [newTechEmail, setNewTechEmail] = useState('');
   const [newTechNotes, setNewTechNotes] = useState('');
 
-  // Admin Technician Password Maintenance State
-  const [visibleTechPasswords, setVisibleTechPasswords] = useState<{ [id: string]: boolean }>({});
+  // Admin Technician Password Maintenance State (Zero Stored Password Exposure)
   const [editingTechPassword, setEditingTechPassword] = useState<TechnicianUser | null>(null);
   const [techEditPasswordVal, setTechEditPasswordVal] = useState('');
   const [showTechEditPasswordVal, setShowTechEditPasswordVal] = useState(false);
+  const [forceChangeOnNextLogin, setForceChangeOnNextLogin] = useState(true);
   const [techPasswordModalError, setTechPasswordModalError] = useState<string | null>(null);
+  const [oneTimeTempPasswordInfo, setOneTimeTempPasswordInfo] = useState<{
+    techName: string;
+    username: string;
+    tempPass: string;
+    mustChange: boolean;
+  } | null>(null);
 
   // Activation Voucher & Mobile Pairing State
   const [voucherTech, setVoucherTech] = useState<TechnicianUser | null>(null);
@@ -487,13 +493,22 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
       return;
     }
 
-    await dbService.updateTechnicianPassword(editingTechPassword.id, techEditPasswordVal.trim());
+    const newPass = techEditPasswordVal.trim();
+    const willForce = forceChangeOnNextLogin;
+
+    await dbService.updateTechnicianPassword(editingTechPassword.id, newPass, willForce);
     setTechniciansList(dbService.getTechniciansSync());
-    setSaveSuccess(`✓ Password successfully updated for technician "${editingTechPassword.name}".`);
+
+    setOneTimeTempPasswordInfo({
+      techName: editingTechPassword.name,
+      username: editingTechPassword.username,
+      tempPass: newPass,
+      mustChange: willForce,
+    });
+
     setEditingTechPassword(null);
     setTechEditPasswordVal('');
     setTechPasswordModalError(null);
-    setTimeout(() => setSaveSuccess(null), 3500);
   };
 
   const handleToggleTechStatus = async (tech: TechnicianUser) => {
@@ -580,21 +595,23 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
 
   const getShareableVoucherText = (tech: TechnicianUser) => {
     const hosp = hospitals.find((h) => h.id === tech.hospitalId) || activeHospital;
+    const isTemp = Boolean(tech.mustChangePassword || tech.isTemporaryPassword);
     return `🏥 PodoPress Diagnostic Station — Technician App Login Credentials
 Facility: ${hosp.name}
 Authorized Technician: ${tech.name}
 
 ==================================================
-STEP 1: DEVICE ENROLLMENT (First-Time / New Install)
+STEP 1: DEVICE ENROLLMENT (First-Time / Re-activation)
 1. Open PodoPress on your Android (.apk), iOS, or Windows (.exe) terminal.
 2. Select "Activate Device with Code".
 3. Hospital / Clinic Code: ${hosp.code}
-4. Station Activation Code: ${tech.activationCode || 'TMH-TECH-1001'}
-5. Set Quick Access Password: ${tech.pin || '1234'}
+4. Technician Username: ${tech.username}
+5. Station Activation Code: ${tech.activationCode || 'TMH-TECH-1001'}
+${isTemp ? `6. Temporary Password: ${tech.pin} (You will be prompted to create your permanent password upon first login)` : '6. Quick Access Password: [Choose your private password during activation]'}
 
 STEP 2: RETURNING STATION SESSIONS
 - Login ID / Username: ${tech.username}
-- Password / PIN: ${tech.pin || '1234'}
+- Password / PIN: ${isTemp ? `${tech.pin} (Temporary — Change Required on Login)` : '[Private — Configured on Station]'}
 ==================================================
 ✓ 100% Offline Diagnostic Scanning Enabled.
 ✓ Examinations automatically sync when connected to Clinic Wi-Fi.`;
@@ -1541,48 +1558,51 @@ STEP 2: RETURNING STATION SESSIONS
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                            4. Password / PIN
+                            4. Password Security
                           </span>
-                          <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.62rem' }}>Admin Managed</span>
+                          {currentHubTech.mustChangePassword ? (
+                            <span className="podo-badge podo-badge-amber" style={{ fontSize: '0.62rem' }}>⚠️ Temp Password</span>
+                          ) : (
+                            <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>🔒 Private &amp; Hashed</span>
+                          )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                          <code style={{ fontSize: '0.98rem', fontWeight: 800, color: visibleTechPasswords[currentHubTech.id] ? '#0f766e' : '#64748b', fontFamily: 'monospace', letterSpacing: visibleTechPasswords[currentHubTech.id] ? 'normal' : '0.12em', whiteSpace: 'nowrap' }}>
-                            {visibleTechPasswords[currentHubTech.id] ? (currentHubTech.pin || '1234') : '••••••••'}
-                          </code>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className="podoload-btn-secondary podoload-btn-sm"
-                              style={{ padding: '0.25rem 0.4rem' }}
-                              onClick={() => setVisibleTechPasswords((prev) => ({ ...prev, [currentHubTech.id]: !prev[currentHubTech.id] }))}
-                              title="Toggle password view"
-                            >
-                              {visibleTechPasswords[currentHubTech.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            </button>
-                            <button
-                              type="button"
-                              className="podoload-btn-secondary podoload-btn-sm"
-                              style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                              onClick={() => handleCopyText(currentHubTech.pin || '1234', 'password')}
-                            >
-                              <Copy className="w-3.5 h-3.5 text-slate-600" />
-                              <span>{copiedLabel === 'password' ? '✓ Copied' : 'Copy'}</span>
-                            </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <code style={{ fontSize: '0.98rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace', letterSpacing: '0.12em', whiteSpace: 'nowrap' }}>
+                              ••••••••
+                            </code>
                           </div>
+                          <button
+                            type="button"
+                            className="podoload-btn-secondary podoload-btn-sm"
+                            style={{ fontSize: '0.7rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                            onClick={() => {
+                              setEditingTechPassword(currentHubTech);
+                              setTechEditPasswordVal('');
+                              setShowTechEditPasswordVal(true);
+                              setForceChangeOnNextLogin(true);
+                              setTechPasswordModalError(null);
+                            }}
+                            title="Set a new temporary password for this technician"
+                          >
+                            <Key className="w-3.5 h-3.5 text-teal-600" />
+                            <span>Set New Password</span>
+                          </button>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
-                          <span style={{ color: '#64748b' }}>Used for station sign-in</span>
+                          <span style={{ color: '#64748b' }}>Zero password exposure</span>
                           <button
                             type="button"
                             onClick={() => {
-                              setEditingTechPassword(currentHubTech);
-                              setTechEditPasswordVal(currentHubTech.pin || '');
-                              setShowTechEditPasswordVal(false);
-                              setTechPasswordModalError(null);
+                              dbService.rotateTechnicianActivationCode(currentHubTech.id);
+                              setTechniciansList(dbService.getTechniciansSync());
+                              setSaveSuccess(`✓ Fresh activation voucher re-issued for ${currentHubTech.name}. Old device bindings cleared.`);
+                              setTimeout(() => setSaveSuccess(null), 3000);
                             }}
                             style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.68rem', color: '#0d9488', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                            title="Invalidate device binding and generate fresh activation voucher"
                           >
-                            Reset Password
+                            Re-issue Voucher &amp; Unbind
                           </button>
                         </div>
                       </div>
@@ -2112,32 +2132,34 @@ STEP 2: RETURNING STATION SESSIONS
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <code style={{ fontSize: '0.72rem', backgroundColor: '#f8fafc', padding: '2px 5px', borderRadius: '3px', letterSpacing: visibleTechPasswords[tech.id] ? 'normal' : '0.12em', color: visibleTechPasswords[tech.id] ? '#0f766e' : '#64748b' }}>
-                            {visibleTechPasswords[tech.id] ? (tech.pin || '••••••••') : '••••••••'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <code style={{ fontSize: '0.72rem', backgroundColor: '#f8fafc', padding: '2px 5px', borderRadius: '3px', letterSpacing: '0.12em', color: '#64748b' }}>
+                            ••••••••
                           </code>
-                          <button
-                            type="button"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
-                            onClick={() => setVisibleTechPasswords((prev) => ({ ...prev, [tech.id]: !prev[tech.id] }))}
-                            title={visibleTechPasswords[tech.id] ? 'Hide password' : 'View technician password'}
-                          >
-                            {visibleTechPasswords[tech.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
+                          {tech.mustChangePassword ? (
+                            <span className="podo-badge podo-badge-amber" style={{ fontSize: '0.6rem' }}>
+                              Temp
+                            </span>
+                          ) : (
+                            <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
+                              Secure
+                            </span>
+                          )}
                           <button
                             type="button"
                             className="podoload-btn-secondary"
                             style={{ fontSize: '0.62rem', padding: '0.15rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                             onClick={() => {
                               setEditingTechPassword(tech);
-                              setTechEditPasswordVal(tech.pin || '');
-                              setShowTechEditPasswordVal(false);
+                              setTechEditPasswordVal('');
+                              setShowTechEditPasswordVal(true);
+                              setForceChangeOnNextLogin(true);
                               setTechPasswordModalError(null);
                             }}
-                            title="Admin Maintenance: Reset or update password for this technician"
+                            title="Set a new temporary password for this technician"
                           >
                             <Key className="w-3 h-3 text-teal-600" />
-                            <span>Reset Password</span>
+                            <span>Set New</span>
                           </button>
                         </div>
                       </td>
@@ -4020,6 +4042,18 @@ STEP 2: RETURNING STATION SESSIONS
                 </div>
               </div>
 
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.74rem', color: '#1e293b', cursor: 'pointer', marginTop: '0.2rem' }}>
+                <input
+                  type="checkbox"
+                  checked={forceChangeOnNextLogin}
+                  onChange={(e) => setForceChangeOnNextLogin(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600 }}>
+                  Force technician to change password upon next station sign-in (Recommended)
+                </span>
+              </label>
+
               {techPasswordModalError && (
                 <div
                   style={{
@@ -4051,7 +4085,109 @@ STEP 2: RETURNING STATION SESSIONS
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
               >
                 <Check className="w-4 h-4" />
-                <span>Save New Password</span>
+                <span>Save &amp; Issue Password</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* One-Time Temporary Password Handover Modal (Strict Security Handover) */}
+      {oneTimeTempPasswordInfo && (
+        <div className="podoload-modal-overlay">
+          <div className="podoload-modal-card" style={{ maxWidth: '440px', width: '92%' }}>
+            <div className="podoload-modal-header" style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#fef3c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#b45309',
+                  }}
+                >
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#0c2328' }}>
+                    Temporary Password Established
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                    One-time administrative handover for {oneTimeTempPasswordInfo.techName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="podoload-modal-close-btn"
+                onClick={() => setOneTimeTempPasswordInfo(null)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem 0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div
+                style={{
+                  backgroundColor: '#fefce8',
+                  border: '1px solid #fef08a',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  fontSize: '0.74rem',
+                  color: '#854d0e',
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ marginBottom: '0.4rem' }}>
+                  <strong>Technician User ID:</strong> <code>{oneTimeTempPasswordInfo.username}</code>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div>
+                    <strong>Temporary Password:</strong>{' '}
+                    <code style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f766e', backgroundColor: '#ffffff', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                      {oneTimeTempPasswordInfo.tempPass}
+                    </code>
+                  </div>
+                  <button
+                    type="button"
+                    className="podoload-btn-secondary podoload-btn-sm"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(oneTimeTempPasswordInfo.tempPass);
+                      setSaveSuccess('✓ Temporary password copied to clipboard!');
+                      setTimeout(() => setSaveSuccess(null), 2500);
+                    }}
+                    style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  >
+                    <Copy className="w-3 h-3 text-teal-600" />
+                    <span>Copy Password</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.45 }}>
+                <p style={{ margin: '0 0 0.4rem 0' }}>
+                  🔒 <strong>Clinical Security Guarantee:</strong> This password is only displayed once right now for administrative handover. It will <strong>never</strong> be visible in plain text again in any system view.
+                </p>
+                {oneTimeTempPasswordInfo.mustChange && (
+                  <p style={{ margin: 0, color: '#0f766e', fontWeight: 600 }}>
+                    ✓ <strong>Forced Password Change Active:</strong> When the technician signs in with this temporary password, the workstation will immediately require them to establish their own private permanent password before granting session access.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="podoload-modal-footer">
+              <button
+                type="button"
+                className="podoload-btn-primary"
+                onClick={() => setOneTimeTempPasswordInfo(null)}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Done / Handover Complete
               </button>
             </div>
           </div>
