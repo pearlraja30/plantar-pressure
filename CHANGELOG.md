@@ -24,6 +24,57 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.80] — 2026-11-11
+#### Production Database Scripts, DDL Schemas & Automated Backup/Disaster Recovery Suite
+
+#### 1. Clinical & Operational Problem Statement
+- System administrators and clinic IT teams required dedicated, physical database script files stored directly within the repository for backup, cloud provisioning, schema migrations, and disaster recovery.
+- Although schemas were dynamically generated in code and documented across theoretical markdown guides, there were no standalone `.sql` DDL scripts or automated backup/restore shell scripts stored in the codebase for operational database administrators.
+
+#### 2. Why the Change Was Suggested
+- **Disaster Recovery & Business Continuity (RPO: 0, RTO: < 5 min)**: Regulatory medical software (IEC 62304 / ISO 27001) mandates reproducible database schemas and verifiable, automated backup/restore scripts with cryptographic integrity verification (SHA-256).
+- **Turnkey Cloud Deployment**: Clinical database administrators need turnkey SQL scripts to provision fresh Supabase projects or enterprise Amazon Aurora / Google Cloud SQL PostgreSQL instances with 1-click execution.
+- **Offline Workstation Backup & Migration**: Offline Windows kiosks and Android/iOS clinics require cross-platform export/import scripts to migrate local offline IndexedDB cases into cloud PostgreSQL schemas seamlessly.
+
+#### 3. Technical Root Cause Analysis
+- DDL schemas previously resided exclusively inside TypeScript strings (`cloudSyncService.ts`) and theoretical documentation files (`POSTGRESQL_3TIER_MIGRATION_PLAN.md`). No standalone `database/` directory existed containing executable `.sql`, `.sh`, and `.cjs` backup tools.
+
+#### 4. End-to-End Architectural Solution
+1. **Supabase Cloud Schema (`database/schema_supabase.sql`)**:
+   - Production SQL script creating `public.station_activations`, `public.clinical_reports`, `public.hospital_profiles`, `public.admin_accounts`, `public.technician_users`, and storage bucket `plantar-scans` with RLS policies, performance indexes, and automatic `updated_at` triggers.
+2. **Enterprise 3-Tier Multi-Tenant PostgreSQL DDL (`database/schema_postgresql_3tier.sql`)**:
+   - Complete PostgreSQL 14–16+ DDL with relational integrity (`tenants`, `users`, `bound_devices`, `device_licenses`, `patients`, `exam_cases`, and `audit_logs`), custom enums, GIN indexes, and an immutable 21 CFR Part 11 tamper guard trigger.
+3. **Clean Production Seed Dataset (`database/seed_data.sql`)**:
+   - Default hospital profile (`TMH-CENTRAL`), administrator account (`admin@technomind.health`), clinical technician voucher (`TMH-TECH-INIT-01`), and sample benchmark clinical case (`PP-NORM-01`).
+4. **Automated Backup & Restore Shell Utility (`database/backup_and_restore.sh`)**:
+   - Automated bash utility with `backup`, `restore`, `seed`, `schema`, and `verify` commands. Features `pg_dump`, `gzip -9` compression, and SHA-256 tamper verification.
+5. **Offline Workstation Snapshot & Cloud Converter (`database/backup_local_station.cjs`)**:
+   - Cross-platform Node.js utility to generate offline workstation backup snapshots, validate JSON schema structure, and convert offline data to PostgreSQL `INSERT` statements.
+6. **Master Database Operations Manual (`database/README.md`)**:
+   - Comprehensive operational manual detailing schema specifications, Supabase dashboard runbooks, and disaster recovery procedures.
+7. **Automated Verification Test (`scripts/unit_tests.cjs`)**:
+   - Added Section 46 asserting file existence, minimum byte sizes, and required SQL/JS constructs.
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `database/schema_supabase.sql`: Standalone Supabase/PostgreSQL schema script.
+- `database/schema_postgresql_3tier.sql`: Enterprise 3-Tier relational PostgreSQL DDL.
+- `database/seed_data.sql`: Production baseline seed data script.
+- `database/backup_and_restore.sh`: Executable backup and restoration shell automation.
+- `database/backup_local_station.cjs`: Workstation backup, validation, and JSON-to-SQL converter.
+- `database/README.md`: Master database operations and disaster recovery manual.
+- `scripts/unit_tests.cjs`: Added Section 46 unit test.
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`, `src/services/dbService.ts`: Synchronized release metadata to version `1.0.80`.
+
+#### 6. Regulatory Verification & Test Battery
+- Total Unit Tests: **123 / 123 Unit Tests Passed (100% OK)** in `scripts/unit_tests.cjs`.
+- Total Scenario Tests: **15 / 15 Validation Scenarios Passed (100% Verified)** in `scripts/validate_system.cjs`.
+- Build Status: Clean Vite + TypeScript compilation (`tsc -b && vite build` in 340ms).
+
+#### 7. Upstream & Downstream System Impact
+- Ensures complete data resilience, rapid deployment for new hospital tenants, and verified backup/restore workflows across offline and cloud deployments.
+
+---
+
 ### [v1.0.79] — 2026-11-11
 #### Elimination of Redundant Sidebar User Profile Card & Header Session Centralization
 

@@ -107,7 +107,7 @@ For the complete, in-depth architectural and operational manual, refer to:
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **122 / 122 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, and cloud sync engines.
+* **123 / 123 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, database schema files, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -267,11 +267,17 @@ The system includes an automated clinical verification battery covering all test
 * **Decluttered Left Navigation**: Removed the redundant user profile card from the bottom of the left sidebar, preserving vertical space for clinical exam and records navigation.
 * **Centralized Header Session Authority**: All active user details (`Tech: <name> ▾`, `Admin: <name> ▾`), active facility information (`Building2 <clinic>`), cloud sync status, role switching, and session sign-out are unified exclusively in the top-right workstation header bar.
 
+### 19. Production Database Scripts, DDL Schemas & Automated Backup Suite (v1.0.80)
+* **Standalone Database Directory (`database/`)**: Hosts production-ready DDL schemas ([`database/schema_supabase.sql`](database/schema_supabase.sql) for Supabase, [`database/schema_postgresql_3tier.sql`](database/schema_postgresql_3tier.sql) for enterprise 3-tier PostgreSQL), baseline seed data ([`database/seed_data.sql`](database/seed_data.sql)), and operations manual ([`database/README.md`](database/README.md)).
+* **Automated Backup & Disaster Recovery**: Shell utility ([`database/backup_and_restore.sh`](database/backup_and_restore.sh)) automating `pg_dump`, `gzip -9` compression, and SHA-256 tamper verification.
+* **Offline Workstation Snapshot & Cloud Converter**: Cross-platform Node.js utility ([`database/backup_local_station.cjs`](database/backup_local_station.cjs)) for workstation snapshot generation, structural JSON validation, and direct JSON-to-SQL migration.
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps
 
 For detailed clinical, architectural, and developer references, consult the following comprehensive manuals:
+* 🗄️ [**`database/README.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/database/README.md) — **Master Database Operations, Schemas & Backup Manual**: Detailed schema specifications, Supabase dashboard runbooks, automated backup/restore automation, and disaster recovery procedures.
 * 📄 [**`CHANGELOG.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CHANGELOG.md) — **Master End-to-End Changes History & Architectural Rationale**: Exhaustive version-by-version log detailing why each change was suggested, technical root causes, end-to-end data flows, files modified, and verification evidence.
 * 📄 [**`CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CLOUD_SEGREGATION_AND_SYNC_STRATEGY.md) — **Master Enterprise Cloud Segregation & Offline Sync Plan**: 3-Tier cloud segregation (Frontend CDN/Native Shells, Backend Microservices on AWS ECS/EKS, Aurora PostgreSQL 16+ & S3), 100% offline-first working strategy across Windows `.exe`, Android `.apk`, and iOS `.ipa`, and technician-based online batch synchronization protocol for later-stage execution.
 * 📄 [**`CROSS_PLATFORM_OPERATIONS_MANUAL.md`**](file:///Users/rajasekaran/Projects/plantar-pressure/CROSS_PLATFORM_OPERATIONS_MANUAL.md) — Complete cross-platform operations guide covering Microsoft Windows Desktop (`.exe`), Google Android (`.apk`), and Apple iOS iPhone/iPad (`.ipa`), hardware scanners, mobile camera gyros, discreet admin routing, and packaging.

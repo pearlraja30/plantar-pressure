@@ -5844,6 +5844,73 @@ it("Enforces Technician Enrollment Validation, Duplicate Prevention & One-Time P
   expect(registeredTechs.length).toBe(2);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 46: Database Migration Scripts, Schema Completeness & Disaster Recovery Verification
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 46: Database Migration Scripts, Schema Completeness & Disaster Recovery Verification ---");
+
+it("Enforces Complete Database Schema Files & Script Presence for Backup Operations", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const projectRoot = path.resolve(__dirname, '..');
+  const dbDir = path.join(projectRoot, 'database');
+
+  // 1. Check database directory existence
+  expect(fs.existsSync(dbDir)).toBe(true);
+
+  // 2. Supabase Schema Verification
+  const supabaseSchemaPath = path.join(dbDir, 'schema_supabase.sql');
+  expect(fs.existsSync(supabaseSchemaPath)).toBe(true);
+  const supabaseSql = fs.readFileSync(supabaseSchemaPath, 'utf8');
+  expect(supabaseSql.includes('public.station_activations')).toBe(true);
+  expect(supabaseSql.includes('public.clinical_reports')).toBe(true);
+  expect(supabaseSql.includes('public.hospital_profiles')).toBe(true);
+  expect(supabaseSql.includes('public.admin_accounts')).toBe(true);
+  expect(supabaseSql.includes('public.technician_users')).toBe(true);
+  expect(supabaseSql.includes('plantar-scans')).toBe(true);
+  expect(supabaseSql.length > 2000).toBe(true);
+
+  // 3. PostgreSQL 3-Tier Enterprise Schema Verification
+  const pgSchemaPath = path.join(dbDir, 'schema_postgresql_3tier.sql');
+  expect(fs.existsSync(pgSchemaPath)).toBe(true);
+  const pgSql = fs.readFileSync(pgSchemaPath, 'utf8');
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS tenants')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS users')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS bound_devices')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS device_licenses')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS patients')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS exam_cases')).toBe(true);
+  expect(pgSql.includes('CREATE TABLE IF NOT EXISTS audit_logs')).toBe(true);
+  expect(pgSql.includes('prevent_audit_log_tampering')).toBe(true);
+  expect(pgSql.length > 2000).toBe(true);
+
+  // 4. Seed Data Script Verification
+  const seedPath = path.join(dbDir, 'seed_data.sql');
+  expect(fs.existsSync(seedPath)).toBe(true);
+  const seedSql = fs.readFileSync(seedPath, 'utf8');
+  expect(seedSql.includes('TMH-CENTRAL')).toBe(true);
+  expect(seedSql.includes('admin@technomind.health')).toBe(true);
+  expect(seedSql.includes('TMH-TECH-INIT-01')).toBe(true);
+  expect(seedSql.includes('PP-NORM-01')).toBe(true);
+
+  // 5. Backup & Disaster Recovery Shell Script Verification
+  const backupShPath = path.join(dbDir, 'backup_and_restore.sh');
+  expect(fs.existsSync(backupShPath)).toBe(true);
+  const backupSh = fs.readFileSync(backupShPath, 'utf8');
+  expect(backupSh.includes('do_backup')).toBe(true);
+  expect(backupSh.includes('do_restore')).toBe(true);
+  expect(backupSh.includes('do_seed')).toBe(true);
+  expect(backupSh.includes('do_verify')).toBe(true);
+
+  // 6. Local Station Backup & JSON-to-SQL Node.js Utility
+  const localBackupPath = path.join(dbDir, 'backup_local_station.cjs');
+  expect(fs.existsSync(localBackupPath)).toBe(true);
+  const localJs = fs.readFileSync(localBackupPath, 'utf8');
+  expect(localJs.includes('createSampleBackup')).toBe(true);
+  expect(localJs.includes('validateBackup')).toBe(true);
+  expect(localJs.includes('jsonToSql')).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

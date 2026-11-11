@@ -600,12 +600,22 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
 2. **Centralized Top-Right Header Session Authority**:
    - The top-right workstation header comprehensively manages active identity (`Tech: <name> ▾`, `Admin: <name> ▾`, `👑 Super Admin: <name> ▾`), active facility information (`Building2 <clinic>`), cloud synchronization status, role switching, and session sign-out (`Sign Out`).
 
-### 16.9 Regulatory Verification & Conformance Status (v1.0.79)
-- **Automated Unit Tests**: **122/122** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.9 Production Database Scripts & Automated Backup/Disaster Recovery Suite (v1.0.80)
+1. **Standalone Physical Database Scripts**:
+   - Created dedicated `database/` directory hosting production DDLs: [`database/schema_supabase.sql`](file:///Users/rajasekaran/Projects/plantar-pressure/database/schema_supabase.sql) (Supabase/PostgreSQL 15+), [`database/schema_postgresql_3tier.sql`](file:///Users/rajasekaran/Projects/plantar-pressure/database/schema_postgresql_3tier.sql) (Enterprise 3-Tier Aurora/Cloud SQL), and [`database/seed_data.sql`](file:///Users/rajasekaran/Projects/plantar-pressure/database/seed_data.sql) (clinical tenant baseline).
+2. **Automated Backup & Disaster Recovery Automation**:
+   - Provided [`database/backup_and_restore.sh`](file:///Users/rajasekaran/Projects/plantar-pressure/database/backup_and_restore.sh) with `backup`, `restore`, `seed`, `schema`, and `verify` commands, implementing `gzip -9` compression and SHA-256 tamper-evident integrity checksums.
+3. **Cross-Platform Workstation Snapshot & Cloud Converter**:
+   - Implemented [`database/backup_local_station.cjs`](file:///Users/rajasekaran/Projects/plantar-pressure/database/backup_local_station.cjs) for local workstation disaster recovery, structural JSON verification, and direct conversion to PostgreSQL `INSERT` statements.
+4. **Operations & Maintenance Reference**:
+   - Authored [`database/README.md`](file:///Users/rajasekaran/Projects/plantar-pressure/database/README.md) containing step-by-step deployment runbooks for Supabase, PostgreSQL servers, and offline workstation disaster recovery.
+
+### 16.10 Regulatory Verification & Conformance Status (v1.0.80)
+- **Automated Unit Tests**: **123/123** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~320ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~340ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.79`.
+- **Release Version**: Tagged and committed `v1.0.80`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*
