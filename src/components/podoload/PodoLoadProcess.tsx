@@ -5,6 +5,8 @@ import { processHarrisMatScan } from '../../services/imageProcessingService';
 import { dbService, DEFAULT_PROCESSING_PARAMETERS } from '../../services/dbService';
 import { ProcessingParameters } from '../../types';
 
+export type HeatmapBackgroundMode = 'black' | 'slate' | 'white';
+
 interface PodoLoadProcessProps {
   leftFoot: FootCaptureData | null;
   rightFoot: FootCaptureData | null;
@@ -33,6 +35,46 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   const [flattenLighting, setFlattenLighting] = useState<boolean>(savedParams.flattenLighting);
   const [removePaperNoise, setRemovePaperNoise] = useState<boolean>(savedParams.removePaperNoise);
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
+
+  // Background color customization (Default to clinical high-contrast Black, with choice of Dark Slate or Clean White)
+  const [heatmapBg, setHeatmapBg] = useState<HeatmapBackgroundMode>(() => {
+    try {
+      return (localStorage.getItem('podoload_heatmap_bg') as HeatmapBackgroundMode) || 'black';
+    } catch {
+      return 'black';
+    }
+  });
+
+  const handleBgChange = (mode: HeatmapBackgroundMode) => {
+    setHeatmapBg(mode);
+    try {
+      localStorage.setItem('podoload_heatmap_bg', mode);
+    } catch {}
+  };
+
+  const getViewportBgStyle = (mode: HeatmapBackgroundMode): React.CSSProperties => {
+    switch (mode) {
+      case 'black':
+        return {
+          backgroundColor: '#000000',
+          borderColor: '#1e293b',
+          boxShadow: 'inset 0 0 24px rgba(0, 0, 0, 0.9), 0 4px 14px rgba(0, 0, 0, 0.35)',
+        };
+      case 'slate':
+        return {
+          backgroundColor: '#0f172a',
+          borderColor: '#334155',
+          boxShadow: 'inset 0 0 24px rgba(15, 23, 42, 0.8), 0 4px 14px rgba(15, 23, 42, 0.3)',
+        };
+      case 'white':
+      default:
+        return {
+          backgroundColor: '#ffffff',
+          borderColor: '#cbd5e1',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+        };
+    }
+  };
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -190,100 +232,244 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
   ]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.85rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '0.65rem', minHeight: 0 }}>
       {/* Main Grid: Left Foot Card + Right Foot Card + Processing Parameters */}
-      <div className="podoload-process-grid">
+      <div className="podoload-process-grid" style={{ minHeight: 0, flex: 1 }}>
         {/* ================= LEFT FOOT PROCESSED CARD ================= */}
-        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0c2328' }}>Left foot</span>
-            <span className="podo-badge podo-badge-green">Processed</span>
+        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.75rem 0.85rem', minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0c2328' }}>Left foot</span>
+              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem', padding: '1px 6px' }}>Processed</span>
+            </div>
+
+            {/* Background Color Quick Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+              <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>BG:</span>
+              <button
+                type="button"
+                onClick={() => handleBgChange('black')}
+                title="Clinical Pitch Black (Maximum Pressure Contrast)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'black' ? '1.5px solid #38bdf8' : '1px solid #94a3b8',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                ⬛ Black
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('slate')}
+                title="Dark Slate (Clinical Dark Mode)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'slate' ? '1.5px solid #38bdf8' : '1px solid #cbd5e1',
+                  backgroundColor: '#0f172a',
+                  color: '#e2e8f0',
+                  cursor: 'pointer',
+                }}
+              >
+                🌑 Slate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('white')}
+                title="Clean White (Paper Simulation)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'white' ? '1.5px solid #0891b2' : '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                ⬜ White
+              </button>
+            </div>
           </div>
 
-          <div className="podoload-process-foot-preview">
-            {/* Heatmap Viewport Box (Zero Black Background) */}
+          <div className="podoload-process-foot-preview" style={{ flex: 1, minHeight: 0 }}>
+            {/* Heatmap Viewport Box (Responsive Fit - Zero Clipped Heel) */}
             <div
+              className="podoload-process-viewport-box"
               style={{
                 width: '100%',
                 flex: 1,
-                minHeight: '290px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
+                height: 'calc(100vh - 290px)',
+                minHeight: '260px',
+                maxHeight: '430px',
+                borderStyle: 'solid',
+                borderWidth: '1px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
                 padding: '0.5rem',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                 position: 'relative',
+                boxSizing: 'border-box',
+                transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                ...getViewportBgStyle(heatmapBg),
               }}
             >
               {leftHeatmapUrl ? (
                 <img
                   src={leftHeatmapUrl}
                   alt="Left Plantar Heatmap"
-                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    objectPosition: 'center',
+                    display: 'block',
+                    filter: heatmapBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
+                  }}
                 />
               ) : (
                 <div style={{ color: '#0ea5e9', fontSize: '0.74rem', fontWeight: 600 }}>Processing Heatmap...</div>
               )}
             </div>
-            <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600, textAlign: 'center' }}>
-              Plantar Pressure Heatmap
+            <span style={{ fontSize: '0.66rem', color: '#657e84', marginTop: '0.2rem', fontWeight: 600, textAlign: 'center' }}>
+              Plantar Pressure Heatmap (Bilateral Calibration)
             </span>
           </div>
         </div>
 
         {/* ================= RIGHT FOOT PROCESSED CARD ================= */}
-        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0c2328' }}>Right foot</span>
-            <span className="podo-badge podo-badge-green">Processed</span>
+        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.75rem 0.85rem', minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0c2328' }}>Right foot</span>
+              <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem', padding: '1px 6px' }}>Processed</span>
+            </div>
+
+            {/* Background Color Quick Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+              <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>BG:</span>
+              <button
+                type="button"
+                onClick={() => handleBgChange('black')}
+                title="Clinical Pitch Black (Maximum Pressure Contrast)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'black' ? '1.5px solid #38bdf8' : '1px solid #94a3b8',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                ⬛ Black
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('slate')}
+                title="Dark Slate (Clinical Dark Mode)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'slate' ? '1.5px solid #38bdf8' : '1px solid #cbd5e1',
+                  backgroundColor: '#0f172a',
+                  color: '#e2e8f0',
+                  cursor: 'pointer',
+                }}
+              >
+                🌑 Slate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('white')}
+                title="Clean White (Paper Simulation)"
+                style={{
+                  padding: '1px 5px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  borderRadius: '3px',
+                  border: heatmapBg === 'white' ? '1.5px solid #0891b2' : '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                }}
+              >
+                ⬜ White
+              </button>
+            </div>
           </div>
 
-          <div className="podoload-process-foot-preview">
-            {/* Heatmap Viewport Box (Zero Black Background) */}
+          <div className="podoload-process-foot-preview" style={{ flex: 1, minHeight: 0 }}>
+            {/* Heatmap Viewport Box (Responsive Fit - Zero Clipped Heel) */}
             <div
+              className="podoload-process-viewport-box"
               style={{
                 width: '100%',
                 flex: 1,
-                minHeight: '290px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
+                height: 'calc(100vh - 290px)',
+                minHeight: '260px',
+                maxHeight: '430px',
+                borderStyle: 'solid',
+                borderWidth: '1px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
                 padding: '0.5rem',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                 position: 'relative',
+                boxSizing: 'border-box',
+                transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                ...getViewportBgStyle(heatmapBg),
               }}
             >
               {rightHeatmapUrl ? (
                 <img
                   src={rightHeatmapUrl}
                   alt="Right Plantar Heatmap"
-                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    objectPosition: 'center',
+                    display: 'block',
+                    filter: heatmapBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
+                  }}
                 />
               ) : (
                 <div style={{ color: '#0ea5e9', fontSize: '0.74rem', fontWeight: 600 }}>Processing Heatmap...</div>
               )}
             </div>
-            <span style={{ fontSize: '0.68rem', color: '#657e84', marginTop: '0.35rem', fontWeight: 600, textAlign: 'center' }}>
-              Plantar Pressure Heatmap
+            <span style={{ fontSize: '0.66rem', color: '#657e84', marginTop: '0.2rem', fontWeight: 600, textAlign: 'center' }}>
+              Plantar Pressure Heatmap (Bilateral Calibration)
             </span>
           </div>
         </div>
 
         {/* ================= RIGHT PANEL: PROCESSING PARAMETERS ================= */}
-        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="podoload-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', padding: '0.75rem 0.85rem', minHeight: 0, overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem' }}>
             <h3 className="podoload-card-title" style={{ margin: 0 }}>PROCESSING PARAMETERS</h3>
             <span
               style={{
-                fontSize: '0.68rem',
+                fontSize: '0.66rem',
                 fontWeight: 700,
                 color: '#047857',
                 backgroundColor: '#ecfdf5',
@@ -322,7 +508,65 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             </div>
           )}
 
-          <div className="podoload-form-group" style={{ marginBottom: '0.4rem' }}>
+          {/* Heatmap Background Preference */}
+          <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
+            <label className="podoload-label">Heatmap Viewport Background</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.3rem', marginTop: '0.15rem' }}>
+              <button
+                type="button"
+                onClick={() => handleBgChange('black')}
+                style={{
+                  padding: '0.35rem 0.25rem',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  borderRadius: '4px',
+                  border: heatmapBg === 'black' ? '2px solid #38bdf8' : '1px solid #334155',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                ⬛ Black
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('slate')}
+                style={{
+                  padding: '0.35rem 0.25rem',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  borderRadius: '4px',
+                  border: heatmapBg === 'slate' ? '2px solid #38bdf8' : '1px solid #cbd5e1',
+                  backgroundColor: '#0f172a',
+                  color: '#e2e8f0',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                🌑 Slate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBgChange('white')}
+                style={{
+                  padding: '0.35rem 0.25rem',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  borderRadius: '4px',
+                  border: heatmapBg === 'white' ? '2px solid #0891b2' : '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                ⬜ White
+              </button>
+            </div>
+          </div>
+
+          <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#3d585e', fontWeight: 600 }}>
               <span>Smoothing strength</span>
               <span>{smoothingStrength} px</span>
@@ -338,7 +582,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             />
           </div>
 
-          <div className="podoload-form-group" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
             <label className="podoload-label">Intensity levels</label>
             <select
               className="podoload-select"
@@ -351,7 +595,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             </select>
           </div>
 
-          <div className="podoload-form-group" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
             <label className="podoload-label">Colour map</label>
             <select
               className="podoload-select"
@@ -364,7 +608,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             </select>
           </div>
 
-          <div className="podoload-form-group" style={{ marginBottom: '0.4rem' }}>
+          <div className="podoload-form-group" style={{ marginBottom: '0.35rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#3d585e', fontWeight: 600 }}>
               <span>Background threshold</span>
               <span>{backgroundThreshold}%</span>
@@ -379,7 +623,7 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.2rem 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.15rem 0' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: '#0c2328', fontWeight: 600, cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -401,9 +645,9 @@ export const PodoLoadProcess: React.FC<PodoLoadProcessProps> = ({
             </label>
           </div>
 
-          <div style={{ fontSize: '0.74rem', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '0.74rem', marginTop: '0.15rem' }}>
             <span style={{ color: 'var(--podo-card-title)', fontWeight: 800 }}>IMAGE CONFIDENCE</span>
-            <div style={{ marginTop: '0.2rem', fontWeight: 700, color: '#0c2328' }}>
+            <div style={{ marginTop: '0.15rem', fontWeight: 700, color: '#0c2328' }}>
               Left / Right <span style={{ color: '#0e7477' }}>{leftFoot?.confidence ?? 94}% / {rightFoot?.confidence ?? 88}%</span>
             </div>
           </div>

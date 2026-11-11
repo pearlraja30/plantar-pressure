@@ -559,4 +559,21 @@ Under the **Super Admin Console** (`Ctrl+Shift+S`):
    - **`[📋 Copy Supabase SQL Schema Script]`**: Copies the complete PostgreSQL database migration script to set up all 5 required tables in Supabase in seconds.
 
 ---
+
+### 12.6 Step 11 Foot Bounding Box Crop & Multi-Mode Background Selector (v1.0.77)
+In **Step 3 (Process Images)** and **Step 4 (Results)**:
+1. **Zero Viewport Heel Cutoff**:
+   - The viewport box (`.podoload-process-viewport-box`) dynamically scales to the screen height (`calc(100vh - 290px)`, min 260px, max 430px) using `object-fit: contain; object-position: center;`.
+   - The plantar footprint from toes to heel is 100% visible on all monitor resolutions (1080p, 900p, 768p) and scaled laptop displays without vertical overflow or bottom border clipping.
+2. **Step 11 Anatomical Foot Bounding Box Crop**:
+   - Adhering to reference `harris_jet_v1.py` Step 11, the processing pipeline calculates the exact footprint bounding box (`minX, maxX, minY, maxY`) and crops the output canvas with proportional margin padding.
+   - Eliminates blank flatbed paper margins and standardizes footprint scale and centering across all image uploads, regardless of paper orientation or off-center placement on the scanner glass.
+3. **Multi-Mode Clinical Background Selector**:
+   - Clinicians can toggle between three background display modes using the quick-toggle buttons (`⬛ Black`, `🌑 Slate`, `⬜ White`):
+     - **⬛ Black (`#000000`)**: Default clinical high-contrast mode, maximizing dynamic range contrast of JET colormaps and highlighting delicate toe and metatarsal pressure contours.
+     - **🌑 Slate (`#0f172a`)**: Clinical dark mode reducing workstation eye fatigue during extended scanning sessions.
+     - **⬜ White (`#ffffff`)**: Clean paper-simulation mode matching clinical printouts.
+   - Background choice is persisted automatically across exam sessions in `localStorage ('podoload_heatmap_bg')`.
+
+---
 *Technomind Healthcare Systems — Document Reference: `PPA-DOC-XPLAT-2026-V1`*

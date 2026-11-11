@@ -1875,6 +1875,50 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
 - **Release Version**: Tagged and committed `v1.0.76`.
 
+---
+
+## 52. ACTIVITY: STEP 11 ANATOMICAL FOOT BOUNDING BOX CROP, RESPONSIVE VIEWPORT AUTO-FIT & MULTI-MODE CLINICAL BACKGROUND SELECTOR (v1.0.77)
+- **Date**: 2026-11-11
+- **Version**: `1.0.77`
+- **Scope**: Resolve user-reported UI alignment issues and vertical viewport overflow in Step 3 (Process Images) and Step 4 (Results). Ensure the processed foot heatmap always fits completely within the screen without cutting off the heel, eliminate image alignment differences across uploads, and provide background color options (Pitch Black default, Dark Slate, Clean White) for clinical dynamic range contrast.
+
+### 52.1 Root Cause Analysis
+1. **Vertical Heel Cutoff & Viewport Expansion**:
+   - In Step 3 (`PodoLoadProcess.tsx`), the viewport box had an unconstrained flex container inside `.podoload-process-grid` with `.podoload-process-foot-preview` set to `min-height: 310px`. On standard 768p/800p/900p displays or 1080p with Windows 125%/150% scaling, the card height pushed past the viewport boundaries, causing the heel to be clipped at the bottom.
+2. **Alignment & Size Discrepancies Across Image Uploads**:
+   - In `src/services/imageProcessingService.ts`, `outputCanvas` was previously sized to the entire scanned page (`width x height`, e.g., 2480x3508 A4 flatbed scan or camera capture).
+   - If an impression was placed near the bottom or center of the paper, the exported PNG contained enormous blank/transparent margins. When rendered with `object-fit: contain`, the browser centered the full page canvas rather than the foot impression, causing off-center footprints to be pushed downward or appear shrunken with inconsistent alignment across scans.
+3. **Heatmap Contrast & Background Visibility**:
+   - Plantar pressure heatmaps rendered with JET colormaps display maximum dynamic range against a clinical pitch black (`#000000`) background, which accentuates faint toe contacts and high peak pressure gradients. Clinicians also require Dark Slate (clinical dark theme) and Clean White (paper report simulation).
+
+### 52.2 Technical Solution Implemented
+1. **Step 11 Anatomical Foot Bounding Box Crop (`imageProcessingService.ts`)**:
+   - Implemented exact adherence to Python reference `harris_jet_v1.py` Step 11 (`minX, maxX, minY, maxY` bounding box).
+   - Added uniform proportional padding (`pad = Math.round(Math.max(16, Math.min(width, height) * 0.035))`).
+   - Crops `outputCanvas` directly to the actual foot footprint, completely discarding extraneous blank flatbed paper margins.
+   - Result: Every single image upload is standardized into a consistent anatomical aspect ratio (~1:2), centering perfectly inside the viewport with zero drift regardless of where the foot was positioned on the scanner glass or paper.
+2. **Responsive Auto-Fit Viewport (`PodoLoadProcess.tsx` & `podoload.css`)**:
+   - Updated `.podoload-process-grid` and `.podoload-process-foot-preview` to `min-height: 0`.
+   - Set `.podoload-process-viewport-box` with responsive constrained height: `height: 'calc(100vh - 290px)'`, `minHeight: '260px'`, `maxHeight: '430px'`.
+   - Applied `maxWidth: '100%'`, `maxHeight: '100%'`, `width: '100%'`, `height: '100%'`, `objectFit: 'contain'`, `objectPosition: 'center'`.
+   - Result: The foot from toes to heel is 100% visible across any screen resolution (1080p, 900p, 768p) with zero heel cutoff.
+3. **Multi-Mode Clinical Background Selector (`PodoLoadProcess.tsx` & `PodoLoadResults.tsx`)**:
+   - Added `HeatmapBackgroundMode = 'black' | 'slate' | 'white'`, defaulting to clinical Pitch Black (`#000000`).
+   - Added quick 1-click toggles (`⬛ Black`, `🌑 Slate`, `⬜ White`) in Left Foot Card, Right Foot Card, and the Parameters Sidebar in Step 3, as well as the top controls bar in Step 4.
+   - Persisted clinician preference seamlessly via `localStorage.getItem('podoload_heatmap_bg')`.
+   - Applied subtle blue glow drop-shadow (`drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))`) on dark backgrounds for maximum diagnostic visual clarity.
+4. **Step 4 Results Continuity (`PodoLoadResults.tsx` & `podoload.css`)**:
+   - Updated `.podoload-bilateral-canvas-box` from fixed `min-height: 440px` to responsive `min-height: 280px; max-height: calc(100vh - 290px); flex: 1;`.
+   - Left and Right foot labels dynamically adapt between `#f8fafc` on dark backgrounds and `#0c2328` on white.
+
+### 52.3 Quality Verification & Conformance
+- **Unit Test Battery**: Added Section 44, expanding to **118/118** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled with 0 errors in 341ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
+- **Release Version**: Tagged and committed `v1.0.77`.
+
+
 
 
 

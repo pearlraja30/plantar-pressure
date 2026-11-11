@@ -1314,8 +1314,31 @@ export async function processHarrisMatScan(
     recommendations: diabeticUlcerRisk.recommendations,
   };
 
+  // Step 11: Anatomical Foot Bounding Box Crop (Exact adherence to Python harris_jet_v1.py Step 11)
+  // Eliminates blank scanner margins, centers the footprint, and standardizes alignment across all image uploads
+  let finalHeatmapDataUrl = outputCanvas.toDataURL('image/png');
+
+  if (minX < maxX && minY < maxY) {
+    const pad = Math.round(Math.max(16, Math.min(width, height) * 0.035));
+    const cropX0 = Math.max(0, minX - pad);
+    const cropY0 = Math.max(0, minY - pad);
+    const cropX1 = Math.min(width, maxX + pad);
+    const cropY1 = Math.min(height, maxY + pad);
+    const cropW = Math.max(1, cropX1 - cropX0);
+    const cropH = Math.max(1, cropY1 - cropY0);
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropW;
+    croppedCanvas.height = cropH;
+    const croppedCtx = croppedCanvas.getContext('2d');
+    if (croppedCtx) {
+      croppedCtx.drawImage(outputCanvas, cropX0, cropY0, cropW, cropH, 0, 0, cropW, cropH);
+      finalHeatmapDataUrl = croppedCanvas.toDataURL('image/png');
+    }
+  }
+
   return {
-    processedDataUrl: outputCanvas.toDataURL('image/png'),
+    processedDataUrl: finalHeatmapDataUrl,
     qcResult,
     categoryDistribution,
     regionalAnalysis,

@@ -33,6 +33,46 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
   const [opacity, setOpacity] = useState<number>(0.85);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
+  // Background color customization (Default to clinical high-contrast Black, matching Process screen)
+  const [resultsBg, setResultsBg] = useState<'black' | 'slate' | 'white'>(() => {
+    try {
+      return (localStorage.getItem('podoload_heatmap_bg') as 'black' | 'slate' | 'white') || 'black';
+    } catch {
+      return 'black';
+    }
+  });
+
+  const handleBgToggle = (mode: 'black' | 'slate' | 'white') => {
+    setResultsBg(mode);
+    try {
+      localStorage.setItem('podoload_heatmap_bg', mode);
+    } catch {}
+  };
+
+  const getResultsBgStyle = (mode: 'black' | 'slate' | 'white'): React.CSSProperties => {
+    switch (mode) {
+      case 'black':
+        return {
+          backgroundColor: '#000000',
+          borderColor: '#1e293b',
+          boxShadow: 'inset 0 0 24px rgba(0, 0, 0, 0.9), 0 4px 14px rgba(0, 0, 0, 0.35)',
+        };
+      case 'slate':
+        return {
+          backgroundColor: '#0f172a',
+          borderColor: '#334155',
+          boxShadow: 'inset 0 0 24px rgba(15, 23, 42, 0.8), 0 4px 14px rgba(15, 23, 42, 0.3)',
+        };
+      case 'white':
+      default:
+        return {
+          backgroundColor: '#ffffff',
+          borderColor: '#cbd5e1',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+        };
+    }
+  };
+
   // Auto-process on mount if raw scan is present but heatmap/analysis has not yet been computed
   useEffect(() => {
     const hasAnyScan = Boolean(leftFoot?.rawDataUrl || rightFoot?.rawDataUrl);
@@ -266,6 +306,62 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   style={{ width: '60px', accentColor: 'var(--podo-primary)' }}
                 />
               </div>
+
+              {/* Background Color Quick Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', marginLeft: '0.2rem' }}>
+                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>BG:</span>
+                <button
+                  type="button"
+                  onClick={() => handleBgToggle('black')}
+                  title="Clinical Pitch Black (Maximum Contrast)"
+                  style={{
+                    padding: '2px 6px',
+                    fontSize: '0.64rem',
+                    fontWeight: 700,
+                    borderRadius: '4px',
+                    border: resultsBg === 'black' ? '1.5px solid #38bdf8' : '1px solid #475569',
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⬛ Black
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBgToggle('slate')}
+                  title="Dark Slate (Clinical Dark Mode)"
+                  style={{
+                    padding: '2px 6px',
+                    fontSize: '0.64rem',
+                    fontWeight: 700,
+                    borderRadius: '4px',
+                    border: resultsBg === 'slate' ? '1.5px solid #38bdf8' : '1px solid #cbd5e1',
+                    backgroundColor: '#0f172a',
+                    color: '#e2e8f0',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🌑 Slate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBgToggle('white')}
+                  title="Clean White (Paper Simulation)"
+                  style={{
+                    padding: '2px 6px',
+                    fontSize: '0.64rem',
+                    fontWeight: 700,
+                    borderRadius: '4px',
+                    border: resultsBg === 'white' ? '1.5px solid #0891b2' : '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⬜ White
+                </button>
+              </div>
             </div>
 
             {/* Export Image Button */}
@@ -279,21 +375,37 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
             </button>
           </div>
 
-          {/* Black Canvas Viewport with Left & Right Feet Side-by-Side */}
-          <div className="podoload-bilateral-canvas-box" style={{ flex: 1 }}>
-            <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-around', padding: '1rem' }}>
+          {/* Canvas Viewport with Left & Right Feet Side-by-Side (Dynamic BG & Zero Overflow) */}
+          <div
+            className="podoload-bilateral-canvas-box"
+            style={{
+              flex: 1,
+              minHeight: '280px',
+              maxHeight: 'calc(100vh - 290px)',
+              ...getResultsBgStyle(resultsBg),
+            }}
+          >
+            <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'space-around', padding: '0.75rem', boxSizing: 'border-box' }}>
               {/* Left Foot Container */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', flex: 1 }}>
-                <span style={{ color: '#0c2328', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', flex: 1, minHeight: 0 }}>
+                <span
+                  style={{
+                    color: resultsBg === 'white' ? '#0c2328' : '#f8fafc',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    marginBottom: '0.35rem',
+                    transition: 'color 0.2s ease',
+                  }}
+                >
                   Left Foot
                 </span>
-                <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 0 }}>
                   {viewMode === 'raw' && (
                     effectiveLeftRaw ? (
                       <img
                         src={effectiveLeftRaw}
                         alt="Left Foot Raw Impression"
-                        style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain' }}
+                        style={{ maxHeight: '100%', maxWidth: '90%', objectFit: 'contain' }}
                       />
                     ) : (
                       <div style={{ color: '#94a3b8', fontSize: '0.74rem' }}>No Left Scan Available</div>
@@ -305,7 +417,13 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                       <img
                         src={effectiveLeftHeatmap}
                         alt="Left Plantar Heatmap"
-                        style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity }}
+                        style={{
+                          maxHeight: '100%',
+                          maxWidth: '90%',
+                          objectFit: 'contain',
+                          opacity,
+                          filter: resultsBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
+                        }}
                       />
                     ) : effectiveLeftRaw ? (
                       <div style={{ color: '#0ea5e9', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -318,12 +436,12 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   )}
 
                   {viewMode === 'overlay' && (
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', minHeight: 0 }}>
                       {effectiveLeftRaw && (
                         <img
                           src={effectiveLeftRaw}
                           alt="Left Base Scan"
-                          style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
+                          style={{ maxHeight: '100%', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
                         />
                       )}
                       {effectiveLeftHeatmap && (
@@ -336,9 +454,10 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                             left: 0,
                             width: '100%',
                             height: '100%',
-                            maxHeight: '380px',
+                            maxHeight: '100%',
                             objectFit: 'contain',
                             opacity,
+                            filter: resultsBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
                           }}
                         />
                       )}
@@ -351,17 +470,25 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
               </div>
 
               {/* Right Foot Container */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', flex: 1 }}>
-                <span style={{ color: '#0c2328', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', flex: 1, minHeight: 0 }}>
+                <span
+                  style={{
+                    color: resultsBg === 'white' ? '#0c2328' : '#f8fafc',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    marginBottom: '0.35rem',
+                    transition: 'color 0.2s ease',
+                  }}
+                >
                   Right Foot
                 </span>
-                <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 0 }}>
                   {viewMode === 'raw' && (
                     effectiveRightRaw ? (
                       <img
                         src={effectiveRightRaw}
                         alt="Right Foot Raw Impression"
-                        style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain' }}
+                        style={{ maxHeight: '100%', maxWidth: '90%', objectFit: 'contain' }}
                       />
                     ) : (
                       <div style={{ color: '#94a3b8', fontSize: '0.74rem', textAlign: 'center' }}>
@@ -375,7 +502,13 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                       <img
                         src={effectiveRightHeatmap}
                         alt="Right Plantar Heatmap"
-                        style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity }}
+                        style={{
+                          maxHeight: '100%',
+                          maxWidth: '90%',
+                          objectFit: 'contain',
+                          opacity,
+                          filter: resultsBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
+                        }}
                       />
                     ) : effectiveRightRaw ? (
                       <div style={{ color: '#0ea5e9', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -391,12 +524,12 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                   )}
 
                   {viewMode === 'overlay' && (
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', minHeight: 0 }}>
                       {effectiveRightRaw && (
                         <img
                           src={effectiveRightRaw}
                           alt="Right Base Scan"
-                          style={{ maxHeight: '380px', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
+                          style={{ maxHeight: '100%', maxWidth: '90%', objectFit: 'contain', opacity: 0.65 }}
                         />
                       )}
                       {effectiveRightHeatmap && (
@@ -409,9 +542,10 @@ export const PodoLoadResults: React.FC<PodoLoadResultsProps> = ({
                             left: 0,
                             width: '100%',
                             height: '100%',
-                            maxHeight: '380px',
+                            maxHeight: '100%',
                             objectFit: 'contain',
                             opacity,
+                            filter: resultsBg === 'black' ? 'drop-shadow(0 0 12px rgba(14, 165, 233, 0.2))' : 'none',
                           }}
                         />
                       )}

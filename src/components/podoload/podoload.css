@@ -595,6 +595,7 @@
   grid-template-columns: 1fr 1fr 1.15fr;
   gap: 0.85rem;
   flex: 1;
+  min-height: 0;
 }
 
 .podoload-process-foot-preview {
@@ -602,7 +603,7 @@
   flex-direction: column;
   gap: 0.35rem;
   flex: 1;
-  min-height: 310px;
+  min-height: 0;
 }
 
 .podoload-results-metrics-grid {
@@ -1210,15 +1211,17 @@
 }
 
 .podoload-bilateral-canvas-box {
-  background-color: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background-color: #000000;
+  border: 1px solid #1e293b;
   border-radius: 6px;
-  min-height: 440px;
+  min-height: 280px;
+  max-height: calc(100vh - 290px);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .podoload-rainbow-bar {

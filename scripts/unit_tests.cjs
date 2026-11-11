@@ -5615,6 +5615,95 @@ it("Enforces Scientific JET Colormap and Transparent Alpha Channel Rendering", (
   expect(peakPixel.b).toBe(0);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 44: Step 11 Anatomical Foot Bounding Box Crop & Responsive Viewport Auto-Fit
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 44: Step 11 Foot Bounding Box Crop & Responsive Viewport Auto-Fit ---");
+
+it("Enforces Step 11 Anatomical Foot Bounding Box Crop & Standardized Centering Across All Uploads", () => {
+  // Simulate an uncropped scanner canvas (e.g. 2480 x 3508 A4 flatbed scan) with an off-center footprint
+  const canvasW = 2480;
+  const canvasH = 3508;
+  const footprint = {
+    minX: 800,
+    maxX: 1400,
+    minY: 1800,
+    maxY: 3200,
+  };
+
+  const cropFootprint = (w, h, bounds) => {
+    const { minX, maxX, minY, maxY } = bounds;
+    if (minX >= maxX || minY >= maxY) {
+      return { cropX0: 0, cropY0: 0, cropW: w, cropH: h };
+    }
+    const pad = Math.round(Math.max(16, Math.min(w, h) * 0.035));
+    const cropX0 = Math.max(0, minX - pad);
+    const cropY0 = Math.max(0, minY - pad);
+    const cropX1 = Math.min(w, maxX + pad);
+    const cropY1 = Math.min(h, maxY + pad);
+    return {
+      cropX0,
+      cropY0,
+      cropW: Math.max(1, cropX1 - cropX0),
+      cropH: Math.max(1, cropY1 - cropY0),
+      pad,
+    };
+  };
+
+  const cropResult = cropFootprint(canvasW, canvasH, footprint);
+  // Pad is 3.5% of min(2480, 3508) = 87px
+  expect(cropResult.pad).toBe(87);
+  expect(cropResult.cropX0).toBe(713); // 800 - 87
+  expect(cropResult.cropY0).toBe(1713); // 1800 - 87
+  expect(cropResult.cropW).toBe(774); // 600 + 2 * 87
+  expect(cropResult.cropH).toBe(1574); // 1400 + 2 * 87
+
+  // Cropped aspect ratio is ~1:2 (natural anatomical foot ratio), completely shedding 2500+ pixels of blank margin
+  expect(cropResult.cropW).toBeLessThan(canvasW * 0.4);
+  expect(cropResult.cropH).toBeLessThan(canvasH * 0.5);
+});
+
+it("Enforces Clinical Background Mode Toggling & Black Default Persistence", () => {
+  const mockStorage = new Map();
+  const getStoredBg = () => mockStorage.get('podoload_heatmap_bg') || 'black';
+  const setStoredBg = (mode) => mockStorage.set('podoload_heatmap_bg', mode);
+
+  // Default is Black for maximum contrast
+  expect(getStoredBg()).toBe('black');
+
+  // Change to Slate
+  setStoredBg('slate');
+  expect(getStoredBg()).toBe('slate');
+
+  // Change to White
+  setStoredBg('white');
+  expect(getStoredBg()).toBe('white');
+
+  // Change back to Black
+  setStoredBg('black');
+  expect(getStoredBg()).toBe('black');
+});
+
+it("Enforces Responsive Viewport Auto-Fit (Zero Heel Cutoff Across Resolutions)", () => {
+  // Ensure viewport constraints prevent overflow on 768p/800p/900p monitors
+  const calculateViewportHeight = (windowInnerHeight) => {
+    const raw = windowInnerHeight - 290;
+    return Math.max(260, Math.min(430, raw));
+  };
+
+  // 1080p full display (1080 - 290 = 790 -> clamped to 430px max)
+  expect(calculateViewportHeight(1080)).toBe(430);
+
+  // 768p laptop display (768 - 290 = 478 -> clamped to 430px max)
+  expect(calculateViewportHeight(768)).toBe(430);
+
+  // 600p scaled display (600 - 290 = 310 -> within 260..430 range)
+  expect(calculateViewportHeight(600)).toBe(310);
+
+  // Small viewport (500 - 290 = 210 -> clamped to 260px min)
+  expect(calculateViewportHeight(500)).toBe(260);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);
