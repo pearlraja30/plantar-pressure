@@ -16,11 +16,13 @@ function scannerDevPlugin() {
           req.on('end', async () => {
             try {
               if (process.platform === 'win32') {
-                const { exec } = await import('node:child_process')
+                const { execFile } = await import('node:child_process')
                 const path = await import('node:path')
                 const os = await import('node:os')
                 const fsp = await import('node:fs')
-                const tempBmp = path.join(os.tmpdir(), `vite_scan_${Date.now()}.bmp`)
+                const tempDir = os.tmpdir()
+                const tempBmp = path.join(tempDir, `vite_scan_${Date.now()}.bmp`)
+                const scriptPath = path.join(tempDir, `vite_ps_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.ps1`)
                 const ps = `
                 try {
                   $cd = New-Object -ComObject WIA.CommonDialog -ErrorAction SilentlyContinue
@@ -30,8 +32,9 @@ function scannerDevPlugin() {
                   }
                 } catch {}
                 `
-                const b64 = Buffer.from(ps, 'utf16le').toString('base64')
-                exec(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${b64}`, { timeout: 30000 }, (_err, stdout) => {
+                fsp.writeFileSync(scriptPath, '\ufeff' + ps, 'utf8')
+                execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], { timeout: 30000 }, (_err, stdout) => {
+                  try { if (fsp.existsSync(scriptPath)) fsp.unlinkSync(scriptPath) } catch {}
                   if (stdout && stdout.includes('SUCCESS') && fsp.existsSync(tempBmp)) {
                     const buf = fsp.readFileSync(tempBmp)
                     try { fsp.unlinkSync(tempBmp) } catch {}

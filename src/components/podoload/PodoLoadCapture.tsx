@@ -933,7 +933,13 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       Scanner Offline / Disconnected
                     </span>
                     <span style={{ fontSize: '0.66rem', color: '#7f1d1d', lineHeight: 1.35, maxWidth: '190px' }}>
-                      {scannerErrorLeft}
+                      {(() => {
+                        const err = scannerErrorLeft || '';
+                        if (err.includes('Command failed:') || err.includes('powershell') || err.includes('-EncodedCommand') || err.includes('The command line is too long')) {
+                          return 'Scanner is offline or busy. Please restart the application, verify USB cable connection, and ensure Epson Scan 2 / WIA driver is installed.';
+                        }
+                        return err;
+                      })()}
                     </span>
                     <button
                       type="button"
@@ -1373,7 +1379,13 @@ export const PodoLoadCapture: React.FC<PodoLoadCaptureProps> = ({
                       Scanner Offline / Disconnected
                     </span>
                     <span style={{ fontSize: '0.66rem', color: '#7f1d1d', lineHeight: 1.35, maxWidth: '190px' }}>
-                      {scannerErrorRight}
+                      {(() => {
+                        const err = scannerErrorRight || '';
+                        if (err.includes('Command failed:') || err.includes('powershell') || err.includes('-EncodedCommand') || err.includes('The command line is too long')) {
+                          return 'Scanner is offline or busy. Please restart the application, verify USB cable connection, and ensure Epson Scan 2 / WIA driver is installed.';
+                        }
+                        return err;
+                      })()}
                     </span>
                     <button
                       type="button"

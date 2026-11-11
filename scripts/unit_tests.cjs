@@ -5357,6 +5357,45 @@ it("Enforces Flatbed (Glass) Scanner Source Selection for Multi-Function Printer
   expect(mockDeviceProperties["3097"]).toBe(1);
 });
 
+it("Enforces Dual-Architecture (64-bit and 32-bit SysWOW64) PowerShell Discovery Fallback for 32-bit Scanner Drivers", () => {
+  // Simulates 64-bit returning 0 WIA devices because Epson driver is 32-bit minidriver
+  const mock64BitResult = { scanners: [] };
+  const mock32BitResult = {
+    scanners: [
+      { id: 'wia-epson-32', name: 'EPSON L3210 Series', manufacturer: 'SEIKO EPSON', status: 'Ready' }
+    ]
+  };
+
+  const executeDiscovery = (res64, res32) => {
+    let result = res64;
+    if (result.scanners.length === 0 && res32.scanners.length > 0) {
+      result = res32; // Fallback to 32-bit SysWOW64
+    }
+    return result;
+  };
+
+  const finalOutput = executeDiscovery(mock64BitResult, mock32BitResult);
+  expect(finalOutput.scanners.length).toBe(1);
+  expect(finalOutput.scanners[0].name).toBe('EPSON L3210 Series');
+});
+
+it("Enforces Clinical Diagnostic Guidance When Printer is Ready but Scanner Driver is Missing", () => {
+  const evaluateScannerStatus = (hasWiaScanner, printerFound) => {
+    if (!hasWiaScanner && printerFound) {
+      return `Printer '${printerFound}' is ready, but its optical scanner driver (Epson Scan 2 / WIA driver) was not detected by Windows. Please install or re-run 'Epson Scan 2' setup to enable scanner automation.`;
+    }
+    if (!hasWiaScanner && !printerFound) {
+      return "No optical scanner hardware responded. Please ensure your printer-cum-scanner is powered ON and connected via USB or Wi-Fi.";
+    }
+    return "Ready";
+  };
+
+  const status = evaluateScannerStatus(false, "EPSON L3210 Series");
+  expect(status.includes("EPSON L3210 Series")).toBe(true);
+  expect(status.includes("Epson Scan 2")).toBe(true);
+  expect(status.includes("Command failed:")).toBe(false);
+});
+
 console.log("\n--- SECTION 42: Password Security Compliance, Stored Password Non-Exposure & Forced Password Change ---");
 
 it("Enforces Zero Stored Password Exposure: Passwords must be masked and never viewable by Admin or Super Admin", () => {

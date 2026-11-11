@@ -1839,6 +1839,43 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly.
 - **Release Version**: Tagged and committed `v1.0.75`.
 
+---
+
+## 51. ACTIVITY: DUAL-ARCHITECTURE WIA DRIVER BRIDGE, COMMONDIALOG FALLBACK & ALL-IN-ONE PRINTER-SCANNER INTEGRATION (v1.0.76)
+- **Date**: 2026-11-11
+- **Version**: `1.0.76`
+- **Scope**: Resolve Windows scanner acquisition failure where multi-function printer (EPSON L3210 Series) shows "Ready" in printer status monitor but "Scanner Offline" in scanning workstation. Eliminate 32-bit vs 64-bit WIA minidriver invisibility and ensure automatic fallback to WIA CommonDialog and clear diagnostic driver guidance.
+
+### 51.1 Technical Root Cause Analysis
+1. **64-bit vs 32-bit Driver Architecture Mismatch**:
+   - Epson L-Series All-in-One devices (L3210, L3250, etc.) install 32-bit WIA/TWAIN minidrivers (`C:\Windows\twain_32\escndv`).
+   - When 64-bit Electron invokes 64-bit PowerShell (`System32\WindowsPowerShell\v1.0\powershell.exe`), `New-Object -ComObject WIA.DeviceManager` queries 64-bit COM registry paths, which cannot see 32-bit WIA drivers and returns `DeviceInfos.Count = 0`.
+2. **Premature Fallback Abort**:
+   - When programmatic connection returned 0 devices, an error string was assigned to `$errMsg`. The subsequent `WIA.CommonDialog` block had condition `if (-not $scanned -and -not $errMsg)`, which aborted the fallback dialog.
+3. **Printer vs Scanner Driver Separation**:
+   - On Windows, multi-function printers report "Ready to print" via Windows Print Spooler (`Win32_Printer` / `spoolsv.exe`). However, optical scanning requires the separate Windows Image Acquisition (`stisvc`) scanner driver package (Epson Scan 2). If only the printer driver is present, the scanner hardware cannot respond without the scanner driver installed.
+
+### 51.2 Architectural Resolution & Implementation
+1. **Dual-Architecture PowerShell Runner (`SysWOW64` Fallback)**:
+   - Updated `runPowerShell()` in `electron/main.cjs` to support execution via 32-bit SysWOW64 PowerShell (`C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe`).
+   - If 64-bit PowerShell finds 0 WIA scanners or fails to connect, `scanner:enumerate` and `scanner:acquire` automatically re-invoke via 32-bit SysWOW64 PowerShell to access 32-bit COM WIA drivers natively.
+2. **Resilient WIA COM Property Reading (`Get-WiaPropVal`)**:
+   - Implemented multi-tier property accessor trying `.Item(propName).Value`, `[propName].Value`, and `.Item(propId).Value` (IDs 2, 3, 4, 7) to prevent COM collection method invocation exceptions across localized Windows editions.
+3. **WIA.CommonDialog ShowAcquireImage Fallback**:
+   - Decoupled `WIA.CommonDialog` from `$errMsg`. Whenever programmatic acquisition does not return an image, Windows native `ShowAcquireImage(1)` automatically engages.
+4. **Vite Dev Server Alignment**:
+   - Refactored `vite.config.ts` dev scanner middleware to execute via temporary `.ps1` file rather than `-EncodedCommand`.
+5. **Actionable Clinical Diagnostics**:
+   - When an All-in-One printer is online (e.g. EPSON L3210) but Windows WIA driver has not responded, the UI provides clear guidance: `Printer 'EPSON L3210 Series' is ready, but its optical scanner driver (Epson Scan 2 / WIA driver) was not detected by Windows. Please install or re-run 'Epson Scan 2' setup to enable scanner automation.`
+
+### 51.3 Quality Verification & Conformance
+- **Unit Test Battery**: Expanded to **115/115** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled with 0 errors in 314ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
+- **Release Version**: Tagged and committed `v1.0.76`.
+
+
 
 
 

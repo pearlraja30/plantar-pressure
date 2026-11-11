@@ -96,8 +96,8 @@ function createWindow() {
 }
 
 // Helper: Execute PowerShell script reliably via temporary .ps1 file
-// This eliminates the Windows cmd.exe 8,191-character command line limit and prevents "The command line is too long" errors!
-async function runPowerShell(scriptText, timeoutMs = 15000) {
+// Supports 64-bit and 32-bit (SysWOW64) execution to transparently bridge 32-bit scanner minidrivers (such as Epson L3210 / Epson Scan 2)
+async function runPowerShell(scriptText, timeoutMs = 15000, force32Bit = false) {
   const tempDir = app ? app.getPath('temp') : (process.env.TEMP || process.env.TMP || os.tmpdir());
   const scriptPath = path.join(
     tempDir,
@@ -107,9 +107,20 @@ async function runPowerShell(scriptText, timeoutMs = 15000) {
   // Write UTF-8 with BOM (\ufeff) so Windows PowerShell 5.1/7 parses Unicode characters without encoding corruption
   fs.writeFileSync(scriptPath, '\ufeff' + scriptText, 'utf8');
 
+  const sysRoot = process.env.SystemRoot || 'C:\\Windows';
+  const sysWow64Ps = path.join(sysRoot, 'SysWOW64', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  const system32Ps = path.join(sysRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
+  let psExe = 'powershell.exe';
+  if (force32Bit && fs.existsSync(sysWow64Ps)) {
+    psExe = sysWow64Ps;
+  } else if (fs.existsSync(system32Ps)) {
+    psExe = system32Ps;
+  }
+
   try {
     return await execFilePromise(
-      'powershell.exe',
+      psExe,
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
       {
         timeout: timeoutMs,
@@ -121,8 +132,9 @@ async function runPowerShell(scriptText, timeoutMs = 15000) {
     // If powershell.exe is not invokable directly via execFile, fallback to shell exec with -File parameter
     if (fs.existsSync(scriptPath)) {
       try {
+        const cmdPrefix = force32Bit && fs.existsSync(sysWow64Ps) ? `"${sysWow64Ps}"` : 'powershell';
         return await execPromise(
-          `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
+          `${cmdPrefix} -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`,
           {
             timeout: timeoutMs,
             maxBuffer: 20 * 1024 * 1024,
@@ -163,14 +175,33 @@ try {
   Get-Service stisvc | Where-Object { $_.Status -ne 'Running' } | Start-Service -ErrorAction SilentlyContinue
 } catch {}
 
+function Get-WiaPropVal($obj, $propName, $propId) {
+  if (-not $obj -or -not $obj.Properties) { return "" }
+  try {
+    $val = $obj.Properties.Item($propName).Value
+    if ($val) { return [string]$val }
+  } catch {}
+  try {
+    $val = $obj.Properties[$propName].Value
+    if ($val) { return [string]$val }
+  } catch {}
+  try {
+    $val = $obj.Properties.Item($propId).Value
+    if ($val) { return [string]$val }
+  } catch {}
+  return ""
+}
+
 try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction SilentlyContinue
   if ($dm -and $dm.DeviceInfos) {
     foreach ($dev in $dm.DeviceInfos) {
       try {
         $devId = [string]$dev.DeviceID
-        $devName = [string]$dev.Properties.Item("Name").Value
-        $mfg = try { [string]$dev.Properties.Item("Manufacturer").Value } catch { "Windows Imaging Device" }
+        $devName = Get-WiaPropVal $dev "Name" 7
+        if (-not $devName) { $devName = Get-WiaPropVal $dev "Description" 4 }
+        $mfg = Get-WiaPropVal $dev "Manufacturer" 3
+        if (-not $mfg) { $mfg = "Windows Imaging Device" }
         if ($devName) {
           $output.scanners += @{
             id = $devId
@@ -225,9 +256,25 @@ try {
 $output | ConvertTo-Json -Compress -Depth 4
       `;
 
-      const { stdout } = await runPowerShell(psScript, 8000);
-      if (stdout && stdout.trim()) {
-        const parsed = JSON.parse(stdout.trim());
+      let stdoutResult = '';
+      try {
+        const res64 = await runPowerShell(psScript, 8000, false);
+        stdoutResult = (res64 && res64.stdout) ? res64.stdout.trim() : '';
+      } catch (e64) {}
+
+      // If 64-bit PowerShell found no WIA scanners, try 32-bit SysWOW64 PowerShell
+      // Critical for 32-bit WIA minidrivers (such as Epson L-Series / Epson Scan 2)
+      if (!stdoutResult || stdoutResult.includes('"scanners":[]')) {
+        try {
+          const res32 = await runPowerShell(psScript, 8000, true);
+          if (res32 && res32.stdout && !res32.stdout.includes('"scanners":[]')) {
+            stdoutResult = res32.stdout.trim();
+          }
+        } catch (e32) {}
+      }
+
+      if (stdoutResult) {
+        const parsed = JSON.parse(stdoutResult);
         const rawScanners = Array.isArray(parsed.scanners) ? parsed.scanners : [];
         const rawPrinters = Array.isArray(parsed.printers) ? parsed.printers : [];
         const defaultPrinterName = (parsed.defaultPrinter || '').trim();
@@ -399,45 +446,71 @@ try {
   Get-Service stisvc | Where-Object { $_.Status -ne 'Running' } | Start-Service -ErrorAction SilentlyContinue
 } catch {}
 
+function Get-WiaPropVal($obj, $propName, $propId) {
+  if (-not $obj -or -not $obj.Properties) { return "" }
+  try {
+    $val = $obj.Properties.Item($propName).Value
+    if ($val) { return [string]$val }
+  } catch {}
+  try {
+    $val = $obj.Properties[$propName].Value
+    if ($val) { return [string]$val }
+  } catch {}
+  try {
+    $val = $obj.Properties.Item($propId).Value
+    if ($val) { return [string]$val }
+  } catch {}
+  return ""
+}
+
 # 1. Try programmatic WIA DeviceManager
 try {
   $dm = New-Object -ComObject WIA.DeviceManager -ErrorAction SilentlyContinue
   if ($dm -and $dm.DeviceInfos) {
     $dev = $null
-    $infos = @($dm.DeviceInfos)
+    $infos = $null
+    try { $infos = @($dm.DeviceInfos) } catch { $infos = @() }
 
-    if ($infos.Length -eq 0) {
-      $errMsg = "No scanner hardware is detected on this workstation. Please connect your printer cum scanner via USB or Wi-Fi, ensure power is ON, and try again."
-    } else {
+    if ($infos.Length -gt 0) {
       # 1. Match by exact DeviceID
       if ($target -and $target -ne "default" -and -not $target.StartsWith("printer-")) {
         foreach ($info in $infos) {
           if ($info.DeviceID -eq $target) {
             $dev = try { $info.Connect() } catch { $null }
-            break
+            if ($dev) { break }
           }
         }
       }
 
-      # 2. Match by printer / scanner friendly name substring
+      # 2. Match by printer / scanner friendly name keywords (e.g. epson, l3210, etc.)
       if (-not $dev -and $target) {
         $cleanTarget = $target.Replace("printer-", "").Replace("-", " ").ToLower()
+        $keywords = $cleanTarget.Split(" ") | Where-Object { $_.Length -gt 2 }
         foreach ($info in $infos) {
-          try {
-            $n = [string]$info.Properties.Item("Name").Value
-            if ($n -and ($cleanTarget.Contains($n.ToLower()) -or $n.ToLower().Contains($cleanTarget))) {
-              $dev = try { $info.Connect() } catch { $null }
-              break
-            }
-          } catch {}
+          $devName = (Get-WiaPropVal $info "Name" 7).ToLower()
+          $devDesc = (Get-WiaPropVal $info "Description" 4).ToLower()
+          $combined = "$devName $devDesc"
+          $matched = $false
+          foreach ($kw in $keywords) {
+            if ($combined.Contains($kw)) { $matched = $true; break }
+          }
+          if ($matched) {
+            $dev = try { $info.Connect() } catch { $null }
+            if ($dev) { break }
+          }
         }
       }
 
-      # 3. Match default / first WIA scanner
+      # 3. Match default / first WIA scanner (Type = 1)
       if (-not $dev) {
         foreach ($info in $infos) {
-          $dev = try { $info.Connect() } catch { $null }
-          if ($dev) { break }
+          try {
+            $type = $info.Type
+            if ($type -eq 1 -or -not $type) {
+              $dev = try { $info.Connect() } catch { $null }
+              if ($dev) { break }
+            }
+          } catch {}
         }
       }
 
@@ -472,17 +545,21 @@ try {
 
           $image = $null
           $transferErr = ""
-          # Transfer: Universal BMP format first (required by WIA specs for all drivers), then JPEG, then default
+          # Transfer: Universal BMP format first (required by WIA specs for all drivers), then PNG, then JPEG, then default
           try {
             $image = $item.Transfer("{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}")
           } catch {
             try {
-              $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
+              $image = $item.Transfer("{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}")
             } catch {
               try {
-                $image = $item.Transfer()
+                $image = $item.Transfer("{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}")
               } catch {
-                $transferErr = $_.Exception.Message
+                try {
+                  $image = $item.Transfer()
+                } catch {
+                  $transferErr = $_.Exception.Message
+                }
               }
             }
           }
@@ -491,41 +568,55 @@ try {
             if (Test-Path $temp) { Remove-Item $temp -Force }
             $image.SaveFile($temp)
             $scanned = $true
-          } elseif (-not $scanned -and $transferErr) {
+          } elseif ($transferErr) {
             $errMsg = "Scanner transfer error: $transferErr"
           }
         }
-      } else {
-        $errMsg = "Scanner hardware is offline or failed to respond. Please check cable and power."
       }
     }
-  } else {
-    $errMsg = "Windows Image Acquisition (WIA) service is unavailable on this machine."
   }
 } catch {
   $errMsg = $_.Exception.Message
 }
 
-# 2. Fallback: Only invoke WIA CommonDialog if device infos exist, not already scanned, and not explicitly failed
-if (-not $scanned -and -not $errMsg) {
+# 2. Method 2: Fallback to WIA.CommonDialog ShowAcquireImage
+# CRITICAL: Always runs if programmatic connection has not yet produced an image
+if (-not $scanned) {
   try {
     $cd = New-Object -ComObject WIA.CommonDialog -ErrorAction SilentlyContinue
     if ($cd) {
-      # ShowAcquireImage(DeviceType=1 Scanner, Intent=1 Color, Bias=131072 Quality, FormatID=BMP, AlwaysSelect=false, UseDeviceProps=true, CancelError=false)
-      $img = $cd.ShowAcquireImage(1, 1, 131072, "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}", $false, $true, $false)
+      $img = $null
+      try {
+        # ShowAcquireImage(1=Scanner, 1=Color/2=Grayscale, 131072=Quality, BMP GUID, AlwaysSelect=false, UseDeviceProps=true, CancelError=false)
+        $img = $cd.ShowAcquireImage(1, ${colorMode}, 131072, "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}", $false, $true, $false)
+      } catch {
+        try {
+          $img = $cd.ShowAcquireImage(1, 1, 0, "", $false, $true, $false)
+        } catch {}
+      }
       if ($img) {
         if (Test-Path $temp) { Remove-Item $temp -Force }
         $img.SaveFile($temp)
         $scanned = $true
+        $errMsg = ""
       }
     }
-  } catch {
-    if (-not $errMsg) { $errMsg = $_.Exception.Message }
-  }
+  } catch {}
 }
 
+# 3. Method 3: Diagnostic analysis if still not scanned
 if (-not $scanned -and -not $errMsg) {
-  $errMsg = "No optical scanner responded. Ensure your printer cum scanner is powered on and connected via USB or Wi-Fi."
+  # Check if printer is installed in Windows
+  $foundPrinter = $null
+  try {
+    $foundPrinter = Get-CimInstance Win32_Printer | Where-Object { $_.Name -like "*epson*" -or $_.Name -like "*l3210*" -or $_.Name -like "*l3250*" -or $_.Name -like "*hp*" -or $_.Name -like "*canon*" } -ErrorAction SilentlyContinue | Select-Object -First 1
+  } catch {}
+
+  if ($foundPrinter) {
+    $errMsg = "Printer '$($foundPrinter.Name)' is ready, but its optical scanner driver (Epson Scan 2 / WIA driver) was not detected by Windows. Please install or re-run 'Epson Scan 2' setup to enable scanner automation."
+  } else {
+    $errMsg = "No optical scanner hardware responded. Please ensure your printer-cum-scanner is powered ON and connected via USB or Wi-Fi."
+  }
 }
 
 if ($scanned -and (Test-Path $temp)) {
@@ -535,7 +626,25 @@ if ($scanned -and (Test-Path $temp)) {
 }
       `;
 
-      const { stdout } = await runPowerShell(psScript, 60000);
+      let runResult = null;
+      try {
+        runResult = await runPowerShell(psScript, 60000, false);
+      } catch (err64) {}
+
+      // If default 64-bit PowerShell fails or returns FAILED, attempt via 32-bit SysWOW64 PowerShell
+      // Essential for 32-bit WIA minidrivers (such as Epson L3210 / Epson Scan 2)
+      if (!runResult || !runResult.stdout || !runResult.stdout.includes('SUCCESS')) {
+        try {
+          const runResult32 = await runPowerShell(psScript, 60000, true);
+          if (runResult32 && runResult32.stdout && runResult32.stdout.includes('SUCCESS')) {
+            runResult = runResult32;
+          } else if (runResult32 && runResult32.stdout && !runResult) {
+            runResult = runResult32;
+          }
+        } catch (err32) {}
+      }
+
+      const stdout = (runResult && runResult.stdout) ? runResult.stdout : '';
       if (stdout && stdout.includes('SUCCESS') && fs.existsSync(tempOutputFile)) {
         const buffer = fs.readFileSync(tempOutputFile);
         let mime = 'image/jpeg';

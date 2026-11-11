@@ -95,3 +95,4 @@ def process(path_in, path_out):
 
 if __name__ == "__main__":
     process(sys.argv[1], sys.argv[2])
+
