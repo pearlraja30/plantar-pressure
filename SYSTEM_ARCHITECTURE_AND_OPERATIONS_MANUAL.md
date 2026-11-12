@@ -632,12 +632,24 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
 3. **Turnkey Clean-Install Provisioning**:
    - On a fresh mobile installation with zero local technician records, entering default credentials (`tech` / `1234`) automatically provisions and authenticates the initial technician user (`Clinical Operator`), guaranteeing zero-lockout field onboarding.
 
-### 16.12 Regulatory Verification & Conformance Status (v1.0.82)
-- **Automated Unit Tests**: **125/125** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.12 Cryptographic Password Storage Encryption & Database Explorer Credential Masking (v1.0.83)
+1. **FIPS 180-4 Synchronous SHA-256 Engine**:
+   - Implemented pure TypeScript synchronous SHA-256 hashing (`sha256Hex`), free of external binaries or asynchronous Web Crypto requirements.
+   - All stored credentials (Technicians, Hospital Administrators, Super Admin) are salted using `pdp_sec_salt_2026_clinical_vault_99` and stored as `ENC:sha256:<64-hex-digest>`.
+2. **Autonomous Offline Database Auto-Migration**:
+   - Existing plain passwords in `IndexedDB` and `localStorage` are automatically detected upon access in `getTechniciansSync()`, `getTechnicians()`, `getAdminAccountsListSync()`, `getAdminAccountSync()`, and `getSuperAdminAccountSync()` and migrated to encrypted salted hashes with zero data loss or operator interruption.
+3. **Database Records Explorer UI Hardening**:
+   - In `PodoLoadDatabaseViewer.tsx`, table headers in `technicians` and `admin_accounts` stores explicitly designate `PASSWORD (ENCRYPTED)`.
+   - Cell contents render an emerald `🔒 Encrypted` badge with masked hash display (`getMaskedPasswordDisplay`), eliminating raw password strings from the DOM.
+   - `Inspect JSON` and clipboard copying pass through `sanitizeRecordForDisplay`, replacing any `.pin` field with masked representations.
+   - Administrative record correction forms utilize `<input type="password" />` labeled `Password / PIN (Encrypted)` with a `🔒 Salted SHA-256` badge and helper text indicating the current stored hash. Input is hashed with `encryptPassword()` upon save.
+
+### 16.13 Regulatory Verification & Conformance Status (v1.0.83)
+- **Automated Unit Tests**: **128/128** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~428ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~228ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.82`.
+- **Release Version**: Tagged and committed `v1.0.83`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

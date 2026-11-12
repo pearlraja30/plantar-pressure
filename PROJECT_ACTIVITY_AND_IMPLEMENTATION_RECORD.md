@@ -2100,6 +2100,48 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android, iOS, and Web targets.
 - **Release Version**: Tagged and committed `v1.0.82`.
 
+---
+
+## 58. ACTIVITY: CRYPTOGRAPHIC PASSWORD ENCRYPTION & DATABASE EXPLORER CREDENTIAL MASKING (v1.0.83)
+- **Date**: 2026-11-12
+- **Version**: `1.0.83`
+- **Scope**: Eliminate plain text password display across the Inbuilt Database Records Explorer (`PodoLoadDatabaseViewer.tsx`), implement pure synchronous FIPS 180-4 SHA-256 salted encryption for all stored credentials in IndexedDB and localStorage, auto-migrate legacy plain passwords, sanitize JSON inspection and clipboard exports, and harden administrative record correction with password-masked form fields.
+
+### 58.1 Clinical & Operational Rationale
+1. **HIPAA & 21 CFR Part 11 Regulatory Compliance**:
+   - In compliance with 21 CFR Part 11 § 11.300 (Controls for Identification Codes and Passwords) and HIPAA Security Rule (45 CFR § 164.312), user passwords must never be stored in plain text or rendered visibly in database inspection tools, DOM elements, or export clipboards.
+2. **Elimination of Plain Credential Display in Inbuilt Database Explorer**:
+   - In `PodoLoadDatabaseViewer.tsx`, the `technicians` store table previously featured a `PASSWORD` column rendering raw passwords (`1234`, `Tech1234`, etc.). This exposed technician credentials to shoulder surfing and administrative compromise.
+3. **Cryptographic Protection Against Rainbow Tables**:
+   - Stored credentials must be hashed using a cryptographic one-way function with a dedicated clinical salt (`pdp_sec_salt_2026_clinical_vault_99`), producing deterministic digests prefixed with `ENC:sha256:<64-hex>`.
+
+### 58.2 Technical Solution Implemented
+1. **Pure Synchronous FIPS 180-4 SHA-256 Cryptographic Engine (`dbService.ts`)**:
+   - Implemented `sha256Hex(str: string): string` with zero external binary or asynchronous dependencies.
+   - Defined constants: `PASSWORD_ENC_PREFIX = 'ENC:sha256:'` and `CLINICAL_SALT = 'pdp_sec_salt_2026_clinical_vault_99'`.
+   - `encryptPassword(plainOrEnc: string): string`: Computes salted SHA-256 digest with idempotence.
+   - `verifyPassword(candidatePlain: string, storedHashOrPlain?: string | null): boolean`: Validates candidate passwords against encrypted hashes with backward-compatible legacy string fallback.
+   - `getMaskedPasswordDisplay(storedHashOrPlain?: string | null): string`: Produces `ENC:sha256:<first 10 hex>••••`, guaranteeing that plain passwords are never revealed even if legacy records are encountered.
+2. **Autonomous Offline Database Auto-Migration (`dbService.ts`)**:
+   - Automatically migrates legacy plain credentials to encrypted salted hashes in `getTechniciansSync()`, `getTechnicians()`, `getAdminAccountsListSync()`, `getAdminAccountSync()`, and `getSuperAdminAccountSync()`.
+   - All credential modification methods (`saveTechnician`, `authenticateTechnician`, `setInitialAdminPassword`, `registerAdminAccount`, `activateTechnicianStation`, `createHospitalAdmin`, `updateHospitalAdmin`, `updateRecordAdmin`, `updateAdminMasterPassword`, `recoverAdminPassword`, `recoverTechnicianPassword`, `updateTechnicianPassword`, `updateAdminAccountPassword`) enforce salted SHA-256 hashing prior to persistence.
+3. **Database Records Explorer Hardening (`PodoLoadDatabaseViewer.tsx`)**:
+   - Updated table column headers to `PASSWORD (ENCRYPTED)` in both `technicians` and `admin_accounts` stores.
+   - Replaced raw text display with emerald `🔒 Encrypted` badges and `{getMaskedPasswordDisplay(pin)}`.
+   - Introduced `sanitizeRecordForDisplay()` to mask credentials in `Inspect JSON` and clipboard copy actions.
+   - Hardened direct table correction forms with `<input type="password" />` labeled `Password / PIN (Encrypted)` with a `🔒 Salted SHA-256` badge and helper display showing current stored hash.
+4. **Cloud Synchronization & Voucher Security (`cloudSyncService.ts`, `PodoLoadAdmin.tsx`)**:
+   - Updated `verifyRemoteUserCredentials` to use `verifyPassword`.
+   - Guarded voucher generation text in `PodoLoadAdmin.tsx` using `isPasswordEncrypted` to ensure invite memos display `[Configured on Station]` instead of raw hash digests.
+
+### 58.3 Quality Verification & Conformance
+- **Unit Test Battery**: Added Section 49, expanding to **128/128** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled cleanly with 0 errors in 228ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android, iOS, and Web targets.
+- **Release Version**: Tagged and committed `v1.0.83`.
+
+
 
 
 

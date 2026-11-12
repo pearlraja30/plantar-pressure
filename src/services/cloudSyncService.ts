@@ -1541,8 +1541,8 @@ CREATE POLICY "Allow anon upsert technician_users"
         const rows = await res.json();
         if (Array.isArray(rows) && rows.length > 0) {
           const r = rows[0];
-          if (r.pin && r.pin.trim() === cleanPin) {
-            const { dbService } = await import('./dbService');
+          const { dbService, verifyPassword } = await import('./dbService');
+          if (r.pin && verifyPassword(cleanPin, r.pin)) {
             if (params.role === 'admin') {
               const acc: AdminAccount = {
                 id: r.id,

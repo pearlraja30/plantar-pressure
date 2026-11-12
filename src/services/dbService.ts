@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.82';
+export const APP_CURRENT_VERSION = '1.0.83';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -196,11 +196,169 @@ export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
   removePaperNoise: true,
 };
 
+// =========================================================================
+// CRYPTOGRAPHIC CREDENTIAL SECURITY & STORAGE ENCRYPTION (FIPS 180-4 SHA-256)
+// =========================================================================
+
+export const PASSWORD_ENC_PREFIX = 'ENC:sha256:';
+export const CLINICAL_SALT = 'pdp_sec_salt_2026_clinical_vault_99';
+
+/**
+ * Pure TypeScript / JavaScript synchronous FIPS 180-4 SHA-256 implementation.
+ * Operates without external binary or async browser subtle crypto dependencies,
+ * ensuring seamless execution in Node.js, Webpack, Vite, Cordova, and Capacitor.
+ */
+export function sha256Hex(str: string): string {
+  function rightRotate(value: number, amount: number) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  const lengthProperty = 'length';
+  let i: number, j: number;
+  let result = '';
+
+  const words: number[] = [];
+  const asciiBitLength = str[lengthProperty] * 8;
+
+  const hash: number[] = [];
+  const k: number[] = [];
+  let primeCounter = 0;
+
+  const isComposite: Record<number, number> = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (i = 0; i < 313; i += candidate) {
+        isComposite[i] = candidate;
+      }
+      hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
+  }
+
+  str += '\x80';
+  while ((str[lengthProperty] % 64) - 56) str += '\x00';
+  for (i = 0; i < str[lengthProperty]; i++) {
+    j = str.charCodeAt(i);
+    if (j >> 8) return ''; // non-ascii
+    words[i >> 2] |= j << (((3 - i) % 4) * 8);
+  }
+  words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
+  words[words[lengthProperty]] = asciiBitLength;
+
+  for (j = 0; j < words[lengthProperty]; ) {
+    const w = words.slice(j, (j += 16));
+    const oldHash = hash.slice(0);
+
+    for (i = 0; i < 64; i++) {
+      const w15 = w[i - 15],
+        w2 = w[i - 2];
+
+      const s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
+      const s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
+      w[i] =
+        i < 16
+          ? w[i]
+          : (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+
+      const ch = (hash[4] & hash[5]) ^ (~hash[4] & hash[6]);
+      const temp1 =
+        (hash[7] +
+          (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) +
+          ch +
+          k[i] +
+          w[i]) |
+        0;
+      const maj = (hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]);
+      const temp2 =
+        ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) +
+          maj) |
+        0;
+
+      hash[7] = hash[6];
+      hash[6] = hash[5];
+      hash[5] = hash[4];
+      hash[4] = (hash[3] + temp1) | 0;
+      hash[3] = hash[2];
+      hash[2] = hash[1];
+      hash[1] = hash[0];
+      hash[0] = (temp1 + temp2) | 0;
+    }
+
+    for (i = 0; i < 8; i++) {
+      hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+  }
+
+  for (i = 0; i < 8; i++) {
+    for (j = 3; j >= 0; j--) {
+      const b = (hash[i] >> (8 * j)) & 255;
+      result += (b < 16 ? '0' : '') + b.toString(16);
+    }
+  }
+  return result;
+}
+
+/**
+ * Checks whether a given stored credential string is encrypted with salted SHA-256.
+ */
+export function isPasswordEncrypted(pin?: string | null): boolean {
+  return typeof pin === 'string' && pin.startsWith(PASSWORD_ENC_PREFIX);
+}
+
+/**
+ * Cryptographically hashes a plain-text password using salted FIPS 180-4 SHA-256.
+ * If already encrypted with the ENC:sha256: prefix, returns idempotent string.
+ */
+export function encryptPassword(plainOrEnc: string): string {
+  if (!plainOrEnc) return '';
+  const clean = plainOrEnc.trim();
+  if (!clean) return '';
+  if (isPasswordEncrypted(clean)) return clean;
+  return `${PASSWORD_ENC_PREFIX}${sha256Hex(`${CLINICAL_SALT}:${clean}`)}`;
+}
+
+/**
+ * Validates a candidate plain password against a stored credential.
+ * Supports both modern encrypted salted hashes and legacy unencrypted passwords.
+ */
+export function verifyPassword(candidatePlain: string, storedHashOrPlain?: string | null): boolean {
+  if (!storedHashOrPlain) {
+    return !candidatePlain || !candidatePlain.trim();
+  }
+  const cleanCandidate = (candidatePlain || '').trim();
+  const cleanStored = storedHashOrPlain.trim();
+
+  if (isPasswordEncrypted(cleanStored)) {
+    return cleanStored === encryptPassword(cleanCandidate);
+  }
+
+  // Backward-compatibility: legacy plain-text password check before auto-migration
+  return cleanStored === cleanCandidate || cleanStored === encryptPassword(cleanCandidate);
+}
+
+/**
+ * Returns a secure masked representation of a credential for UI rendering and logs.
+ * Never reveals plain-text passwords even if legacy unencrypted records are encountered.
+ */
+export function getMaskedPasswordDisplay(storedHashOrPlain?: string | null): string {
+  if (!storedHashOrPlain) return '••••••••';
+  const clean = storedHashOrPlain.trim();
+  if (isPasswordEncrypted(clean)) {
+    const rawHash = clean.slice(PASSWORD_ENC_PREFIX.length);
+    return `${PASSWORD_ENC_PREFIX}${rawHash.slice(0, 10)}••••`;
+  }
+  // Even if legacy plain text is present, NEVER reveal it!
+  const computedHash = sha256Hex(`${CLINICAL_SALT}:${clean}`);
+  return `${PASSWORD_ENC_PREFIX}${computedHash.slice(0, 10)}••••`;
+}
+
 export const DEFAULT_SUPER_ADMIN_ACCOUNT: SuperAdminAccount = {
   id: 'superadmin-master-01',
   name: 'Global Chief Administrator',
   username: 'superadmin@technomind.health',
-  pin: 'superadmin@123',
+  pin: encryptPassword('superadmin@123'),
   role: 'superadmin',
   email: 'superadmin@technomind.health',
   phone: '+1 (800) 555-SUPER',
@@ -1418,6 +1576,10 @@ class PodoPressDatabase {
               t.activationCode = `${prefix}-TECH-${Math.floor(1000 + Math.random() * 9000)}`;
               updated = true;
             }
+            if (t.pin && !isPasswordEncrypted(t.pin)) {
+              t.pin = encryptPassword(t.pin);
+              updated = true;
+            }
           }
           if (updated) {
             try {
@@ -1448,6 +1610,23 @@ class PodoPressDatabase {
         req.onsuccess = () => {
           const dbList = req.result as TechnicianUser[];
           if (dbList && dbList.length > 0) {
+            let migrated = false;
+            for (const t of dbList) {
+              if (t.pin && !isPasswordEncrypted(t.pin)) {
+                t.pin = encryptPassword(t.pin);
+                migrated = true;
+              }
+            }
+            if (migrated) {
+              try {
+                const rwTx = db.transaction('technicians', 'readwrite');
+                const rwStore = rwTx.objectStore('technicians');
+                for (const t of dbList) {
+                  rwStore.put(t);
+                }
+                localStorage.setItem(LS_KEYS.TECHNICIANS, JSON.stringify(dbList));
+              } catch {}
+            }
             resolve(dbList);
           } else {
             resolve(cached);
@@ -1467,6 +1646,10 @@ class PodoPressDatabase {
       if (!tech.activationCode) tech.activationCode = timed.code;
       if (!tech.activationCodeGeneratedAt) tech.activationCodeGeneratedAt = timed.generatedAt;
       if (!tech.activationCodeExpiresAt) tech.activationCodeExpiresAt = timed.expiresAt;
+    }
+
+    if (tech.pin) {
+      tech.pin = encryptPassword(tech.pin);
     }
 
     const list = this.getTechniciansSync();
@@ -1526,7 +1709,7 @@ class PodoPressDatabase {
       (t) =>
         t.status === 'active' &&
         (t.username.toLowerCase() === normalizedUser || t.email?.toLowerCase() === normalizedUser) &&
-        (!t.pin || t.pin === cleanPin)
+        (!t.pin || verifyPassword(cleanPin, t.pin))
     );
 
     if (tech) {
@@ -1557,7 +1740,7 @@ class PodoPressDatabase {
           id: 'tech-auto-01',
           name: 'Clinical Operator',
           username: normalizedUser.includes('@') ? normalizedUser : 'tech@technomind.health',
-          pin: cleanPin,
+          pin: encryptPassword(cleanPin),
           email: normalizedUser.includes('@') ? normalizedUser : 'tech@technomind.health',
           phone: '+91 (0) 44 2839 0002',
           hospitalId: hosp.id,
@@ -2199,7 +2382,7 @@ class PodoPressDatabase {
           id: `tech-${normHospCode.toLowerCase()}-${Date.now().toString(36)}`,
           name: displayName || 'Clinical Specialist',
           username: rawUser,
-          pin: (params.password && params.password.trim()) || '1234',
+          pin: encryptPassword((params.password && params.password.trim()) || '1234'),
           hospitalId: hospital.id,
           hospitalName: hospital.name,
           role: 'technician',
@@ -2219,7 +2402,7 @@ class PodoPressDatabase {
             id: `admin-${normHospCode.toLowerCase()}`,
             name: `${normHospCode} Hospital Administrator`,
             username: `admin@${normHospCode.toLowerCase()}.health`,
-            pin: (params.password && params.password.trim()) || 'admin123',
+            pin: encryptPassword((params.password && params.password.trim()) || 'admin123'),
             role: 'admin',
             hospitalId: hospital.id,
             hospitalName: hospital.name,
@@ -2317,7 +2500,7 @@ class PodoPressDatabase {
 
     // 3. Update password if technician customized it on activation
     if (params.password && params.password.trim().length >= 4) {
-      tech.pin = params.password.trim();
+      tech.pin = encryptPassword(params.password.trim());
     }
 
     // 4. Bind hardware device fingerprint & MAC Address
@@ -2721,7 +2904,15 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.ADMIN_ACCOUNT);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id) return parsed;
+        if (parsed && parsed.id) {
+          if (parsed.pin && !isPasswordEncrypted(parsed.pin)) {
+            parsed.pin = encryptPassword(parsed.pin);
+            try {
+              localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(parsed));
+            } catch {}
+          }
+          return parsed;
+        }
       }
     } catch {
       // Fallback
@@ -2733,7 +2924,7 @@ class PodoPressDatabase {
     const current = this.getAdminAccountSync();
     const updated: AdminAccount = {
       ...current,
-      pin: newPassword.trim(),
+      pin: encryptPassword(newPassword.trim()),
       isInitialSetupCompleted: true,
       lastLoginAt: new Date().toISOString(),
     };
@@ -2855,7 +3046,22 @@ class PodoPressDatabase {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter((a) => a && a.id);
+          let migrated = false;
+          const valid = parsed
+            .filter((a) => a && a.id)
+            .map((a: AdminAccount) => {
+              if (a.pin && !isPasswordEncrypted(a.pin)) {
+                migrated = true;
+                return { ...a, pin: encryptPassword(a.pin) };
+              }
+              return a;
+            });
+          if (migrated) {
+            try {
+              localStorage.setItem(LS_KEYS.ADMIN_ACCOUNTS_LIST, JSON.stringify(valid));
+            } catch {}
+          }
+          return valid;
         }
       }
     } catch {
@@ -2885,7 +3091,7 @@ class PodoPressDatabase {
     const superAdmin = this.getSuperAdminAccountSync();
     const isSuperAdminMatch =
       cleanPin === 'superadmin@123' ||
-      cleanPin === superAdmin?.pin ||
+      verifyPassword(cleanPin, superAdmin?.pin) ||
       cleanPin.toUpperCase() === 'SUPER-MASTER-KEY-9999' ||
       cleanUser === 'superadmin@technomind.health' ||
       cleanUser === 'superadmin';
@@ -2939,7 +3145,7 @@ class PodoPressDatabase {
           a.username.toLowerCase() === cleanUser ||
           (a.email && a.email.toLowerCase() === cleanUser) ||
           a.name.toLowerCase() === cleanUser;
-        const matchPin = (a.pin && a.pin.trim() === cleanPin) || isSuperAdminMatch;
+        const matchPin = (a.pin && verifyPassword(cleanPin, a.pin)) || isSuperAdminMatch;
         return matchUser && matchPin;
       });
 
@@ -2999,7 +3205,7 @@ class PodoPressDatabase {
         id: 'admin-auto-01',
         name: 'Hospital Administrator',
         username: cleanUser === 'superadmin@technomind.health' ? 'admin@technomind.health' : (cleanUser || 'admin@technomind.health'),
-        pin: cleanPin,
+        pin: encryptPassword(cleanPin),
         hospitalId: hosp.id,
         hospitalName: hosp.name,
         role: 'admin',
@@ -3092,7 +3298,15 @@ class PodoPressDatabase {
       const saved = localStorage.getItem(LS_KEYS.SUPER_ADMIN_ACCOUNT);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.username) return parsed;
+        if (parsed && parsed.username) {
+          if (parsed.pin && !isPasswordEncrypted(parsed.pin)) {
+            parsed.pin = encryptPassword(parsed.pin);
+            try {
+              localStorage.setItem(LS_KEYS.SUPER_ADMIN_ACCOUNT, JSON.stringify(parsed));
+            } catch {}
+          }
+          return parsed;
+        }
       }
     } catch {
       // Ignore
@@ -3123,7 +3337,7 @@ class PodoPressDatabase {
       (superAdmin.email && superAdmin.email.toLowerCase() === cleanUser) ||
       cleanUser === superAdmin.name.toLowerCase();
 
-    const isMatchPin = superAdmin.pin && superAdmin.pin.trim() === cleanPin;
+    const isMatchPin = superAdmin.pin && verifyPassword(cleanPin, superAdmin.pin);
 
     if (isMatchUser && isMatchPin) {
       superAdmin.lastLoginAt = new Date().toISOString();
@@ -3200,7 +3414,7 @@ class PodoPressDatabase {
       id: 'admin-' + Math.random().toString(36).slice(2, 9),
       name: adminData.name.trim(),
       username: cleanUsername,
-      pin: adminData.pin.trim(),
+      pin: encryptPassword(adminData.pin.trim()),
       hospitalId,
       hospitalName: finalHospitalName,
       role: 'admin',
@@ -3271,9 +3485,14 @@ class PodoPressDatabase {
     const idx = list.findIndex((a) => a.id === adminId);
     if (idx < 0) return { success: false, error: 'Hospital Administrator not found.' };
 
+    const finalUpdates = { ...updates };
+    if (finalUpdates.pin) {
+      finalUpdates.pin = encryptPassword(finalUpdates.pin);
+    }
+
     const updated: AdminAccount = {
       ...list[idx],
-      ...updates,
+      ...finalUpdates,
     };
     list[idx] = updated;
 
@@ -3727,6 +3946,9 @@ class PodoPressDatabase {
             ...updatedData,
             id: key,
           };
+          if (tech.pin) {
+            tech.pin = encryptPassword(tech.pin);
+          }
           await this.saveTechnician(tech);
           break;
         }
@@ -3738,6 +3960,9 @@ class PodoPressDatabase {
             ...(idx >= 0 ? list[idx] : {}),
             ...updatedData,
           };
+          if (updatedAdmin.pin) {
+            updatedAdmin.pin = encryptPassword(updatedAdmin.pin);
+          }
           if (idx >= 0) {
             list[idx] = updatedAdmin;
           } else {
@@ -3808,17 +4033,17 @@ class PodoPressDatabase {
       return { success: false, error: 'Please enter your current Master Password.' };
     }
     const expectedPin = admin.pin || '1234';
-    if (cleanCurrent !== expectedPin) {
+    if (!verifyPassword(cleanCurrent, expectedPin)) {
       return { success: false, error: 'Incorrect current Master Password. Verification failed.' };
     }
     if (!cleanNew || cleanNew.length < 4) {
       return { success: false, error: 'New Master Password must be at least 4 characters.' };
     }
-    if (cleanNew === expectedPin) {
+    if (verifyPassword(cleanNew, expectedPin)) {
       return { success: false, error: 'New password cannot be identical to the current password.' };
     }
 
-    admin.pin = cleanNew;
+    admin.pin = encryptPassword(cleanNew);
     admin.isInitialSetupCompleted = true;
     try {
       localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(admin));
@@ -3878,7 +4103,7 @@ class PodoPressDatabase {
     const isSuperMaster =
       cleanVerify === 'SUPER-MASTER-KEY-9999' ||
       cleanVerify === 'SUPERADMIN@123' ||
-      (superAdmin && cleanVerify === superAdmin.pin.toUpperCase());
+      (superAdmin && (cleanVerify === superAdmin.pin.toUpperCase() || verifyPassword(cleanVerify, superAdmin.pin)));
 
     const keyMatches =
       isSuperMaster ||
@@ -3909,7 +4134,7 @@ class PodoPressDatabase {
       return { success: false, error: 'New Master Password must be at least 4 characters long.' };
     }
 
-    registered.pin = newPassword.trim();
+    registered.pin = encryptPassword(newPassword.trim());
     this.clearAdminLockout();
     try {
       localStorage.setItem(LS_KEYS.ADMIN_ACCOUNT, JSON.stringify(registered));
@@ -3951,8 +4176,8 @@ class PodoPressDatabase {
     const adminAccount = this.getAdminAccountSync();
     const superAdminAccount = this.getSuperAdminAccountSync();
     const cleanAuth = verificationCodeOrEmail.trim();
-    const isAdminPassword = Boolean(adminAccount && adminAccount.pin === cleanAuth);
-    const isSuperAdminPassword = Boolean(superAdminAccount && superAdminAccount.pin === cleanAuth);
+    const isAdminPassword = Boolean(adminAccount && verifyPassword(cleanAuth, adminAccount.pin));
+    const isSuperAdminPassword = Boolean(superAdminAccount && verifyPassword(cleanAuth, superAdminAccount.pin));
     const isMasterRecoveryKey = Boolean(
       (adminAccount?.recoveryKey && adminAccount.recoveryKey.toUpperCase() === cleanAuth.toUpperCase()) ||
       (superAdminAccount?.recoveryKey && superAdminAccount.recoveryKey.toUpperCase() === cleanAuth.toUpperCase())
@@ -3969,7 +4194,7 @@ class PodoPressDatabase {
       return { success: false, error: 'New password must be at least 4 characters long.' };
     }
 
-    tech.pin = newPassword.trim();
+    tech.pin = encryptPassword(newPassword.trim());
     tech.mustChangePassword = true;
     tech.isTemporaryPassword = true;
     tech.passwordResetAt = new Date().toISOString();
@@ -3987,7 +4212,7 @@ class PodoPressDatabase {
     const tech = list.find((t) => t.id === technicianId);
     if (!tech) return false;
 
-    tech.pin = newPassword.trim();
+    tech.pin = encryptPassword(newPassword.trim());
     tech.mustChangePassword = mustChangePassword;
     tech.isTemporaryPassword = mustChangePassword;
     tech.passwordResetAt = new Date().toISOString();
@@ -4001,7 +4226,7 @@ class PodoPressDatabase {
     mustChangePassword: boolean = false
   ): boolean {
     const res = this.updateHospitalAdmin(adminId, {
-      pin: newPassword.trim(),
+      pin: encryptPassword(newPassword.trim()),
       mustChangePassword,
       isTemporaryPassword: mustChangePassword,
       passwordResetAt: new Date().toISOString(),
@@ -4015,6 +4240,12 @@ class PodoPressDatabase {
 
     return res.success;
   }
+
+  // Cryptographic Credential Helpers
+  public isPasswordEncrypted = isPasswordEncrypted;
+  public encryptPassword = encryptPassword;
+  public verifyPassword = verifyPassword;
+  public getMaskedPasswordDisplay = getMaskedPasswordDisplay;
 
   // =========================================================================
   // DEVICE BINDING & LICENSING PASS-THROUGH METHODS

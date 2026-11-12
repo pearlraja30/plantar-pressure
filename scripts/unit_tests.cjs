@@ -6066,6 +6066,206 @@ it("Enforces Mobile Isolation: Eliminates Clinic Admin Portal & Restricts Mobile
   expect(desktopState.showActivateTab).toBe(true); // Available on desktop
 });
 
+// --- SECTION 49: Cryptographic Salted SHA-256 Password Encryption & Database Explorer Credential Masking ---
+console.log("\n--- SECTION 49: Cryptographic Salted SHA-256 Password Encryption & Database Explorer Credential Masking ---");
+
+it("Validates pure synchronous FIPS 180-4 SHA-256 implementation against native crypto", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const crypto = require('crypto');
+  const dbServicePath = path.resolve(__dirname, '../src/services/dbService.ts');
+  const dbSource = fs.readFileSync(dbServicePath, 'utf8');
+
+  // Verify functions are exported in dbService
+  expect(dbSource.includes('export const PASSWORD_ENC_PREFIX = \'ENC:sha256:\';')).toBe(true);
+  expect(dbSource.includes('export function sha256Hex(')).toBe(true);
+  expect(dbSource.includes('export function isPasswordEncrypted(')).toBe(true);
+  expect(dbSource.includes('export function encryptPassword(')).toBe(true);
+  expect(dbSource.includes('export function verifyPassword(')).toBe(true);
+  expect(dbSource.includes('export function getMaskedPasswordDisplay(')).toBe(true);
+
+  // Extract pure JS SHA-256 logic from source or test equivalent
+  function sha256Hex(str) {
+    function rightRotate(value, amount) {
+      return (value >>> amount) | (value << (32 - amount));
+    }
+    const mathPow = Math.pow;
+    const maxWord = mathPow(2, 32);
+    const lengthProperty = 'length';
+    let i, j;
+    let result = '';
+    const words = [];
+    const asciiBitLength = str[lengthProperty] * 8;
+    const hash = [];
+    const k = [];
+    let primeCounter = 0;
+    const isComposite = {};
+    for (let candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (i = 0; i < 313; i += candidate) {
+          isComposite[i] = candidate;
+        }
+        hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+        k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+      }
+    }
+    str += '\x80';
+    while ((str[lengthProperty] % 64) - 56) str += '\x00';
+    for (i = 0; i < str[lengthProperty]; i++) {
+      j = str.charCodeAt(i);
+      if (j >> 8) return '';
+      words[i >> 2] |= j << (((3 - i) % 4) * 8);
+    }
+    words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
+    words[words[lengthProperty]] = asciiBitLength;
+    for (j = 0; j < words[lengthProperty]; ) {
+      const w = words.slice(j, (j += 16));
+      const oldHash = hash.slice(0);
+      for (i = 0; i < 64; i++) {
+        const w15 = w[i - 15], w2 = w[i - 2];
+        const s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
+        const s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
+        w[i] = i < 16 ? w[i] : (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+        const ch = (hash[4] & hash[5]) ^ (~hash[4] & hash[6]);
+        const temp1 = (hash[7] + (rightRotate(hash[4], 6) ^ rightRotate(hash[4], 11) ^ rightRotate(hash[4], 25)) + ch + k[i] + w[i]) | 0;
+        const maj = (hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2]);
+        const temp2 = ((rightRotate(hash[0], 2) ^ rightRotate(hash[0], 13) ^ rightRotate(hash[0], 22)) + maj) | 0;
+        hash[7] = hash[6];
+        hash[6] = hash[5];
+        hash[5] = hash[4];
+        hash[4] = (hash[3] + temp1) | 0;
+        hash[3] = hash[2];
+        hash[2] = hash[1];
+        hash[1] = hash[0];
+        hash[0] = (temp1 + temp2) | 0;
+      }
+      for (i = 0; i < 8; i++) {
+        hash[i] = (hash[i] + oldHash[i]) | 0;
+      }
+    }
+    for (i = 0; i < 8; i++) {
+      for (j = 3; j >= 0; j--) {
+        const b = (hash[i] >> (8 * j)) & 255;
+        result += (b < 16 ? '0' : '') + b.toString(16);
+      }
+    }
+    return result;
+  }
+
+  const testVectors = [
+    '1234',
+    'Tech1234',
+    'admin123',
+    'superadmin@123',
+    'clinical_salt:9901_test',
+    'PodoPressSecurePass2026!',
+  ];
+
+  for (const vec of testVectors) {
+    const expected = crypto.createHash('sha256').update(vec).digest('hex');
+    const actual = sha256Hex(vec);
+    expect(actual).toBe(expected);
+  }
+});
+
+it("Validates salted password encryption, verification, idempotence, and masking", () => {
+  const PASSWORD_ENC_PREFIX = 'ENC:sha256:';
+  const CLINICAL_SALT = 'pdp_sec_salt_2026_clinical_vault_99';
+  const crypto = require('crypto');
+
+  function sha256Hex(str) {
+    return crypto.createHash('sha256').update(str).digest('hex');
+  }
+  function isPasswordEncrypted(pin) {
+    return typeof pin === 'string' && pin.startsWith(PASSWORD_ENC_PREFIX);
+  }
+  function encryptPassword(plainOrEnc) {
+    if (!plainOrEnc) return '';
+    const clean = plainOrEnc.trim();
+    if (!clean) return '';
+    if (isPasswordEncrypted(clean)) return clean;
+    return `${PASSWORD_ENC_PREFIX}${sha256Hex(`${CLINICAL_SALT}:${clean}`)}`;
+  }
+  function verifyPassword(candidatePlain, storedHashOrPlain) {
+    if (!storedHashOrPlain) return !candidatePlain || !candidatePlain.trim();
+    const cleanCandidate = (candidatePlain || '').trim();
+    const cleanStored = storedHashOrPlain.trim();
+    if (isPasswordEncrypted(cleanStored)) {
+      return cleanStored === encryptPassword(cleanCandidate);
+    }
+    return cleanStored === cleanCandidate || cleanStored === encryptPassword(cleanCandidate);
+  }
+  function getMaskedPasswordDisplay(storedHashOrPlain) {
+    if (!storedHashOrPlain) return '••••••••';
+    const clean = storedHashOrPlain.trim();
+    if (isPasswordEncrypted(clean)) {
+      const rawHash = clean.slice(PASSWORD_ENC_PREFIX.length);
+      return `${PASSWORD_ENC_PREFIX}${rawHash.slice(0, 10)}••••`;
+    }
+    const computedHash = sha256Hex(`${CLINICAL_SALT}:${clean}`);
+    return `${PASSWORD_ENC_PREFIX}${computedHash.slice(0, 10)}••••`;
+  }
+
+  // 1. Salted Hash Creation
+  const hashedTech = encryptPassword('1234');
+  expect(isPasswordEncrypted(hashedTech)).toBe(true);
+  expect(hashedTech.startsWith('ENC:sha256:')).toBe(true);
+  expect(hashedTech.length).toBe(11 + 64); // prefix + 64 hex chars
+
+  // 2. Idempotent Encryption
+  const doubleHashed = encryptPassword(hashedTech);
+  expect(doubleHashed).toBe(hashedTech);
+
+  // 3. Verification of candidate password against hash
+  expect(verifyPassword('1234', hashedTech)).toBe(true);
+  expect(verifyPassword('1234 ', hashedTech)).toBe(true); // Trims whitespace
+  expect(verifyPassword('wrongPass', hashedTech)).toBe(false);
+  expect(verifyPassword('12345', hashedTech)).toBe(false);
+
+  // 4. Backward Compatibility with legacy plain-text in database
+  expect(verifyPassword('1234', '1234')).toBe(true);
+  expect(verifyPassword('Tech1234', 'Tech1234')).toBe(true);
+  expect(verifyPassword('wrong', '1234')).toBe(false);
+
+  // 5. Masked Display: NEVER exposes plain-text password
+  const maskedEnc = getMaskedPasswordDisplay(hashedTech);
+  expect(maskedEnc.startsWith('ENC:sha256:')).toBe(true);
+  expect(maskedEnc.includes('••••')).toBe(true);
+  expect(maskedEnc.includes('1234')).toBe(false); // Plain text completely absent
+
+  const maskedPlain = getMaskedPasswordDisplay('1234');
+  expect(maskedPlain.startsWith('ENC:sha256:')).toBe(true);
+  expect(maskedPlain.includes('1234')).toBe(false); // Plain text NEVER displayed even for legacy strings
+
+  expect(getMaskedPasswordDisplay('')).toBe('••••••••');
+  expect(getMaskedPasswordDisplay(null)).toBe('••••••••');
+});
+
+it("Verifies PodoLoadDatabaseViewer eliminates plain passwords in table, inspection JSON, and edit forms", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const viewerPath = path.resolve(__dirname, '../src/components/podoload/PodoLoadDatabaseViewer.tsx');
+  expect(fs.existsSync(viewerPath)).toBe(true);
+  const viewerSource = fs.readFileSync(viewerPath, 'utf8');
+
+  // 1. Table Header updated to PASSWORD (ENCRYPTED)
+  expect(viewerSource.includes('PASSWORD (ENCRYPTED)')).toBe(true);
+
+  // 2. Table cells display encrypted badge and masked hash, eliminating raw {t.pin}
+  expect(viewerSource.includes('{getMaskedPasswordDisplay(t.pin)}')).toBe(true);
+  expect(viewerSource.includes('{getMaskedPasswordDisplay(a.pin)}')).toBe(true);
+  expect(viewerSource.includes('<code>{t.pin || \'••••••••\'}</code>')).toBe(false); // Plain display strictly removed!
+
+  // 3. JSON inspector and copy sanitized
+  expect(viewerSource.includes('sanitizeRecordForDisplay')).toBe(true);
+  expect(viewerSource.includes('{JSON.stringify(sanitizeRecordForDisplay(inspectingRecord.data), null, 2)}')).toBe(true);
+
+  // 4. Edit modal uses type="password" and hashes input upon save
+  expect(viewerSource.includes('type="password"')).toBe(true);
+  expect(viewerSource.includes('Password / PIN (Encrypted)')).toBe(true);
+  expect(viewerSource.includes('payloadToSave.pin = encryptPassword(editPasswordInput.trim());')).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

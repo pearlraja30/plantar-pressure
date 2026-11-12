@@ -303,7 +303,7 @@ export interface TechnicianUser {
   id: string;
   name: string;
   username: string; // Login ID, e.g. sarah.tech or tech@hospital.com
-  pin: string; // Login Password
+  pin: string; // Login Password (salted SHA-256 encrypted: ENC:sha256:...)
   hospitalId: string; // Associated hospital ID
   hospitalName?: string;
   role: 'technician';
@@ -389,7 +389,7 @@ export interface SuperAdminAccount {
   id: string;
   name: string;
   username: string; // e.g. superadmin@technomind.health or superadmin
-  pin: string; // Master Super Admin Password
+  pin: string; // Master Super Admin Password (salted SHA-256 encrypted: ENC:sha256:...)
   role: 'superadmin';
   email: string;
   phone?: string;
@@ -403,7 +403,7 @@ export interface AdminAccount {
   id: string;
   name: string;
   username: string; // Login ID / Email, e.g. admin@technomind.health
-  pin: string; // Master Admin Password
+  pin: string; // Master Admin Password (salted SHA-256 encrypted: ENC:sha256:...)
   hospitalId: string;
   hospitalName: string;
   role: 'admin';

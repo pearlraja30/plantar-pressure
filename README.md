@@ -107,7 +107,7 @@ For the complete, in-depth architectural and operational manual, refer to:
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **125 / 125 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, database schema files, PDF report layout without overlays, mobile platform isolation, and cloud sync engines.
+* **128 / 128 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, database schema files, PDF report layout without overlays, mobile platform isolation, cryptographic salted SHA-256 password encryption, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -281,6 +281,12 @@ The system includes an automated clinical verification battery covering all test
 * **Clinic Admin Portal Elimination on Mobile**: Strictly hides the `🏥 Clinic Admin Portal` button, administrative gesture shortcuts, and in-modal admin links on Android and iOS mobile native apps, reserving system governance exclusively for desktop/web workstations.
 * **Exclusive Technician Login**: Eliminates device activation forms and tab switchers on mobile devices, presenting exclusively the **Clinical Technician Login** interface with mobile-optimized single-column touchscreen inputs.
 * **Turnkey Clean-Install Provisioning**: On clean mobile installations with zero registered technicians, entering default credentials (`tech` / `1234`) automatically provisions and authenticates the initial technician user (`Clinical Operator`), preventing lockout.
+
+### 22. Cryptographic Salted SHA-256 Password Encryption & Database Explorer Credential Masking (v1.0.83)
+* **Zero Plain-Text Credential Display**: Permanently eliminates plain passwords from the Inbuilt Database Records Explorer (`PodoLoadDatabaseViewer.tsx`) table, JSON inspection modal, and clipboard copy operations.
+* **FIPS 180-4 Pure Synchronous SHA-256 Engine**: Cryptographically hashes all stored credentials with clinical salt `pdp_sec_salt_2026_clinical_vault_99`, persisting passwords as `ENC:sha256:<64-hex-digest>`.
+* **Autonomous Offline Database Auto-Migration**: Automatically migrates legacy plain credentials in IndexedDB and localStorage upon first access with zero data loss.
+* **Hardened Table & Form UI**: Renders emerald `🔒 Encrypted` badges with masked hash previews in the database viewer and secures record correction forms with masked `<input type="password" />` fields.
 
 ---
 

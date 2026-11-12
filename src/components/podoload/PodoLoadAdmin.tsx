@@ -43,7 +43,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import { HospitalProfile, HospitalDoctor, HospitalTechnician, TechnicianUser, Patient, AnalysisCase, BoundDevice, DeviceLicense, AdminAccount, AuditEvent, VoucherExpiryPolicy, VoucherExpiryUnit } from '../../types';
-import { dbService, DEFAULT_VOUCHER_EXPIRY_POLICY, formatVoucherPolicyLabel, formatRemainingTime } from '../../services/dbService';
+import { dbService, DEFAULT_VOUCHER_EXPIRY_POLICY, formatVoucherPolicyLabel, formatRemainingTime, isPasswordEncrypted } from '../../services/dbService';
 import { deviceBindingService } from '../../services/deviceBindingService';
 import { cloudSyncService, RemoteStationRecord } from '../../services/cloudSyncService';
 import { diagnosticsLogger, DiagnosticErrorLog } from '../../services/diagnosticsLogger';
@@ -616,6 +616,8 @@ export const PodoLoadAdmin: React.FC<PodoLoadAdminProps> = ({
   const getShareableVoucherText = (tech: TechnicianUser) => {
     const hosp = hospitals.find((h) => h.id === tech.hospitalId) || activeHospital;
     const isTemp = Boolean(tech.mustChangePassword || tech.isTemporaryPassword);
+    const hasPlainTemp = isTemp && tech.pin && !isPasswordEncrypted(tech.pin);
+    const tempPassText = hasPlainTemp ? `${tech.pin} (Temporary — Change Required on Login)` : '[Private — Configured on Station]';
     return `🏥 PodoPress Diagnostic Station — Technician App Login Credentials
 Facility: ${hosp.name}
 Authorized Technician: ${tech.name}
@@ -627,11 +629,11 @@ STEP 1: DEVICE ENROLLMENT (First-Time / Re-activation)
 3. Hospital / Clinic Code: ${hosp.code}
 4. Technician Username: ${tech.username}
 5. Station Activation Code: ${tech.activationCode || 'TMH-TECH-1001'}
-${isTemp ? `6. Temporary Password: ${tech.pin} (You will be prompted to create your permanent password upon first login)` : '6. Quick Access Password: [Choose your private password during activation]'}
+${hasPlainTemp ? `6. Temporary Password: ${tech.pin} (You will be prompted to create your permanent password upon first login)` : '6. Quick Access Password: [Choose your private password during activation]'}
 
 STEP 2: RETURNING STATION SESSIONS
 - Login ID / Username: ${tech.username}
-- Password / PIN: ${isTemp ? `${tech.pin} (Temporary — Change Required on Login)` : '[Private — Configured on Station]'}
+- Password / PIN: ${tempPassText}
 ==================================================
 ✓ 100% Offline Diagnostic Scanning Enabled.
 ✓ Examinations automatically sync when connected to Clinic Wi-Fi.`;

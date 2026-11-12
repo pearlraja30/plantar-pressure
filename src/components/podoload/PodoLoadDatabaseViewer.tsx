@@ -22,8 +22,9 @@ import {
   Save,
   AlertCircle,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
-import { dbService } from '../../services/dbService';
+import { dbService, getMaskedPasswordDisplay, encryptPassword, isPasswordEncrypted } from '../../services/dbService';
 import { Patient, AnalysisCase, TechnicianUser, AdminAccount, BoundDevice } from '../../types';
 
 interface PodoLoadDatabaseViewerProps {
@@ -78,6 +79,18 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editPasswordInput, setEditPasswordInput] = useState('');
+
+  // Sanitizes credentials in JSON modal & clipboard copy so plain passwords are NEVER exposed
+  const sanitizeRecordForDisplay = (record: any): any => {
+    if (!record || typeof record !== 'object') return record;
+    if (Array.isArray(record)) return record.map(sanitizeRecordForDisplay);
+    const sanitized = { ...record };
+    if ('pin' in sanitized) {
+      sanitized.pin = getMaskedPasswordDisplay(sanitized.pin);
+    }
+    return sanitized;
+  };
 
   const handleOpenEditRecord = (
     store: 'patients' | 'cases' | 'technicians' | 'admin_accounts' | 'bound_devices' | 'settings',
@@ -86,6 +99,7 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
   ) => {
     setEditError(null);
     setEditSuccess(null);
+    setEditPasswordInput('');
     setEditingRecord({
       store,
       id,
@@ -122,6 +136,14 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
       } catch (err: any) {
         setEditError(`Invalid JSON syntax: ${err?.message || 'Check JSON formatting'}`);
         return;
+      }
+    }
+
+    if (editingRecord.store === 'technicians' || editingRecord.store === 'admin_accounts') {
+      if (editPasswordInput.trim()) {
+        payloadToSave.pin = encryptPassword(editPasswordInput.trim());
+      } else if (payloadToSave.pin && !isPasswordEncrypted(payloadToSave.pin)) {
+        payloadToSave.pin = encryptPassword(payloadToSave.pin);
       }
     }
 
@@ -296,7 +318,7 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
   // Copy record JSON
   const handleCopyRecord = () => {
     if (!inspectingRecord) return;
-    navigator.clipboard.writeText(JSON.stringify(inspectingRecord.data, null, 2));
+    navigator.clipboard.writeText(JSON.stringify(sanitizeRecordForDisplay(inspectingRecord.data), null, 2));
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
@@ -679,7 +701,7 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                   <th style={{ textAlign: 'left' }}>LOGIN USERNAME</th>
                   <th style={{ textAlign: 'left' }}>ASSIGNED HOSPITAL</th>
                   <th style={{ textAlign: 'center' }}>STATUS</th>
-                  <th style={{ textAlign: 'left' }}>PASSWORD</th>
+                  <th style={{ textAlign: 'left' }}>PASSWORD (ENCRYPTED)</th>
                   <th style={{ textAlign: 'right' }}>ACTIONS</th>
                 </tr>
               </thead>
@@ -702,7 +724,19 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                       </span>
                     </td>
                     <td>
-                      <code>{t.pin || '••••••••'}</code>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span
+                          className="podo-badge podo-badge-green"
+                          style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          title="Cryptographically hashed with Salted FIPS 180-4 SHA-256"
+                        >
+                          <Lock className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Encrypted</span>
+                        </span>
+                        <code style={{ fontSize: '0.68rem', color: '#0f766e', wordBreak: 'break-all' }}>
+                          {getMaskedPasswordDisplay(t.pin)}
+                        </code>
+                      </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
@@ -741,6 +775,7 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                   <th style={{ textAlign: 'left' }}>LOGIN USERNAME / EMAIL</th>
                   <th style={{ textAlign: 'left' }}>FACILITY</th>
                   <th style={{ textAlign: 'left' }}>PHONE</th>
+                  <th style={{ textAlign: 'left' }}>PASSWORD (ENCRYPTED)</th>
                   <th style={{ textAlign: 'center' }}>STATUS</th>
                   <th style={{ textAlign: 'right' }}>ACTIONS</th>
                 </tr>
@@ -759,6 +794,21 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                     </td>
                     <td>{a.hospitalName}</td>
                     <td>{a.phone || '—'}</td>
+                    <td>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span
+                          className="podo-badge podo-badge-green"
+                          style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          title="Cryptographically hashed with Salted FIPS 180-4 SHA-256"
+                        >
+                          <Lock className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Encrypted</span>
+                        </span>
+                        <code style={{ fontSize: '0.68rem', color: '#0f766e', wordBreak: 'break-all' }}>
+                          {getMaskedPasswordDisplay(a.pin)}
+                        </code>
+                      </div>
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className="podo-badge podo-badge-green" style={{ fontSize: '0.62rem' }}>
                         Active
@@ -998,7 +1048,7 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                   fontFamily: 'monospace',
                 }}
               >
-                {JSON.stringify(inspectingRecord.data, null, 2)}
+                {JSON.stringify(sanitizeRecordForDisplay(inspectingRecord.data), null, 2)}
               </pre>
             </div>
 
@@ -1291,13 +1341,24 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                         </select>
                       </div>
                       <div className="podoload-form-group">
-                        <label className="podoload-label">Password / PIN</label>
+                        <label className="podoload-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Password / PIN (Encrypted)</span>
+                          <span style={{ fontSize: '0.62rem', color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>Salted SHA-256</span>
+                          </span>
+                        </label>
                         <input
-                          type="text"
+                          type="password"
                           className="podoload-input"
-                          value={editingRecord.data.pin || ''}
-                          onChange={(e) => handleUpdateFormField('pin', e.target.value)}
+                          placeholder="Enter new password to hash & encrypt (leave blank to keep current)"
+                          value={editPasswordInput}
+                          onChange={(e) => setEditPasswordInput(e.target.value)}
+                          autoComplete="new-password"
                         />
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          Current stored hash: <code style={{ color: '#0f766e' }}>{getMaskedPasswordDisplay(editingRecord.data.pin)}</code>
+                        </div>
                       </div>
                       <div className="podoload-form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="podoload-label">Administrative Notes</label>
@@ -1349,6 +1410,26 @@ export const PodoLoadDatabaseViewer: React.FC<PodoLoadDatabaseViewerProps> = ({
                           value={editingRecord.data.email || ''}
                           onChange={(e) => handleUpdateFormField('email', e.target.value)}
                         />
+                      </div>
+                      <div className="podoload-form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="podoload-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Master Password (Encrypted)</span>
+                          <span style={{ fontSize: '0.62rem', color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>Salted SHA-256</span>
+                          </span>
+                        </label>
+                        <input
+                          type="password"
+                          className="podoload-input"
+                          placeholder="Enter new master password to hash & encrypt (leave blank to keep current)"
+                          value={editPasswordInput}
+                          onChange={(e) => setEditPasswordInput(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          Current stored hash: <code style={{ color: '#0f766e' }}>{getMaskedPasswordDisplay(editingRecord.data.pin)}</code>
+                        </div>
                       </div>
                     </div>
                   )}
