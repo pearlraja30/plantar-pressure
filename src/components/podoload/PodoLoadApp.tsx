@@ -1799,7 +1799,7 @@ export function PodoLoadApp() {
 
       {/* Role & Account Switcher Modal (Super Admin vs Hospital Administrator vs Clinical Technician) */}
       <PodoLoadRoleModal
-        isOpen={isRoleModalOpen || (!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin')}
+        isOpen={isRoleModalOpen || (!isMobileDevice && !deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin')}
         onClose={() => {
           setIsRoleModalOpen(false);
           setRoleModalAdminMode(false);
@@ -1810,7 +1810,7 @@ export function PodoLoadApp() {
         currentUser={currentUser}
         onSelectRole={handleSelectRole}
         onLogout={handleLogout}
-        isMandatoryActivation={!deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin'}
+        isMandatoryActivation={!isMobileDevice && !deviceAuthStatus.isAuthorized && currentUser.role !== 'admin' && currentUser.role !== 'superadmin'}
         isSessionLocked={isSessionLocked}
         activationReason={deviceAuthStatus.reason}
         initialAdminMode={roleModalAdminMode}

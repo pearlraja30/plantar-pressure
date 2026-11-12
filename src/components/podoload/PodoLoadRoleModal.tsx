@@ -67,13 +67,15 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent))));
 
   const isStationAdminAllowed = dbService.isStationAdminLoginAllowed();
-  const allowAdminTabs = isStationAdminAllowed || initialAdminMode || initialSuperAdminMode;
+  const allowAdminTabs = !isMobileDevice && (isStationAdminAllowed || initialAdminMode || initialSuperAdminMode);
 
   const technicians: TechnicianUser[] = dbService.getTechniciansSync();
   const [registeredAdmin, setRegisteredAdmin] = useState<AdminAccount>(() => dbService.getAdminAccountSync());
-  const [isAdminContext, setIsAdminContext] = useState<boolean>(() => Boolean(initialAdminMode));
+  const [isAdminContext, setIsAdminContext] = useState<boolean>(() => !isMobileDevice && Boolean(initialAdminMode));
   const [selectedRole, setSelectedRole] = useState<'superadmin' | 'admin' | 'technician'>(
-    initialSuperAdminMode
+    isMobileDevice
+      ? 'technician'
+      : initialSuperAdminMode
       ? 'superadmin'
       : initialAdminMode
       ? 'admin'
@@ -81,8 +83,6 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       ? 'technician'
       : currentUser.role === 'superadmin'
       ? 'superadmin'
-      : isMobileDevice
-      ? 'technician'
       : currentUser.role
   );
   const [selectedTechId, setSelectedTechId] = useState<string>(
@@ -91,6 +91,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
 
   // Sync admin or superadmin mode when props change or modal opens
   useEffect(() => {
+    if (isMobileDevice) {
+      setIsAdminContext(false);
+      setSelectedRole('technician');
+      return;
+    }
     if (initialSuperAdminMode) {
       setSelectedRole('superadmin');
     } else if (initialAdminMode) {
@@ -104,13 +109,14 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       setIsAdminContext(false);
       setSelectedRole('technician');
     }
-  }, [initialAdminMode, initialSuperAdminMode, currentUser.role, isOpen, allowAdminTabs]);
+  }, [initialAdminMode, initialSuperAdminMode, currentUser.role, isOpen, allowAdminTabs, isMobileDevice]);
 
-  // Discreet 5-tap header gesture tracking
+  // Discreet 5-tap header gesture tracking (Disabled on mobile platforms)
   const [headerTapCount, setHeaderTapCount] = useState(0);
   const lastHeaderTapRef = useRef<number>(0);
 
   const handleHeaderTap = () => {
+    if (isMobileDevice) return;
     const now = Date.now();
     if (now - lastHeaderTapRef.current < 700) {
       const next = headerTapCount + 1;
@@ -166,6 +172,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
     dbService.getDeviceAuthorizationSync()
   );
   const [mobileAuthTab, setMobileAuthTab] = useState<'login' | 'activate'>(() => {
+    if (isMobileDevice) return 'login';
     if (isMandatoryActivation) return 'activate';
     return dbService.getDeviceAuthorizationSync() ? 'login' : 'activate';
   });
@@ -221,7 +228,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
       if (t) return t.username;
     }
     const techs = dbService.getTechniciansSync();
-    return techs[0]?.username || '';
+    return techs[0]?.username || (isMobileDevice ? 'tech@technomind.health' : '');
   });
 
   // Device Binding Lockout State
@@ -1881,8 +1888,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           gap: '0.5rem',
                         }}
                       >
-                        {/* Tab Switcher: Station Quick Login vs Activate Station with Code */}
-                        {!isMandatoryActivation && (
+                        {/* Tab Switcher: Station Quick Login vs Activate Station with Code (Desktop / Web only) */}
+                        {!isMobileDevice && !isMandatoryActivation && (
                           <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
                             <button
                               type="button"
@@ -1942,8 +1949,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           </div>
                         )}
 
-                        {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING */}
-                        {mobileAuthTab === 'activate' ? (
+                        {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING (Desktop / Web only) */}
+                        {(!isMobileDevice && mobileAuthTab === 'activate') ? (
                           <div
                             style={{
                               display: 'flex',
@@ -2212,11 +2219,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                               </div>
                             )}
 
-                            {/* 2-Column Grid: Technician User ID & Password Input */}
+                            {/* 2-Column Grid on Desktop, 1-Column on Mobile: Technician User ID & Password Input */}
                             <div
                               style={{
                                 display: 'grid',
-                                gridTemplateColumns: '1.2fr 1fr',
+                                gridTemplateColumns: isMobileDevice ? '1fr' : '1.2fr 1fr',
                                 gap: '0.65rem',
                                 backgroundColor: '#ffffff',
                                 padding: '0.6rem 0.75rem',
@@ -2318,52 +2325,56 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                 <span>🔑 Forgot Password? Reset via Admin</span>
                               </button>
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setMobileAuthTab('activate');
-                                  setPinError(null);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  fontSize: '0.68rem',
-                                  color: '#64748b',
-                                  textDecoration: 'underline',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Switch / Re-pair Station
-                              </button>
+                              {!isMobileDevice && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMobileAuthTab('activate');
+                                    setPinError(null);
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '0.68rem',
+                                    color: '#64748b',
+                                    textDecoration: 'underline',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Switch / Re-pair Station
+                                </button>
+                              )}
                             </div>
 
-                            <div style={{ marginTop: '0.4rem', paddingTop: '0.45rem', borderTop: '1px solid #ccfbf1', display: 'flex', justifyContent: 'center' }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIsAdminContext(true);
-                                  setSelectedRole('admin');
-                                  setPinError(null);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  fontSize: '0.72rem',
-                                  color: '#0f766e',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem',
-                                  padding: '2px 4px',
-                                }}
-                              >
-                                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                                <span>Clinic Administrator? Sign in to create &amp; manage technician logins →</span>
-                              </button>
-                            </div>
+                            {!isMobileDevice && (
+                              <div style={{ marginTop: '0.4rem', paddingTop: '0.45rem', borderTop: '1px solid #ccfbf1', display: 'flex', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsAdminContext(true);
+                                    setSelectedRole('admin');
+                                    setPinError(null);
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '0.72rem',
+                                    color: '#0f766e',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    padding: '2px 4px',
+                                  }}
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+                                  <span>Clinic Administrator? Sign in to create &amp; manage technician logins →</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2607,7 +2618,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 )}
 
-                {!isAdminContext && !isMandatoryActivation && (
+                {!isMobileDevice && !isAdminContext && !isMandatoryActivation && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2636,7 +2647,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   </button>
                 )}
 
-                {isAdminContext && !isMandatoryActivation && (
+                {!isMobileDevice && isAdminContext && !isMandatoryActivation && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2713,7 +2724,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   <span>Log In as Hospital Administrator</span>
                 </button>
               ) : (
-                mobileAuthTab === 'activate' ? (
+                (!isMobileDevice && mobileAuthTab === 'activate') ? (
                   <button
                     type="button"
                     className="podoload-btn-primary"

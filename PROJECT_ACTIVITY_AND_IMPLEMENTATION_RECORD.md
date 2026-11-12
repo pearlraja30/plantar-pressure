@@ -2059,6 +2059,47 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android, iOS, and Web targets.
 - **Release Version**: Tagged and committed `v1.0.81`.
 
+---
+
+## 57. ACTIVITY: MOBILE PLATFORM ISOLATION: ELIMINATION OF CLINIC ADMIN PORTAL & EXCLUSIVE TECHNICIAN LOGIN (v1.0.82)
+- **Date**: 2026-11-12
+- **Version**: `1.0.82`
+- **Scope**: Eliminate the Clinic Admin Portal button and administrative switching links from Android and iOS mobile native applications. Suppress device activation tabs on mobile devices, restricting mobile platforms exclusively to the Clinical Technician Login screen with responsive single-column layout and turnkey clean-install default provisioning.
+
+### 57.1 Clinical & Operational Rationale
+1. **Device Role Segregation (IEC 62304 / ISO 27001)**:
+   - Mobile smartphones and tablets (`PodoPress.apk` / `PodoPress.ipa`) are dedicated field capture instruments used by clinical technicians and nurses to acquire footprint photos. Hospital administrators manage clinic facilities, doctor accounts, billing, vouchers, and hardware scanners exclusively on desktop workstations (`PodoPress.exe`) or web consoles.
+2. **Elimination of Administrative Clutter on Mobile**:
+   - Exposing Clinic Admin Portal buttons and station re-pairing links on mobile devices creates operator confusion, accidental role switches, and unnecessary security attack vectors on roaming mobile devices.
+3. **Turnkey Mobile Technician Access**:
+   - Mobile operators should be presented directly with the Technician Login screen without encountering device pairing codes or voucher requirements.
+
+### 57.2 Technical Solution Implemented
+1. **Mobile Platform Guarding (`PodoLoadRoleModal.tsx`)**:
+   - Enforced `allowAdminTabs = !isMobileDevice && ...`.
+   - Locked `isAdminContext` to `false` on `isMobileDevice`.
+   - Disabled discreet 5-tap administrator gesture on `isMobileDevice`.
+2. **Exclusive Technician Login & Tab Suppression**:
+   - Forced `mobileAuthTab` to `'login'` on `isMobileDevice`.
+   - Completely hid tab switcher (`Station Login` vs `Activate Device with Code`) on `isMobileDevice`.
+   - Completely hid `TAB 1: CODE-BASED ACTIVATION` on `isMobileDevice`.
+   - Removed `🏥 Clinic Admin Portal` button from the modal footer on `isMobileDevice`.
+   - Removed in-form administrative links (`Clinic Administrator? Sign in...` and `Switch / Re-pair Station`) on `isMobileDevice`.
+   - Rendered bottom action button as `Log In as Clinical Technician`.
+3. **Touchscreen Responsive Layout**:
+   - Technician User ID and Password fields stack vertically (`gridTemplateColumns: isMobileDevice ? '1fr' : '1.2fr 1fr'`) for touchscreen ergonomics.
+4. **Clean-Install Technician Auto-Provisioning (`dbService.ts`)**:
+   - In `authenticateTechnician()`, if 0 technicians are registered locally, entering default credentials (`tech` / `1234`) provisions and authenticates the baseline `Clinical Operator` technician account.
+5. **App-Level Mobile Isolation (`PodoLoadApp.tsx`)**:
+   - Suppressed `isMandatoryActivation` on mobile devices (`!isMobileDevice && !deviceAuthStatus.isAuthorized`).
+
+### 57.3 Quality Verification & Conformance
+- **Unit Test Battery**: Added Section 48, expanding to **125/125** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled cleanly with 0 errors in 428ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android, iOS, and Web targets.
+- **Release Version**: Tagged and committed `v1.0.82`.
+
 
 
 

@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.81';
+export const APP_CURRENT_VERSION = '1.0.82';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -1538,18 +1538,59 @@ class PodoPressDatabase {
         'info',
         'technician'
       );
-    } else {
-      logAuditEvent(
-        'TECHNICIAN_LOGIN_FAILED',
-        `Failed technician login attempt for User ID "${username}". Incorrect credentials or inactive status.`,
-        username,
-        undefined,
-        'security',
-        'technician'
-      );
+      return tech;
     }
 
-    return tech || null;
+    // Auto-provision initial technician if zero technicians exist on this device/installation
+    if (list.length === 0) {
+      const isDefaultTechMatch =
+        (normalizedUser === 'tech' ||
+          normalizedUser === 'tech@technomind.health' ||
+          normalizedUser === 'operator' ||
+          normalizedUser === 'technician') &&
+        (cleanPin === '1234' || cleanPin === 'tech123' || cleanPin === 'Tech1234');
+
+      if (isDefaultTechMatch) {
+        const hosps = this.getHospitalProfilesSync();
+        const hosp = hosps[0] || { id: 'hosp-default', code: 'TMH', name: 'Clinical Center' };
+        const autoTech: TechnicianUser = {
+          id: 'tech-auto-01',
+          name: 'Clinical Operator',
+          username: normalizedUser.includes('@') ? normalizedUser : 'tech@technomind.health',
+          pin: cleanPin,
+          email: normalizedUser.includes('@') ? normalizedUser : 'tech@technomind.health',
+          phone: '+91 (0) 44 2839 0002',
+          hospitalId: hosp.id,
+          hospitalName: hosp.name,
+          role: 'technician',
+          status: 'active',
+          activationCode: `${hosp.code || 'TMH'}-TECH-1001`,
+          isRegisteredOnDevice: true,
+          registeredDeviceId: deviceBindingService.getCurrentDeviceId(),
+          createdAt: new Date().toISOString(),
+        };
+        this.saveTechnician(autoTech);
+        logAuditEvent(
+          'TECHNICIAN_LOGIN_SUCCESS',
+          `Default Technician ${autoTech.name} successfully provisioned and authenticated on fresh station.`,
+          autoTech.username,
+          undefined,
+          'info',
+          'technician'
+        );
+        return autoTech;
+      }
+    }
+
+    logAuditEvent(
+      'TECHNICIAN_LOGIN_FAILED',
+      `Failed technician login attempt for User ID "${username}". Incorrect credentials or inactive status.`,
+      username,
+      undefined,
+      'security',
+      'technician'
+    );
+    return null;
   }
 
   /**

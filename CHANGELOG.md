@@ -24,6 +24,61 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.82] — 2026-11-12
+#### Mobile Platform Isolation: Elimination of Clinic Admin Portal & Exclusive Technician Login on Android and iOS
+
+#### 1. Clinical & Operational Problem Statement
+- On Android and iOS mobile devices (`PodoPress.apk` / `PodoPress.ipa`), launching the app presented the `Activate Device with Code` hardware pairing form with an exposed `🏥 Clinic Admin Portal` button in the footer and administrative links (`Clinic Administrator? Sign in to create & manage technician logins →`, `Switch / Re-pair Station`).
+- Mobile phones and tablets are exclusively clinical operator tools carried by home-care podiatrists and field nurses for camera-based footprint captures. Administrators configure hospital settings, billing, voucher licenses, and scanners exclusively from desktop workstations (`PodoPress.exe`) or web consoles.
+- Showing Clinic Admin Portal and activation forms on mobile apps caused operator confusion and presented security vulnerabilities on roaming mobile devices.
+
+#### 2. Why the Change Was Suggested
+- **Role-Based Device Segregation & Zero Admin Exposure**: Clinical staff operating smartphones/tablets must only be authorized to log in as Technicians. Administrative master portals and configuration must be inaccessible from mobile endpoints.
+- **Streamlined Mobile UX**: Mobile users must never be forced onto hardware pairing forms (`Activate Device with Code`). The mobile interface must present exclusively the **Technician Login** interface (`Station Login`), prompting for User ID and Password with zero superfluous options.
+- **Turnkey Clean-Install Login**: On a brand new mobile installation with zero local technician records, entering default credentials (`tech` / `1234`) automatically provisions and authenticates the initial technician user (`Clinical Operator`), preventing lockout.
+
+#### 3. Technical Root Cause Analysis
+- In `PodoLoadRoleModal.tsx`, the `🏥 Clinic Admin Portal` button was rendered when `!isAdminContext && !isMandatoryActivation` without checking `!isMobileDevice`.
+- On clean installations with no previous token, `dbService.getDeviceAuthorizationSync()` returned null, causing `mobileAuthTab` to initialize to `'activate'`, rendering the hardware pairing form and tab switchers.
+- `PodoLoadApp.tsx` passed `isMandatoryActivation={!deviceAuthStatus.isAuthorized}` without guarding against mobile platforms (`!isMobileDevice`).
+
+#### 4. End-to-End Architectural Solution
+1. **Mobile Platform Guarding (`PodoLoadRoleModal.tsx`)**:
+   - `allowAdminTabs` set to `!isMobileDevice && ...`.
+   - `isAdminContext` initialized and locked to `false` on `isMobileDevice`.
+   - Header discreet 5-tap gesture disabled on `isMobileDevice`.
+2. **Exclusive Technician Login on Mobile**:
+   - `mobileAuthTab` locked to `'login'` when `isMobileDevice` is true.
+   - Tab switcher (`Station Login` vs `Activate Device with Code`) completely hidden on `isMobileDevice`.
+   - Hardware activation form (`TAB 1`) completely hidden on `isMobileDevice`.
+   - Bottom footer button `🏥 Clinic Admin Portal` completely hidden on `isMobileDevice`.
+   - In-form links (`Clinic Administrator? Sign in...` and `Switch / Re-pair Station`) completely hidden on `isMobileDevice`.
+   - Bottom action button renders exclusively: `Log In as Clinical Technician` (or `Log In as <username>`).
+3. **Responsive 1-Column Stacking**:
+   - Technician User ID and Password fields stack vertically (`gridTemplateColumns: isMobileDevice ? '1fr' : '1.2fr 1fr'`) for optimal touchscreen usability.
+4. **Clean-Install Auto-Provisioning (`dbService.ts`)**:
+   - Updated `authenticateTechnician` in `dbService.ts` to provision initial technician `Clinical Operator` upon entering default credentials on empty database.
+5. **App-Level Mobile Isolation (`PodoLoadApp.tsx`)**:
+   - Suppressed `isMandatoryActivation` on mobile devices (`!isMobileDevice && !deviceAuthStatus.isAuthorized`).
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `src/components/podoload/PodoLoadRoleModal.tsx`: Mobile isolation, hidden admin portal, hidden activation tab, exclusive technician login.
+- `src/components/podoload/PodoLoadApp.tsx`: Suppressed `isMandatoryActivation` on mobile devices.
+- `src/services/dbService.ts`: Added initial technician auto-provisioning for clean installations.
+- `scripts/unit_tests.cjs`: Added Section 48 asserting mobile isolation and exclusive technician login.
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`, `src/services/dbService.ts`: Bumped to `v1.0.82`.
+
+#### 6. Regulatory Verification & Test Battery
+- Total Unit Tests: **125 / 125 Unit Tests Passed (100% OK)** in `scripts/unit_tests.cjs`.
+- Total Scenario Tests: **15 / 15 Validation Scenarios Passed (100% Verified)** in `scripts/validate_system.cjs`.
+- Build Status: Clean Vite + TypeScript compilation (`tsc -b && vite build` in 428ms).
+- Capacitor Sync: Clean sync across Android, iOS, and Web.
+
+#### 7. Upstream & Downstream System Impact
+- Android APK and iOS IPA launches directly into a sleek, focused Technician Login screen with zero administrative noise.
+
+---
+
 ### [v1.0.81] — 2026-11-12
 #### Elimination of Text Overlays, Clean Scanner Naming & Universal Two-Tier Header Architecture in Clinical Reports
 

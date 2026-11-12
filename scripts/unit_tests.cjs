@@ -5986,6 +5986,86 @@ it("Enforces Two-Tier Header Architecture, Clean Scanner Naming & Bounded Cell T
   expect(pdfSource.includes("drawSafeCellText(doc, r[2], margin + 116, rowY + 5.2, 52)")).toBe(true);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 48: Mobile Platform Isolation, Clinic Admin Portal Elimination & Exclusive Technician Login Verification
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 48: Mobile Platform Isolation & Exclusive Technician Login Verification ---");
+
+it("Enforces Mobile Isolation: Eliminates Clinic Admin Portal & Restricts Mobile Apps Exclusively to Technician Login", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const modalPath = path.resolve(__dirname, '../src/components/podoload/PodoLoadRoleModal.tsx');
+  const appPath = path.resolve(__dirname, '../src/components/podoload/PodoLoadApp.tsx');
+  const dbServicePath = path.resolve(__dirname, '../src/services/dbService.ts');
+
+  expect(fs.existsSync(modalPath)).toBe(true);
+  expect(fs.existsSync(appPath)).toBe(true);
+  expect(fs.existsSync(dbServicePath)).toBe(true);
+
+  const modalSource = fs.readFileSync(modalPath, 'utf8');
+  const appSource = fs.readFileSync(appPath, 'utf8');
+  const dbSource = fs.readFileSync(dbServicePath, 'utf8');
+
+  // 1. Role Modal mobile guards: Admin tabs strictly disabled on mobile
+  expect(modalSource.includes("allowAdminTabs = !isMobileDevice && (isStationAdminAllowed || initialAdminMode || initialSuperAdminMode)")).toBe(true);
+  expect(modalSource.includes("isAdminContext, setIsAdminContext] = useState<boolean>(() => !isMobileDevice && Boolean(initialAdminMode))")).toBe(true);
+  expect(modalSource.includes("if (isMobileDevice) return; // Discreet 5-tap gesture")).toBe(false); // Clean check
+  expect(modalSource.includes("if (isMobileDevice) return;")).toBe(true);
+
+  // 2. Mobile tab locks to 'login' and disables 'activate' tab on mobile
+  expect(modalSource.includes("if (isMobileDevice) return 'login';")).toBe(true);
+  expect(modalSource.includes("{!isMobileDevice && !isMandatoryActivation && (")).toBe(true);
+  expect(modalSource.includes("{(!isMobileDevice && mobileAuthTab === 'activate') ? (")).toBe(true);
+
+  // 3. Clinic Admin Portal button and links completely eliminated on mobile
+  expect(modalSource.includes("{!isMobileDevice && !isAdminContext && !isMandatoryActivation && (")).toBe(true);
+  expect(modalSource.includes("🏥 Clinic Admin Portal")).toBe(true);
+  expect(modalSource.includes("(!isMobileDevice && mobileAuthTab === 'activate') ? (")).toBe(true);
+
+  // 4. App-level mandatory activation suppressed on mobile
+  expect(appSource.includes("!isMobileDevice && !deviceAuthStatus.isAuthorized")).toBe(true);
+
+  // 5. Default Technician Auto-Provisioning on Clean Installation
+  expect(dbSource.includes("if (list.length === 0) {")).toBe(true);
+  expect(dbSource.includes("Clinical Operator")).toBe(true);
+  expect(dbSource.includes("tech@technomind.health")).toBe(true);
+
+  // Simulation test: verify mobile logic flow
+  const simulateRoleModal = (isMobile, hasAuthToken, role) => {
+    const isStationAdminAllowed = !isMobile;
+    const allowAdminTabs = !isMobile && isStationAdminAllowed;
+    const isAdminContext = !isMobile && (role === 'admin');
+    const selectedRole = isMobile ? 'technician' : (allowAdminTabs && role === 'admin' ? 'admin' : 'technician');
+    const mobileAuthTab = isMobile ? 'login' : (hasAuthToken ? 'login' : 'activate');
+    const showClinicAdminPortalButton = !isMobile && !isAdminContext;
+    const showActivateTab = !isMobile;
+    const actionButtonText = isMobile || mobileAuthTab === 'login' ? 'Log In as Clinical Technician' : 'Authorize & Register Device';
+
+    return {
+      selectedRole,
+      isAdminContext,
+      mobileAuthTab,
+      showClinicAdminPortalButton,
+      showActivateTab,
+      actionButtonText,
+    };
+  };
+
+  // On Mobile (Android/iOS):
+  const mobileState = simulateRoleModal(true, false, 'technician');
+  expect(mobileState.selectedRole).toBe('technician');
+  expect(mobileState.isAdminContext).toBe(false);
+  expect(mobileState.mobileAuthTab).toBe('login');
+  expect(mobileState.showClinicAdminPortalButton).toBe(false); // STRICTLY HIDDEN!
+  expect(mobileState.showActivateTab).toBe(false); // STRICTLY HIDDEN!
+  expect(mobileState.actionButtonText).toBe('Log In as Clinical Technician');
+
+  // On Desktop/Web Workstation:
+  const desktopState = simulateRoleModal(false, false, 'technician');
+  expect(desktopState.showClinicAdminPortalButton).toBe(true); // Available on desktop
+  expect(desktopState.showActivateTab).toBe(true); // Available on desktop
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

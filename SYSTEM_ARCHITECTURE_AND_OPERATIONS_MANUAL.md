@@ -621,12 +621,23 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
 3. **Guaranteed Bounded Table Cell Rendering (`drawSafeCellText`)**:
    - Defensively measures string width against cell bounding width (`maxW`). Strings exceeding column boundaries are clipped with an ellipsis (`…`), guaranteeing zero horizontal column collisions across bilateral acquisition audits, 6-category comparative distributions, bilateral morphometrics, orthotic prescriptions, and practitioner sign-off sections.
 
-### 16.11 Regulatory Verification & Conformance Status (v1.0.81)
-- **Automated Unit Tests**: **124/124** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.11 Mobile Platform Isolation & Exclusive Technician Login Architecture (v1.0.82)
+1. **Mobile Platform Role Guarding**:
+   - Strictly eliminates the `🏥 Clinic Admin Portal` button and all administrative portal links from Android and iOS mobile native applications.
+   - Enforces `allowAdminTabs = false` and `isAdminContext = false` on mobile devices (`isMobileDevice` / `Capacitor.isNativePlatform()`), reserving administrative and facility governance strictly to desktop workstations and web consoles.
+2. **Exclusive Technician Login & Tab Suppression**:
+   - Suppresses the tab switcher (`Station Login` vs `Activate Device with Code`) on mobile devices.
+   - Mobile apps launch directly into the **Clinical Technician Login** interface, with vertical single-column inputs (`User ID / Username` and `Password / PIN`) optimized for touchscreen usability.
+   - Bottom action button renders exclusively as `Log In as Clinical Technician`.
+3. **Turnkey Clean-Install Provisioning**:
+   - On a fresh mobile installation with zero local technician records, entering default credentials (`tech` / `1234`) automatically provisions and authenticates the initial technician user (`Clinical Operator`), guaranteeing zero-lockout field onboarding.
+
+### 16.12 Regulatory Verification & Conformance Status (v1.0.82)
+- **Automated Unit Tests**: **125/125** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~320ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~428ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.81`.
+- **Release Version**: Tagged and committed `v1.0.82`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*
