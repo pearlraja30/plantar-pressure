@@ -44,6 +44,55 @@ function safeAddImageToDoc(
 }
 
 /**
+ * Formats verbose multi-model scanner hardware strings into clean, professional labels
+ * that fit crisply within tabular columns without truncation or bleed.
+ */
+function cleanScannerModelName(raw: string | undefined): string {
+  if (!raw) return 'Diagnostic Flatbed Scanner';
+  let str = raw.trim();
+  if (str.includes('EcoTank') || str.includes('L-Series')) {
+    if (str.includes('L3210')) return 'Epson EcoTank (L3210 Series)';
+    if (str.includes('L3250')) return 'Epson EcoTank (L3250 Series)';
+    if (str.includes('L3150')) return 'Epson EcoTank (L3150 Series)';
+    if (str.includes('L4150')) return 'Epson EcoTank (L4150 Series)';
+    return 'Epson EcoTank L-Series';
+  }
+  return str
+    .replace(/\s*\(Default\s+Printer(?:\s+cum\s+Scanner)?\)/gi, '')
+    .replace(/cum Scanner/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Safely prints text inside a table cell with strict boundary clipping / ellipsis truncation
+ * to guarantee zero horizontal bleed, zero column collisions, and zero text overlays.
+ */
+function drawSafeCellText(
+  doc: jsPDF,
+  text: string | number | undefined | null,
+  x: number,
+  y: number,
+  maxW: number,
+  options?: { align?: 'left' | 'center' | 'right' }
+) {
+  if (text === undefined || text === null || text === '') {
+    doc.text('—', x, y, options);
+    return;
+  }
+  const str = String(text).trim();
+  if (doc.getTextWidth(str) <= maxW) {
+    doc.text(str, x, y, options);
+    return;
+  }
+  let truncated = str;
+  while (truncated.length > 0 && doc.getTextWidth(truncated + '…') > maxW) {
+    truncated = truncated.slice(0, -1);
+  }
+  doc.text(truncated.trim() + '…', x, y, options);
+}
+
+/**
  * Generates an official 4-page Clinical Plantar Pressure Analysis PDF Report
  * Matching Technomind Healthcare Technical File specifications (Appendix A)
  */
@@ -62,7 +111,7 @@ export async function generateClinicalReportPdf(
   const margin = 20;
   const contentWidth = pageWidth - margin * 2;
 
-  // Header helper function
+  // Header helper function (Universal Two-Tier Layout: Zero Overlap Guarantee)
   const drawPageHeader = (pageNum: number, title: string) => {
     // Top banner
     doc.setFillColor(15, 23, 42); // slate 900
@@ -86,20 +135,22 @@ export async function generateClinicalReportPdf(
     doc.setFillColor(13, 148, 136); // teal-600
     doc.rect(0, 22, pageWidth, 2, 'F');
 
-    // Section title
+    // Section title (Tier 1: Dedicated Line - Zero collision)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
-    doc.text(title, margin, 34);
+    doc.text(title, margin, 31);
 
-    // Document control metadata
+    // Document control metadata (Tier 2: Dedicated Line - Zero collision)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Report ID: ${analysisCase.caseNumber}  |  Date: ${new Date(analysisCase.createdAt).toLocaleDateString()}`, pageWidth - margin, 34, { align: 'right' });
+    doc.text('Clinical Diagnostic Examination  •  Class B SaMD (IEC 62304)', margin, 36);
+    doc.text(`Report ID: ${analysisCase.caseNumber}  |  Date: ${new Date(analysisCase.createdAt).toLocaleDateString()}`, pageWidth - margin, 36, { align: 'right' });
 
     doc.setDrawColor(226, 232, 240);
-    doc.line(margin, 38, pageWidth - margin, 38);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 39.5, pageWidth - margin, 39.5);
   };
 
   // Footer helper function
@@ -167,17 +218,17 @@ export async function generateClinicalReportPdf(
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(row[0], margin + 4, rowY + 5.5);
+    drawSafeCellText(doc, row[0], margin + 4, rowY + 5.5, 36);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(row[1], margin + 42, rowY + 5.5);
+    drawSafeCellText(doc, row[1], margin + 42, rowY + 5.5, 46);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(row[2], margin + 92, rowY + 5.5);
+    drawSafeCellText(doc, row[2], margin + 92, rowY + 5.5, 46);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(row[3], margin + 142, rowY + 5.5);
+    drawSafeCellText(doc, row[3], margin + 142, rowY + 5.5, 46);
   });
 
   curY += demoRows.length * 8 + 12;
@@ -199,14 +250,14 @@ export async function generateClinicalReportPdf(
   doc.text('Evaluated Foot Side:', margin + 6, curY + 8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(13, 148, 136); // Teal
-  doc.text(`${analysisCase.footSide.toUpperCase()} FOOT`, margin + 48, curY + 8);
+  drawSafeCellText(doc, `${analysisCase.footSide.toUpperCase()} FOOT`, margin + 48, curY + 8, contentWidth - 54);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
   doc.text('Clinical Indication:', margin + 6, curY + 16);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
-  doc.text(analysisCase.indication, margin + 48, curY + 16);
+  drawSafeCellText(doc, analysisCase.indication, margin + 48, curY + 16, contentWidth - 54);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
@@ -226,7 +277,7 @@ export async function generateClinicalReportPdf(
   curY += 6;
 
   const acqRows = [
-    ['Scanner Hardware Model', analysisCase.scanMetadata.scannerModel],
+    ['Scanner Hardware Model', cleanScannerModelName(analysisCase.scanMetadata.scannerModel)],
     ['Driver / API Interface', analysisCase.scanMetadata.scannerDriver],
     ['Optical Sampling DPI', `${analysisCase.scanMetadata.dpi} DPI (Calibrated 1:1 scale)`],
     ['Quality Gate Status', analysisCase.qcResult?.passed ? 'PASSED (Score 92/100)' : analysisCase.qcResult ? 'FLAGGED WITH WARNINGS' : 'PASSED (Physiological Baseline)'],
@@ -241,10 +292,10 @@ export async function generateClinicalReportPdf(
     doc.rect(margin, rowY, contentWidth, 7.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(r[0], margin + 4, rowY + 5.2);
+    drawSafeCellText(doc, r[0], margin + 4, rowY + 5.2, 58);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(r[1], margin + 65, rowY + 5.2);
+    drawSafeCellText(doc, r[1], margin + 65, rowY + 5.2, 100);
   });
 
   drawPageFooter(1);
@@ -417,19 +468,19 @@ export async function generateClinicalReportPdf(
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(r[0], margin + 4, rowY + 5.5);
+    drawSafeCellText(doc, r[0], margin + 4, rowY + 5.5, 58);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(13, 148, 136); // Teal
-    doc.text(r[1], margin + 65, rowY + 5.5);
+    drawSafeCellText(doc, r[1], margin + 65, rowY + 5.5, 28);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(r[2], margin + 95, rowY + 5.5);
+    drawSafeCellText(doc, r[2], margin + 95, rowY + 5.5, 50);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(22, 101, 52); // Green
-    doc.text(r[3], margin + 148, rowY + 5.5);
+    drawSafeCellText(doc, r[3], margin + 148, rowY + 5.5, 20);
   });
 
   curY += measRows.length * 8.5 + 14;
@@ -537,26 +588,26 @@ export async function generateClinicalReportPdf(
   doc.text('Reviewer Name:', margin + 6, curY + 18);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(sign.physicianName, margin + 35, curY + 18);
+  drawSafeCellText(doc, sign.physicianName, margin + 35, curY + 18, contentWidth - 95);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text('Professional Role:', margin + 6, curY + 25);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 23, 42);
-  doc.text(sign.role, margin + 35, curY + 25);
+  drawSafeCellText(doc, sign.role, margin + 35, curY + 25, contentWidth - 95);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text('Verification Date:', margin + 6, curY + 32);
   doc.setTextColor(15, 23, 42);
-  doc.text(new Date(sign.signedAt).toLocaleString(), margin + 35, curY + 32);
+  drawSafeCellText(doc, new Date(sign.signedAt).toLocaleString(), margin + 35, curY + 32, contentWidth - 95);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text('Clinical Comments:', margin + 6, curY + 39);
   doc.setTextColor(15, 23, 42);
-  const splitComments = doc.splitTextToSize(sign.comments, contentWidth - 42);
+  const splitComments = doc.splitTextToSize(sign.comments, contentWidth - 95);
   doc.text(splitComments, margin + 35, curY + 39);
 
   // Digital Signature seal
@@ -596,10 +647,10 @@ export async function generateClinicalReportPdf(
     doc.rect(margin, rowY, contentWidth, 6.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(s[0], margin + 4, rowY + 4.5);
+    drawSafeCellText(doc, s[0], margin + 4, rowY + 4.5, 48);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(s[1], margin + 55, rowY + 4.5);
+    drawSafeCellText(doc, s[1], margin + 55, rowY + 4.5, 110);
   });
 
   curY += stdRows.length * 6.5 + 10;
@@ -663,19 +714,22 @@ export async function generateBilateralClubbedReportPdf(
     doc.setFillColor(13, 148, 136); // teal-600
     doc.rect(0, 22, pageWidth, 2, 'F');
 
+    // Section title (Tier 1: Dedicated Line - Zero collision)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
-    doc.text(title, margin, 34);
+    doc.text(title, margin, 31);
 
+    // Document control metadata (Tier 2: Dedicated Sub-Line - Zero collision)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Left Case: ${leftCase.caseNumber}  |  Right Case: ${rightCase.caseNumber}`, pageWidth - margin, 34, { align: 'right' });
+    doc.text('Bilateral Paired Diagnostic Session  •  Class B SaMD (IEC 62304)', margin, 36);
+    doc.text(`Left Case: ${leftCase.caseNumber}  |  Right Case: ${rightCase.caseNumber}`, pageWidth - margin, 36, { align: 'right' });
 
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
-    doc.line(margin, 38, pageWidth - margin, 38);
+    doc.line(margin, 39.5, pageWidth - margin, 39.5);
   };
 
   const drawPageFooter = (pageNum: number) => {
@@ -735,16 +789,16 @@ export async function generateBilateralClubbedReportPdf(
     doc.rect(margin, rowY, contentWidth, 7.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(r[0], margin + 3, rowY + 5);
+    drawSafeCellText(doc, r[0], margin + 3, rowY + 5, 38);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(r[1], margin + 42, rowY + 5);
+    drawSafeCellText(doc, r[1], margin + 42, rowY + 5, 44);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(r[2], margin + 90, rowY + 5);
+    drawSafeCellText(doc, r[2], margin + 88, rowY + 5, 44);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(r[3], margin + 135, rowY + 5);
+    drawSafeCellText(doc, r[3], margin + 134, rowY + 5, 54);
   });
 
   curY += demoRows.length * 7.5 + 10;
@@ -763,13 +817,13 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFontSize(8.5);
   doc.setTextColor(30, 41, 59);
   doc.text(auditHeaders[0], margin + 4, curY + 5.2);
-  doc.text(auditHeaders[1], margin + 65, curY + 5.2);
-  doc.text(auditHeaders[2], margin + 120, curY + 5.2);
+  doc.text(auditHeaders[1], margin + 56, curY + 5.2);
+  doc.text(auditHeaders[2], margin + 116, curY + 5.2);
 
   const bilateralAuditRows = [
     ['Case Number', leftCase.caseNumber, rightCase.caseNumber],
     ['Acquisition Timestamp', new Date(leftCase.createdAt).toLocaleString(), new Date(rightCase.createdAt).toLocaleString()],
-    ['Hardware Scanner', leftCase.scanMetadata.scannerModel, rightCase.scanMetadata.scannerModel],
+    ['Hardware Scanner', cleanScannerModelName(leftCase.scanMetadata.scannerModel), cleanScannerModelName(rightCase.scanMetadata.scannerModel)],
     ['Calibrated Resolution', `${leftCase.scanMetadata.dpi} DPI`, `${rightCase.scanMetadata.dpi} DPI`],
     ['Automated QC Score', `PASSED (${leftCase.qcResult?.score ?? 98}/100)`, `PASSED (${rightCase.qcResult?.score ?? 98}/100)`],
     ['Algorithm Pipeline', leftCase.algorithmVersion, rightCase.algorithmVersion],
@@ -781,11 +835,11 @@ export async function generateBilateralClubbedReportPdf(
     doc.rect(margin, rowY, contentWidth, 7.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 85, 105);
-    doc.text(r[0], margin + 4, rowY + 5.2);
+    drawSafeCellText(doc, r[0], margin + 4, rowY + 5.2, 50);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(r[1], margin + 65, rowY + 5.2);
-    doc.text(r[2], margin + 120, rowY + 5.2);
+    drawSafeCellText(doc, r[1], margin + 56, rowY + 5.2, 58);
+    drawSafeCellText(doc, r[2], margin + 116, rowY + 5.2, 52);
   });
 
   drawPageFooter(1);
@@ -855,18 +909,18 @@ export async function generateBilateralClubbedReportPdf(
     doc.rect(margin, rowY, contentWidth, 6.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(cat.id, margin + 4, rowY + 4.5);
+    drawSafeCellText(doc, cat.id, margin + 4, rowY + 4.5, 14);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(cat.label, margin + 20, rowY + 4.5);
+    drawSafeCellText(doc, cat.label, margin + 20, rowY + 4.5, 46);
     doc.setFont('courier', 'bold');
     doc.setTextColor(13, 148, 136);
-    doc.text(`${lDist ? lDist.percentage : 0}%`, margin + 70, rowY + 4.5);
-    doc.text(`${rDist ? rDist.percentage : 0}%`, margin + 100, rowY + 4.5);
+    drawSafeCellText(doc, `${lDist ? lDist.percentage : 0}%`, margin + 70, rowY + 4.5, 26);
+    drawSafeCellText(doc, `${rDist ? rDist.percentage : 0}%`, margin + 100, rowY + 4.5, 26);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
-    doc.text(`${lDist ? (lDist.areaMm2 / 100).toFixed(1) : '0.0'}`, margin + 130, rowY + 4.5);
-    doc.text(`${rDist ? (rDist.areaMm2 / 100).toFixed(1) : '0.0'}`, margin + 155, rowY + 4.5);
+    drawSafeCellText(doc, `${lDist ? (lDist.areaMm2 / 100).toFixed(1) : '0.0'}`, margin + 130, rowY + 4.5, 22);
+    drawSafeCellText(doc, `${rDist ? (rDist.areaMm2 / 100).toFixed(1) : '0.0'}`, margin + 155, rowY + 4.5, 22);
   });
 
   curY += 7 + CLINICAL_CATEGORIES.length * 6.5 + 6;
@@ -987,15 +1041,15 @@ export async function generateBilateralClubbedReportPdf(
     doc.rect(margin, rowY, contentWidth, 6.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(m[0], margin + 4, rowY + 4.5);
+    drawSafeCellText(doc, m[0], margin + 4, rowY + 4.5, 58);
     doc.setFont('courier', 'bold');
     doc.setTextColor(13, 148, 136);
-    doc.text(m[1], margin + 65, rowY + 4.5);
-    doc.text(m[2], margin + 95, rowY + 4.5);
+    drawSafeCellText(doc, m[1], margin + 65, rowY + 4.5, 28);
+    drawSafeCellText(doc, m[2], margin + 95, rowY + 4.5, 28);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(m[3], margin + 125, rowY + 4.5);
-    doc.text(m[4], margin + 155, rowY + 4.5);
+    drawSafeCellText(doc, m[3], margin + 125, rowY + 4.5, 28);
+    drawSafeCellText(doc, m[4], margin + 155, rowY + 4.5, 25);
   });
 
   curY += 7 + morphoComparison.length * 6.5 + 8;
@@ -1011,7 +1065,7 @@ export async function generateBilateralClubbedReportPdf(
   const rightRecs = rightCase.orthoticMeasurements.recommendations || ['Custom supportive insole pair'];
 
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, curY, contentWidth, 32, 2, 2, 'F');
+  doc.roundedRect(margin, curY, contentWidth, 34, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
@@ -1019,7 +1073,8 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text(leftRecs.slice(0, 2).map((r, i) => `[${i + 1}] ${r}`).join('  |  '), margin + 4, curY + 12);
+  const leftRecText = leftRecs.slice(0, 2).map((r, i) => `[${i + 1}] ${r}`).join('   |   ');
+  drawSafeCellText(doc, leftRecText, margin + 4, curY + 12, contentWidth - 8);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -1028,7 +1083,8 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text(rightRecs.slice(0, 2).map((r, i) => `[${i + 1}] ${r}`).join('  |  '), margin + 4, curY + 26);
+  const rightRecText = rightRecs.slice(0, 2).map((r, i) => `[${i + 1}] ${r}`).join('   |   ');
+  drawSafeCellText(doc, rightRecText, margin + 4, curY + 26, contentWidth - 8);
 
   drawPageFooter(3);
 
@@ -1040,7 +1096,7 @@ export async function generateBilateralClubbedReportPdf(
 
   curY = 44;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, curY, contentWidth, 38, 2, 2, 'F');
+  doc.roundedRect(margin, curY, contentWidth, 40, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
@@ -1053,12 +1109,12 @@ export async function generateBilateralClubbedReportPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Signing Practitioner: ${signerName}`, margin + 4, curY + 15);
-  doc.text(`Professional Role: ${signerRole}`, margin + 4, curY + 21);
-  doc.text(`Authorization Date: ${new Date(signOffObj?.signedAt || leftCase.createdAt).toLocaleString()}`, margin + 4, curY + 27);
-  doc.text(`Practitioner Notes: ${signOffObj?.comments || 'Bilateral plantar scan verified and authorized for orthotic fabrication.'}`, margin + 4, curY + 33);
+  drawSafeCellText(doc, `Signing Practitioner: ${signerName}`, margin + 4, curY + 15, contentWidth - 8);
+  drawSafeCellText(doc, `Professional Role: ${signerRole}`, margin + 4, curY + 21, contentWidth - 8);
+  drawSafeCellText(doc, `Authorization Date: ${new Date(signOffObj?.signedAt || leftCase.createdAt).toLocaleString()}`, margin + 4, curY + 27, contentWidth - 8);
+  drawSafeCellText(doc, `Practitioner Notes: ${signOffObj?.comments || 'Bilateral plantar scan verified and authorized for orthotic fabrication.'}`, margin + 4, curY + 33, contentWidth - 8);
 
-  curY += 46;
+  curY += 48;
 
   // Regulatory Standards Table
   doc.setFont('helvetica', 'bold');

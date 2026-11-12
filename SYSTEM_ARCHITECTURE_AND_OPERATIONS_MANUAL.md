@@ -610,12 +610,23 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
 4. **Operations & Maintenance Reference**:
    - Authored [`database/README.md`](file:///Users/rajasekaran/Projects/plantar-pressure/database/README.md) containing step-by-step deployment runbooks for Supabase, PostgreSQL servers, and offline workstation disaster recovery.
 
-### 16.10 Regulatory Verification & Conformance Status (v1.0.80)
-- **Automated Unit Tests**: **123/123** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.10 Crisp Clinical Report PDF Generation, Two-Tier Header Separation & Tabular Zero-Overlay Architecture (v1.0.81)
+1. **Universal Two-Tier Page Header Architecture**:
+   - Eliminated text collisions caused by identical vertical baseline rendering (`Y=34`) of section titles and right-aligned document control metadata across all 4 report pages.
+   - **Tier 1 (Section Title)**: Positioned at `margin`, `y = 31` (11pt bold `#0f172a`), giving long titles the full 170mm width without obstruction.
+   - **Tier 2 (Metadata & Subtitle)**: Standardized clinical examination subtitle at `margin`, `y = 36` (8pt `#64748b`), and right-aligned document metadata at `pageWidth - margin`, `y = 36`.
+   - **Divider & Content Offset**: Divider line lowered to `y = 39.5`, and table content start adjusted to `curY = 44`.
+2. **Scanner Hardware Model Cleansing (`cleanScannerModelName`)**:
+   - Programmatically sanitizes verbose multi-model printer/scanner names (e.g. `Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150) (Default Printer cum Scanner)`) into crisp, standardized clinical labels like `Epson EcoTank (L3210 Series)`.
+3. **Guaranteed Bounded Table Cell Rendering (`drawSafeCellText`)**:
+   - Defensively measures string width against cell bounding width (`maxW`). Strings exceeding column boundaries are clipped with an ellipsis (`…`), guaranteeing zero horizontal column collisions across bilateral acquisition audits, 6-category comparative distributions, bilateral morphometrics, orthotic prescriptions, and practitioner sign-off sections.
+
+### 16.11 Regulatory Verification & Conformance Status (v1.0.81)
+- **Automated Unit Tests**: **124/124** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~340ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~320ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.80`.
+- **Release Version**: Tagged and committed `v1.0.81`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

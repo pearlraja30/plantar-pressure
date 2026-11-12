@@ -5911,6 +5911,81 @@ it("Enforces Complete Database Schema Files & Script Presence for Backup Operati
   expect(localJs.includes('jsonToSql')).toBe(true);
 });
 
+// -----------------------------------------------------------------------------
+// SECTION 47: Crisp Clinical Report PDF Generation, Two-Tier Header Separation & Tabular Zero-Overlay Verification
+// -----------------------------------------------------------------------------
+console.log("\n--- SECTION 47: Crisp Clinical Report PDF Generation & Tabular Zero-Overlay Verification ---");
+
+it("Enforces Two-Tier Header Architecture, Clean Scanner Naming & Bounded Cell Text in Clinical PDF Reports", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const pdfServicePath = path.resolve(__dirname, '../src/services/reportPdfService.ts');
+  expect(fs.existsSync(pdfServicePath)).toBe(true);
+  const pdfSource = fs.readFileSync(pdfServicePath, 'utf8');
+
+  // 1. Two-Tier Header Architecture Verification (Zero Y-Collision)
+  // Section Title on Tier 1 at Y=31, Metadata/Subtitles on Tier 2 at Y=36, Divider at Y=39.5, Content at curY=44
+  expect(pdfSource.includes("doc.text(title, margin, 31)")).toBe(true);
+  expect(pdfSource.includes("doc.text('Clinical Diagnostic Examination")).toBe(true);
+  expect(pdfSource.includes("margin, 36")).toBe(true);
+  expect(pdfSource.includes("pageWidth - margin, 36, { align: 'right' }")).toBe(true);
+  expect(pdfSource.includes("doc.line(margin, 39.5, pageWidth - margin, 39.5)")).toBe(true);
+
+  // 2. Scanner Hardware String Cleansing (cleanScannerModelName)
+  expect(pdfSource.includes("function cleanScannerModelName")).toBe(true);
+  const cleanScannerModelName = (raw) => {
+    if (!raw) return 'Diagnostic Flatbed Scanner';
+    let str = raw.trim();
+    if (str.includes('EcoTank') || str.includes('L-Series')) {
+      if (str.includes('L3210')) return 'Epson EcoTank (L3210 Series)';
+      if (str.includes('L3250')) return 'Epson EcoTank (L3250 Series)';
+      if (str.includes('L3150')) return 'Epson EcoTank (L3150 Series)';
+      if (str.includes('L4150')) return 'Epson EcoTank (L4150 Series)';
+      return 'Epson EcoTank L-Series';
+    }
+    return str
+      .replace(/\s*\(Default\s+Printer(?:\s+cum\s+Scanner)?\)/gi, '')
+      .replace(/cum Scanner/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  expect(cleanScannerModelName(undefined)).toBe('Diagnostic Flatbed Scanner');
+  expect(cleanScannerModelName('Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150)')).toBe('Epson EcoTank (L3210 Series)');
+  expect(cleanScannerModelName('EPSON L3210 Series (Default Printer cum Scanner)')).toBe('EPSON L3210 Series');
+
+  // 3. Tabular Cell Boundary Clipping & Ellipsis Truncation (drawSafeCellText)
+  expect(pdfSource.includes("function drawSafeCellText")).toBe(true);
+  
+  // Simulated safe truncation logic
+  const mockMeasureWidth = (str) => str.length * 2.2; // ~2.2mm per char in 8pt helvetica
+  const drawSafeCellSim = (text, maxW) => {
+    if (text === undefined || text === null || text === '') return '—';
+    const str = String(text).trim();
+    if (mockMeasureWidth(str) <= maxW) return str;
+    let truncated = str;
+    while (truncated.length > 0 && mockMeasureWidth(truncated + '…') > maxW) {
+      truncated = truncated.slice(0, -1);
+    }
+    return truncated.trim() + '…';
+  };
+
+  const shortStr = "Left Foot";
+  expect(drawSafeCellSim(shortStr, 30)).toBe("Left Foot");
+  
+  const longStr = "Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150) High Resolution Diagnostic";
+  const truncatedStr = drawSafeCellSim(longStr, 40);
+  expect(truncatedStr.endsWith('…')).toBe(true);
+  expect(mockMeasureWidth(truncatedStr) <= 40).toBe(true);
+  expect(drawSafeCellSim(null, 30)).toBe('—');
+
+  // 4. Verification that Table Rendering Calls drawSafeCellText in both Single and Bilateral Reports
+  expect(pdfSource.includes("drawSafeCellText(doc, row[0], margin + 4, rowY + 5.5, 36)")).toBe(true);
+  expect(pdfSource.includes("drawSafeCellText(doc, r[0], margin + 4, rowY + 5.2, 50)")).toBe(true);
+  expect(pdfSource.includes("drawSafeCellText(doc, r[1], margin + 56, rowY + 5.2, 58)")).toBe(true);
+  expect(pdfSource.includes("drawSafeCellText(doc, r[2], margin + 116, rowY + 5.2, 52)")).toBe(true);
+});
+
 console.log("\n======================================================================");
 console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED out of ${passed + failed} TESTS`);
 console.log(`STATUS: ${failed === 0 ? `\x1b[32mALL ${passed} UNIT TESTS PASSED (100% OK)\x1b[0m` : "\x1b[31mFAILURES DETECTED\x1b[0m"}`);

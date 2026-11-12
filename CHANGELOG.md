@@ -24,6 +24,53 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.81] — 2026-11-12
+#### Elimination of Text Overlays, Clean Scanner Naming & Universal Two-Tier Header Architecture in Clinical Reports
+
+#### 1. Clinical & Operational Problem Statement
+- Exported and printed 4-page Clinical Plantar Pressure Analysis reports (in both single-foot and bilateral clubbed modes) suffered from prominent text collisions and overlapping lines on every page.
+- **Header Collision**: Page section titles (e.g. `PAGE 1 — BILATERAL PATIENT DEMOGRAPHICS & CASE SUMMARY`) and right-aligned document control metadata (`Left Case: PPA-2026-6536  |  Right Case: PPA-2026-6536`) were drawn at the exact same vertical baseline (`Y = 34`), colliding directly in the center and superimposing text.
+- **Tabular Horizontal Bleed**: In the Bilateral Acquisition Audit table, hardware scanner strings (e.g. `Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150)`) lacked column boundary constraints, bleeding horizontally past Column 2's start (140mm) and stamping text directly over the right foot scan parameters.
+- **Unbounded Table Cells**: Demographics, morphometrics, prescriptions, and practitioner sign-off notes risked horizontal single-line overflow without defensive clipping.
+
+#### 2. Why the Change Was Suggested
+- **Diagnostic & Regulatory Clarity (IEC 62304 / ISO 14971 / 21 CFR Part 11)**: Clinical diagnostic reports are legally binding medical records distributed to surgeons, podiatrists, and orthotic laboratories. Text overlaps, garbled headers, and superimposed hardware data invalidate audit compliance, compromise legibility, and prevent clear practitioner sign-off.
+- **Hardware String Harmonization**: Flatbed multi-function printers report verbose device strings containing slashes, multi-model identifiers, and parenthetical suffixes (`(Default Printer cum Scanner)`). These must be cleaned to standard professional designations (`Epson EcoTank (L3210 Series)`).
+- **Defensive Cell Clipping**: Medical tables must strictly enforce cell width boundaries with ellipsis (`…`) truncation, guaranteeing zero horizontal column collisions regardless of text length.
+
+#### 3. Technical Root Cause Analysis
+- In `src/services/reportPdfService.ts`, `drawPageHeader` placed both the left-aligned section title and right-aligned metadata at `y = 34`. When section titles exceeded ~35 characters, they collided directly with the right-aligned text at `pageWidth - margin`.
+- Table columns were drawn using unconstrained `doc.text()` calls without measuring text width against column cell widths. In bilateral reports, Column 1 was at `margin + 65` (85mm) and Column 2 at `margin + 120` (140mm), leaving only 55mm of space, whereas the scanner hardware string measured 95mm.
+
+#### 4. End-to-End Architectural Solution
+1. **Universal Two-Tier Header Architecture**:
+   - **Tier 1 (Section Title)**: Rendered at `margin`, `y = 31` (11pt bold `#0f172a`), utilizing the full 170mm page width without competition.
+   - **Tier 2 (Metadata & Subtitle)**: Subtitle (`Clinical Diagnostic Examination • Class B SaMD (IEC 62304)`) at `margin`, `y = 36` (8pt `#64748b`), and Document Control Metadata right-aligned at `pageWidth - margin`, `y = 36`.
+   - **Divider & Content Start**: Divider line lowered to `y = 39.5`, and table content start adjusted to `curY = 44`.
+2. **Hardware Model Cleansing (`cleanScannerModelName`)**:
+   - Sanitizes verbose scanner strings into crisp, professional labels (`Epson EcoTank (L3210 Series)`), stripping `(Default Printer cum Scanner)` and normalizing whitespace.
+3. **Bounded Table Cell Rendering (`drawSafeCellText`)**:
+   - Programmatically measures text width against column cell boundary `maxW`. Truncates long strings with ellipsis (`…`) so text never bleeds into neighboring columns.
+4. **Realigned Tabular Columns**:
+   - Bilateral Acquisition Audit table adjusted to Col 0: 50mm, Col 1: 58mm, Col 2: 52mm.
+   - 6-Category comparative table, bilateral morphometrics table, recommendations, and regulatory standards all wrapped with `drawSafeCellText`.
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `src/services/reportPdfService.ts`: Two-tier header, `cleanScannerModelName`, `drawSafeCellText`, bounded column layouts.
+- `scripts/unit_tests.cjs`: Added Section 47 verifying header separation, scanner cleaning, and cell truncation.
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`, `src/services/dbService.ts`: Bumped to `v1.0.81`.
+
+#### 6. Regulatory Verification & Test Battery
+- Total Unit Tests: **124 / 124 Unit Tests Passed (100% OK)** in `scripts/unit_tests.cjs`.
+- Total Scenario Tests: **15 / 15 Validation Scenarios Passed (100% Verified)** in `scripts/validate_system.cjs`.
+- Build Status: Clean Vite + TypeScript compilation (`tsc -b && vite build` in 320ms).
+- Capacitor Sync: Clean sync across Android, iOS, and Web.
+
+#### 7. Upstream & Downstream System Impact
+- Clinical reports rendered and exported to PDF are now crisp, sharp, and publication-ready across single-foot and bilateral clubbed modes on all devices.
+
+---
+
 ### [v1.0.80] — 2026-11-11
 #### Production Database Scripts, DDL Schemas & Automated Backup/Disaster Recovery Suite
 

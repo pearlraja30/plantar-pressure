@@ -113,3 +113,4 @@ node database/backup_local_station.cjs json-to-sql database/backups/station_back
 - **IEC 62304 / ISO 14971**: Continuous data retention, disaster recovery procedures (RPO: 0, RTO: < 5 minutes), and schema version traceability.
 - **21 CFR Part 11**: Immutable audit logging (`audit_logs`), preventing record falsification or deletion.
 - **ISO 27001 / HIPAA**: End-to-end encrypted scans in storage buckets, masked passwords, and station-scoped MAC address authorization.
+

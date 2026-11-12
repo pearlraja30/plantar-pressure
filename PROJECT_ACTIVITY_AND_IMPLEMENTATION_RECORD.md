@@ -2023,6 +2023,43 @@ When testing the scanner workflow on both the Windows Desktop EXE and web statio
 - **Capacitor Synchronization**: Assets synchronized cleanly across Android and iOS targets.
 - **Release Version**: Tagged and committed `v1.0.80`.
 
+---
+
+## 56. ACTIVITY: CRISP CLINICAL REPORT PDF GENERATION, TWO-TIER HEADER SEPARATION & TABULAR ZERO-OVERLAY VERIFICATION (v1.0.81)
+- **Date**: 2026-11-12
+- **Version**: `1.0.81`
+- **Scope**: Eliminate all text collisions and overlays in single-foot and bilateral clubbed PDF reports. Implement universal two-tier page header architecture separating section titles from document control metadata. Harmonize verbose hardware scanner names and enforce programmatic cell boundary clipping (`drawSafeCellText`) across all tabular sections.
+
+### 56.1 Clinical & Operational Rationale
+1. **Clinical Diagnostic & Legal Authority (IEC 62304 / ISO 14971 / 21 CFR Part 11)**:
+   - Diagnostic plantar pressure reports are formal clinical documents shared among podiatrists, orthopedic surgeons, and orthotic laboratories. Text collisions, superimposed page headers, and bleeding table data compromise legal validity, obscure crucial pressure distributions, and impair clinical interpretation.
+2. **Hardware String Standardization**:
+   - Multi-function all-in-one printer/scanners (e.g., Epson L3210/L3250 series) provide overly long hardware strings (`Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150) (Default Printer cum Scanner)`). These must be cleaned to standard diagnostic labels (`Epson EcoTank (L3210 Series)`) to prevent column overflow.
+3. **Guaranteed Bounded Table Formatting**:
+   - Every table cell must enforce strict width boundaries with automatic ellipsis truncation (`…`), guaranteeing zero horizontal bleed across columns regardless of data length.
+
+### 56.2 Technical Solution Implemented
+1. **Universal Two-Tier Header Architecture**:
+   - Split page header into two distinct vertical tiers:
+     - **Tier 1 (Section Title)**: `margin`, `y = 31`, 11pt bold `#0f172a`, providing the entire 170mm width for titles without right-side competition.
+     - **Tier 2 (Metadata & Subtitle)**: Subtitle at `margin`, `y = 36` (8pt `#64748b`), and right-aligned document control metadata at `pageWidth - margin`, `y = 36`.
+     - Divider line lowered to `y = 39.5`, and table content start adjusted to `curY = 44`.
+2. **Scanner String Cleansing (`cleanScannerModelName`)**:
+   - Added regex and model mapping to convert verbose strings into concise labels like `Epson EcoTank (L3210 Series)` while stripping parenthetical suffixes.
+3. **Bounded Table Cell Rendering (`drawSafeCellText`)**:
+   - Programmatically measures text width against column cell boundary `maxW`. Truncates long strings with ellipsis (`…`) so text never bleeds into neighboring columns.
+4. **Realigned Tabular Columns**:
+   - Bilateral Acquisition Audit table adjusted to Col 0: 50mm, Col 1: 58mm, Col 2: 52mm.
+   - 6-Category comparative table, bilateral morphometrics table, recommendations, and regulatory standards all wrapped with `drawSafeCellText`.
+
+### 56.3 Quality Verification & Conformance
+- **Unit Test Battery**: Added Section 47, expanding to **124/124** Unit Tests in `scripts/unit_tests.cjs` (`npm test`) — 100% PASSED.
+- **Clinical Validation Battery**: All **15/15** Clinical Validation Scenarios in `scripts/validate_system.cjs` — 100% PASSED.
+- **TypeScript & Vite Build**: `tsc -b && vite build` compiled cleanly with 0 errors in 320ms.
+- **Capacitor Synchronization**: Assets synchronized cleanly across Android, iOS, and Web targets.
+- **Release Version**: Tagged and committed `v1.0.81`.
+
+
 
 
 

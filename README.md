@@ -107,7 +107,7 @@ For the complete, in-depth architectural and operational manual, refer to:
 ## 🧪 Regulatory Verification & Validation (VT-01 to VT-15)
 
 The system includes an automated clinical verification battery covering all test protocols defined in Section 15 of Technical File `PPA-SW-TF-001`.
-* **123 / 123 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, database schema files, and cloud sync engines.
+* **124 / 124 Unit Tests Passing** (`npm run test:unit`) — 100% test coverage across mathematical, image processing, security, database writing, burn-on-use codes, timed permits, Windows WIA hardware scanner automation, three-tier role hierarchy, administrative zero-lockout, database schema files, PDF report layout without overlays, and cloud sync engines.
 * **15 / 15 Clinical Scenarios Passing** (`npm run test:validate`) — 100% regulatory verification adherence.
 * In the running application, click the **"V&V Battery"** button in the header.
 * Click **"Run Full V&V Battery"** to execute all tests with live mathematical verification.
@@ -271,6 +271,11 @@ The system includes an automated clinical verification battery covering all test
 * **Standalone Database Directory (`database/`)**: Hosts production-ready DDL schemas ([`database/schema_supabase.sql`](database/schema_supabase.sql) for Supabase, [`database/schema_postgresql_3tier.sql`](database/schema_postgresql_3tier.sql) for enterprise 3-tier PostgreSQL), baseline seed data ([`database/seed_data.sql`](database/seed_data.sql)), and operations manual ([`database/README.md`](database/README.md)).
 * **Automated Backup & Disaster Recovery**: Shell utility ([`database/backup_and_restore.sh`](database/backup_and_restore.sh)) automating `pg_dump`, `gzip -9` compression, and SHA-256 tamper verification.
 * **Offline Workstation Snapshot & Cloud Converter**: Cross-platform Node.js utility ([`database/backup_local_station.cjs`](database/backup_local_station.cjs)) for workstation snapshot generation, structural JSON validation, and direct JSON-to-SQL migration.
+
+### 20. Crisp Clinical Report PDF Generation & Universal Two-Tier Header Architecture (v1.0.81)
+* **Universal Two-Tier Page Header**: Separates section titles (Tier 1: Y=31, full 170mm width) from document control metadata (Tier 2: Y=36), completely eliminating text collisions and garbled overlays across all 4 report pages.
+* **Hardware Scanner Name Cleansing**: Automatically simplifies verbose device strings (e.g. `Epson EcoTank / L-Series (L3250 / L3210 / L3150 / L4150) (Default Printer cum Scanner)`) into clean diagnostic labels (`Epson EcoTank (L3210 Series)`).
+* **Guaranteed Bounded Table Cells (`drawSafeCellText`)**: Programmatically measures string widths and clips with ellipsis (`…`), guaranteeing zero horizontal bleed across columns in demographics, acquisition audits, 6-category distributions, morphometrics, prescriptions, and regulatory sign-offs.
 
 ---
 

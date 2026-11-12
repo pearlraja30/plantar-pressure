@@ -276,3 +276,4 @@ CREATE TRIGGER trg_technician_users_updated_at
 -- =====================================================================
 -- End of Supabase Schema Migration Script
 -- =====================================================================
+
