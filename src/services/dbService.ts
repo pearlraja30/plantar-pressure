@@ -10,7 +10,7 @@ import { logAuditEvent, getAuditEvents } from './auditService';
 
 const DB_NAME = 'PodoPressDB';
 const DB_VERSION = 2;
-export const APP_CURRENT_VERSION = '1.0.83';
+export const APP_CURRENT_VERSION = '1.0.84';
 
 export const DEFAULT_PATIENT_ID_CONFIG: PatientIdConfig = {
   prefix: 'PP-',
@@ -1704,7 +1704,10 @@ class PodoPressDatabase {
     const list = this.getTechniciansSync();
     const normalizedUser = username.trim().toLowerCase();
     const cleanPin = pin.trim();
+    const currentDeviceId = deviceBindingService.getCurrentDeviceId();
+    const currentMac = deviceBindingService.getDeviceMacAddress();
 
+    // 1. Direct match in local technicians cache
     const tech = list.find(
       (t) =>
         t.status === 'active' &&
@@ -1713,9 +1716,19 @@ class PodoPressDatabase {
     );
 
     if (tech) {
+      // Auto-bind hardware device if newly created or unregistered on this physical station
+      if (!tech.isRegisteredOnDevice || tech.registeredDeviceId !== currentDeviceId) {
+        tech.isRegisteredOnDevice = true;
+        tech.registeredDeviceId = currentDeviceId;
+        tech.macAddress = currentMac;
+        tech.authorizedAt = tech.authorizedAt || new Date().toISOString();
+        this.saveTechnician(tech);
+        deviceBindingService.bindCurrentDeviceWithUser(tech.username, tech.name, currentMac);
+      }
+
       logAuditEvent(
         'TECHNICIAN_LOGIN_SUCCESS',
-        `Technician ${tech.name} (User ID: ${tech.username}) successfully authenticated at ${tech.hospitalName || 'Clinic'}.`,
+        `Technician ${tech.name} (User ID: ${tech.username}) successfully authenticated at ${tech.hospitalName || 'Clinic'}. Station ${currentDeviceId} bound.`,
         tech.username,
         undefined,
         'info',
@@ -1724,7 +1737,55 @@ class PodoPressDatabase {
       return tech;
     }
 
-    // Auto-provision initial technician if zero technicians exist on this device/installation
+    // 2. Newly Created Account Auto-Provisioning & Authorization on Fresh/Mobile Stations
+    // When a technician account (e.g. "raja") is created by the Admin or when an operator logs in
+    // on a newly installed mobile/desktop device:
+    const isNewAccountCandidate = normalizedUser.length >= 2 && cleanPin.length >= 3;
+    const isInitialStationSetup = list.length === 0 || list.every((t) => t.username.startsWith('tech@') || t.username === 'operator');
+    const deviceAuth = this.getDeviceAuthorizationSync();
+
+    if (isNewAccountCandidate && (isInitialStationSetup || deviceAuth)) {
+      const activeHosp = this.getActiveHospitalSync() || this.getHospitalProfilesSync()[0] || {
+        id: 'hosp-default',
+        code: 'TMH',
+        name: 'Technomind Healthcare Systems',
+      };
+
+      const displayName = normalizedUser.charAt(0).toUpperCase() + normalizedUser.slice(1);
+      const autoTech: TechnicianUser = {
+        id: `tech-${normalizedUser}-${Date.now().toString(36)}`,
+        name: displayName,
+        username: normalizedUser,
+        pin: encryptPassword(cleanPin),
+        email: normalizedUser.includes('@') ? normalizedUser : `${normalizedUser}@technomind.health`,
+        phone: '+91 (0) 44 2839 0002',
+        hospitalId: activeHosp.id,
+        hospitalName: activeHosp.name,
+        role: 'technician',
+        status: 'active',
+        activationCode: `${activeHosp.code || 'TMH'}-TECH-${Math.floor(1000 + Math.random() * 9000)}`,
+        isRegisteredOnDevice: true,
+        registeredDeviceId: currentDeviceId,
+        macAddress: currentMac,
+        authorizedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+
+      this.saveTechnician(autoTech);
+      deviceBindingService.bindCurrentDeviceWithUser(autoTech.username, autoTech.name, currentMac);
+
+      logAuditEvent(
+        'TECHNICIAN_LOGIN_SUCCESS',
+        `Newly created technician "${autoTech.name}" (User ID: ${autoTech.username}) provisioned and bound to station ${currentDeviceId}.`,
+        autoTech.username,
+        undefined,
+        'info',
+        'technician'
+      );
+      return autoTech;
+    }
+
+    // 3. Fallback for legacy default technician match if list is empty
     if (list.length === 0) {
       const isDefaultTechMatch =
         (normalizedUser === 'tech' ||
@@ -1749,10 +1810,13 @@ class PodoPressDatabase {
           status: 'active',
           activationCode: `${hosp.code || 'TMH'}-TECH-1001`,
           isRegisteredOnDevice: true,
-          registeredDeviceId: deviceBindingService.getCurrentDeviceId(),
+          registeredDeviceId: currentDeviceId,
+          macAddress: currentMac,
+          authorizedAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
         };
         this.saveTechnician(autoTech);
+        deviceBindingService.bindCurrentDeviceWithUser(autoTech.username, autoTech.name, currentMac);
         logAuditEvent(
           'TECHNICIAN_LOGIN_SUCCESS',
           `Default Technician ${autoTech.name} successfully provisioned and authenticated on fresh station.`,
@@ -1773,6 +1837,67 @@ class PodoPressDatabase {
       'security',
       'technician'
     );
+    return null;
+  }
+
+  /**
+   * Asynchronously authenticates a technician, attempting local IndexedDB and Supabase Cloud
+   * lookup if the credential is not yet hydrated in synchronous local storage.
+   */
+  public async authenticateTechnicianAsync(username: string, pin: string): Promise<TechnicianUser | null> {
+    const syncRes = this.authenticateTechnician(username, pin);
+    if (syncRes) return syncRes;
+
+    const normalizedUser = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+    const currentDeviceId = deviceBindingService.getCurrentDeviceId();
+    const currentMac = deviceBindingService.getDeviceMacAddress();
+
+    // 1. Try pulling from IndexedDB in case localStorage was cleared or not yet hydrated
+    const dbTechs = await this.getTechnicians();
+    const idbMatch = dbTechs.find(
+      (t) =>
+        t.status === 'active' &&
+        (t.username.toLowerCase() === normalizedUser || t.email?.toLowerCase() === normalizedUser) &&
+        (!t.pin || verifyPassword(cleanPin, t.pin))
+    );
+    if (idbMatch) {
+      if (!idbMatch.isRegisteredOnDevice || idbMatch.registeredDeviceId !== currentDeviceId) {
+        idbMatch.isRegisteredOnDevice = true;
+        idbMatch.registeredDeviceId = currentDeviceId;
+        idbMatch.macAddress = currentMac;
+        idbMatch.authorizedAt = idbMatch.authorizedAt || new Date().toISOString();
+        await this.saveTechnician(idbMatch);
+        deviceBindingService.bindCurrentDeviceWithUser(idbMatch.username, idbMatch.name, currentMac);
+      }
+      return idbMatch;
+    }
+
+    // 2. Try fetching from Cloud Sync (Supabase) if online
+    try {
+      const { cloudSyncService } = await import('./cloudSyncService');
+      const pullRes = await cloudSyncService.pullTechniciansFromCloud();
+      if (pullRes.success && pullRes.technicians.length > 0) {
+        const cloudMatch = pullRes.technicians.find(
+          (t) =>
+            t.status === 'active' &&
+            (t.username.toLowerCase() === normalizedUser || t.email?.toLowerCase() === normalizedUser) &&
+            (!t.pin || verifyPassword(cleanPin, t.pin))
+        );
+        if (cloudMatch) {
+          cloudMatch.isRegisteredOnDevice = true;
+          cloudMatch.registeredDeviceId = currentDeviceId;
+          cloudMatch.macAddress = currentMac;
+          cloudMatch.authorizedAt = cloudMatch.authorizedAt || new Date().toISOString();
+          await this.saveTechnician(cloudMatch);
+          deviceBindingService.bindCurrentDeviceWithUser(cloudMatch.username, cloudMatch.name, currentMac);
+          return cloudMatch;
+        }
+      }
+    } catch {
+      // Offline fallback
+    }
+
     return null;
   }
 

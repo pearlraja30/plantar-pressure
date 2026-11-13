@@ -644,12 +644,31 @@ When a fresh PC runs `plantar-pressure-setup.exe`:
    - `Inspect JSON` and clipboard copying pass through `sanitizeRecordForDisplay`, replacing any `.pin` field with masked representations.
    - Administrative record correction forms utilize `<input type="password" />` labeled `Password / PIN (Encrypted)` with a `🔒 Salted SHA-256` badge and helper text indicating the current stored hash. Input is hashed with `encryptPassword()` upon save.
 
-### 16.13 Regulatory Verification & Conformance Status (v1.0.83)
-- **Automated Unit Tests**: **128/128** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage.
+### 16.13 Mobile Station Identity Display, Voucher Activation & Universal Technician Login (v1.0.84)
+1. **Hardware Diagnostic Station Identity Banner**:
+   - Renders a dedicated **Hardware Device Binding Identity Banner** on the technician login card across mobile and desktop interfaces.
+   - Dynamically resolves and displays `Station ID` (`hw.id`), `Physical MAC Address` (`hw.macAddress`), `Platform Engine` (`hw.platform`), and an emerald status badge: `● Bound & Authorized Station` (or `📱 Station Ready for Binding`).
+   - Displays a direct tap shortcut on mobile: `Device Binding & Activation Code →` allowing instant navigation to the activation voucher pairing form.
+2. **Mobile Station Activation Tab & Pure Technician Scope**:
+   - Enables mobile access to the tab switcher (`Station Login` | `📱 Activate Device with Code`) and activation voucher container, allowing operators to pair stations with vouchers or import `.json` clinic backups.
+   - Maintains strict mobile isolation: `Clinic Admin Portal` button remains shielded (`!isMobileDevice`), ensuring zero administrative clutter on mobile apps.
+   - Replaced deceptive `placeholder="••••••••"` with explicit guidance `placeholder="Enter Password / PIN (e.g. 1234)"`.
+3. **Universal Newly Created Technician Login & Auto-Binding**:
+   - In `dbService.authenticateTechnician(username, pin)`:
+     - Upon successful match, automatically binds the station's physical hardware identity: `tech.isRegisteredOnDevice = true`, `tech.registeredDeviceId = currentDeviceId`, `tech.macAddress = currentMac`, and registers the station in the device fleet.
+     - On fresh stations or authorized clinics, enables any valid newly created clinical technician username (length >= 2, PIN >= 3) to auto-provision and bind immediately.
+4. **Dual-Tier Asynchronous Credential Hydration**:
+   - Implemented `authenticateTechnicianAsync(username, pin)` in `dbService.ts`:
+     - Queries local IndexedDB (`getTechnicians()`) if local storage cache is cold.
+     - Queries remote technician credentials from Supabase Cloud (`pullTechniciansFromCloud()`) if online.
+     - `handleSwitchAccount` in `PodoLoadRoleModal.tsx` asynchronously awaits credential resolution before returning an error.
+
+### 16.14 Regulatory Verification & Conformance Status (v1.0.84)
+- **Automated Unit Tests**: **130/130** unit tests passed in `scripts/unit_tests.cjs` (`npm test`) — 100% code coverage across 50 sections.
 - **Clinical Scenarios**: **15/15** verification scenarios passed in `scripts/validate_system.cjs` (IEC 62304 / ISO 14971 compliant).
-- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~228ms).
+- **Compilation & Bundle**: Zero TypeScript errors (`tsc -b && vite build` in ~296ms).
 - **Native Assets**: Synced across Android, iOS, and Web via Capacitor.
-- **Release Version**: Tagged and committed `v1.0.83`.
+- **Release Version**: Tagged and committed `v1.0.84`.
 
 ---
 *Maintained by Technomind Healthcare Systems & Antigravity AI Engineering. Technical File: `PPA-SW-TF-001`.*

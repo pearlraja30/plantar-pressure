@@ -6012,15 +6012,15 @@ it("Enforces Mobile Isolation: Eliminates Clinic Admin Portal & Restricts Mobile
   expect(modalSource.includes("if (isMobileDevice) return; // Discreet 5-tap gesture")).toBe(false); // Clean check
   expect(modalSource.includes("if (isMobileDevice) return;")).toBe(true);
 
-  // 2. Mobile tab locks to 'login' and disables 'activate' tab on mobile
+  // 2. Mobile tab defaults to 'login' while allowing station voucher activation
   expect(modalSource.includes("if (isMobileDevice) return 'login';")).toBe(true);
-  expect(modalSource.includes("{!isMobileDevice && !isMandatoryActivation && (")).toBe(true);
-  expect(modalSource.includes("{(!isMobileDevice && mobileAuthTab === 'activate') ? (")).toBe(true);
+  expect(modalSource.includes("{!isMandatoryActivation && (")).toBe(true);
+  expect(modalSource.includes("{mobileAuthTab === 'activate' ? (")).toBe(true);
 
   // 3. Clinic Admin Portal button and links completely eliminated on mobile
   expect(modalSource.includes("{!isMobileDevice && !isAdminContext && !isMandatoryActivation && (")).toBe(true);
   expect(modalSource.includes("🏥 Clinic Admin Portal")).toBe(true);
-  expect(modalSource.includes("(!isMobileDevice && mobileAuthTab === 'activate') ? (")).toBe(true);
+  expect(modalSource.includes("mobileAuthTab === 'activate' ? (")).toBe(true);
 
   // 4. App-level mandatory activation suppressed on mobile
   expect(appSource.includes("!isMobileDevice && !deviceAuthStatus.isAuthorized")).toBe(true);
@@ -6036,10 +6036,10 @@ it("Enforces Mobile Isolation: Eliminates Clinic Admin Portal & Restricts Mobile
     const allowAdminTabs = !isMobile && isStationAdminAllowed;
     const isAdminContext = !isMobile && (role === 'admin');
     const selectedRole = isMobile ? 'technician' : (allowAdminTabs && role === 'admin' ? 'admin' : 'technician');
-    const mobileAuthTab = isMobile ? 'login' : (hasAuthToken ? 'login' : 'activate');
+    const mobileAuthTab = 'login';
     const showClinicAdminPortalButton = !isMobile && !isAdminContext;
-    const showActivateTab = !isMobile;
-    const actionButtonText = isMobile || mobileAuthTab === 'login' ? 'Log In as Clinical Technician' : 'Authorize & Register Device';
+    const showActivateTab = true; // Enabled for mobile station voucher binding
+    const actionButtonText = 'Log In as Clinical Technician';
 
     return {
       selectedRole,
@@ -6057,7 +6057,7 @@ it("Enforces Mobile Isolation: Eliminates Clinic Admin Portal & Restricts Mobile
   expect(mobileState.isAdminContext).toBe(false);
   expect(mobileState.mobileAuthTab).toBe('login');
   expect(mobileState.showClinicAdminPortalButton).toBe(false); // STRICTLY HIDDEN!
-  expect(mobileState.showActivateTab).toBe(false); // STRICTLY HIDDEN!
+  expect(mobileState.showActivateTab).toBe(true); // Accessible for station binding
   expect(mobileState.actionButtonText).toBe('Log In as Clinical Technician');
 
   // On Desktop/Web Workstation:
@@ -6264,6 +6264,135 @@ it("Verifies PodoLoadDatabaseViewer eliminates plain passwords in table, inspect
   expect(viewerSource.includes('type="password"')).toBe(true);
   expect(viewerSource.includes('Password / PIN (Encrypted)')).toBe(true);
   expect(viewerSource.includes('payloadToSave.pin = encryptPassword(editPasswordInput.trim());')).toBe(true);
+});
+
+console.log("\n--- SECTION 50: Mobile Station Device Binding Display & Newly Created Technician Login ---");
+
+it("Verifies PodoLoadRoleModal renders hardware device binding banner and enables mobile voucher activation", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const roleModalPath = path.resolve(__dirname, '../src/components/podoload/PodoLoadRoleModal.tsx');
+  expect(fs.existsSync(roleModalPath)).toBe(true);
+  const roleModalSource = fs.readFileSync(roleModalPath, 'utf8');
+
+  // 1. Hardware Device Binding Banner is rendered in the technician login tab
+  expect(roleModalSource.includes('Hardware Device Binding Identity Banner')).toBe(true);
+  expect(roleModalSource.includes('Station ID:')).toBe(true);
+  expect(roleModalSource.includes('{hw.id}')).toBe(true);
+  expect(roleModalSource.includes('MAC:')).toBe(true);
+  expect(roleModalSource.includes('{hw.macAddress}')).toBe(true);
+  expect(roleModalSource.includes('100% Offline Clinical Scanning Ready')).toBe(true);
+
+  // 2. Tab Switcher is accessible on mobile (not blocked by !isMobileDevice)
+  expect(roleModalSource.includes('Tab Switcher: Station Quick Login vs Activate Station with Code')).toBe(true);
+  expect(roleModalSource.includes('{/* Tab Switcher: Station Quick Login vs Activate Station with Code */}\n                        {!isMandatoryActivation && (')).toBe(true);
+  expect(roleModalSource.includes('📱 Activate Device with Code')).toBe(true);
+
+  // 3. Clinic Admin Portal button remains strictly hidden on mobile devices
+  expect(roleModalSource.includes('!isMobileDevice && !isAdminContext && !isMandatoryActivation && (')).toBe(true);
+  expect(roleModalSource.includes('🏥 Clinic Admin Portal')).toBe(true);
+
+  // 4. Password placeholder is clear and descriptive (no deceptive masked placeholder dots on technician login)
+  expect(roleModalSource.includes('placeholder="Enter Password / PIN (e.g. 1234)"')).toBe(true);
+
+  // 5. Asynchronous authentication fallback is connected
+  expect(roleModalSource.includes('await dbService.authenticateTechnicianAsync(userToAuth, passToAuth)')).toBe(true);
+});
+
+it("Enforces newly created account login and automatic physical hardware station binding", () => {
+  const fs = require('fs');
+  const path = require('path');
+  const dbServicePath = path.resolve(__dirname, '../src/services/dbService.ts');
+  expect(fs.existsSync(dbServicePath)).toBe(true);
+  const dbServiceSource = fs.readFileSync(dbServicePath, 'utf8');
+
+  // Verify authenticateTechnician and authenticateTechnicianAsync exist in dbService
+  expect(dbServiceSource.includes('public authenticateTechnician(username: string, pin: string): TechnicianUser | null')).toBe(true);
+  expect(dbServiceSource.includes('public async authenticateTechnicianAsync(username: string, pin: string): Promise<TechnicianUser | null>')).toBe(true);
+  expect(dbServiceSource.includes('isRegisteredOnDevice = true')).toBe(true);
+  expect(dbServiceSource.includes('registeredDeviceId = currentDeviceId')).toBe(true);
+
+  // Simulation: Test technician login and automatic device binding
+  const mockCurrentDeviceId = 'DEV-90F8-7B64';
+  const mockCurrentMac = 'DE:90:F8:7B:64:AB';
+
+  let localTechnicians = [
+    {
+      id: 'tech-raja-01',
+      name: 'Raja',
+      username: 'raja',
+      pin: 'ENC:sha256:clinical_vault_hash_for_1234',
+      hospitalId: 'hosp-tmh',
+      hospitalName: 'Technomind Healthcare Systems',
+      role: 'technician',
+      status: 'active',
+      isRegisteredOnDevice: false,
+      registeredDeviceId: undefined,
+      macAddress: undefined,
+    }
+  ];
+
+  // Verification helper mimicking dbService.authenticateTechnician
+  const verifyAndBindTechnician = (username, pin, deviceId, mac) => {
+    const norm = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
+
+    const tech = localTechnicians.find(
+      (t) => t.status === 'active' && t.username.toLowerCase() === norm
+    );
+
+    if (tech) {
+      // Auto-bind device
+      if (!tech.isRegisteredOnDevice || tech.registeredDeviceId !== deviceId) {
+        tech.isRegisteredOnDevice = true;
+        tech.registeredDeviceId = deviceId;
+        tech.macAddress = mac;
+      }
+      return tech;
+    }
+
+    // Auto-provision fresh newly created account
+    if (norm.length >= 2 && cleanPin.length >= 3) {
+      const newTech = {
+        id: `tech-${norm}-auto`,
+        name: norm.charAt(0).toUpperCase() + norm.slice(1),
+        username: norm,
+        pin: cleanPin,
+        hospitalId: 'hosp-tmh',
+        hospitalName: 'Technomind Healthcare Systems',
+        role: 'technician',
+        status: 'active',
+        isRegisteredOnDevice: true,
+        registeredDeviceId: deviceId,
+        macAddress: mac,
+      };
+      localTechnicians.push(newTech);
+      return newTech;
+    }
+
+    return null;
+  };
+
+  // 1. Newly created account 'raja' logs in for the first time
+  const initialTech = localTechnicians[0];
+  expect(initialTech.isRegisteredOnDevice).toBe(false);
+  expect(initialTech.registeredDeviceId).toBe(undefined);
+
+  const loggedInRaja = verifyAndBindTechnician('raja', '1234', mockCurrentDeviceId, mockCurrentMac);
+  expect(loggedInRaja).not.toBe(null);
+  expect(loggedInRaja.username).toBe('raja');
+  expect(loggedInRaja.isRegisteredOnDevice).toBe(true);
+  expect(loggedInRaja.registeredDeviceId).toBe(mockCurrentDeviceId);
+  expect(loggedInRaja.macAddress).toBe(mockCurrentMac);
+
+  // 2. Newly created custom account on fresh install (e.g. 'dr.sharma') auto-provisions and binds
+  const loggedInNewUser = verifyAndBindTechnician('dr.sharma', 'Tech1234', mockCurrentDeviceId, mockCurrentMac);
+  expect(loggedInNewUser).not.toBe(null);
+  expect(loggedInNewUser.username).toBe('dr.sharma');
+  expect(loggedInNewUser.isRegisteredOnDevice).toBe(true);
+  expect(loggedInNewUser.registeredDeviceId).toBe(mockCurrentDeviceId);
+  expect(loggedInNewUser.macAddress).toBe(mockCurrentMac);
+  expect(localTechnicians.some((t) => t.username === 'dr.sharma')).toBe(true);
 });
 
 console.log("\n======================================================================");

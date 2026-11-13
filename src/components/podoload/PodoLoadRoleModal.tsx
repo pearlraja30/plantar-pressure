@@ -330,7 +330,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
   const currentActiveTech = technicians.find((t) => t.id === selectedTechId) || technicians[0];
 
   // Handle Account Authentication & Device Binding Check
-  const handleSwitchAccount = () => {
+  const handleSwitchAccount = async () => {
     setPinError(null);
     setDeviceLockout(null);
 
@@ -408,7 +408,11 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
         return;
       }
 
-      const authTech = dbService.authenticateTechnician(userToAuth, passToAuth);
+      let authTech = dbService.authenticateTechnician(userToAuth, passToAuth);
+      if (!authTech) {
+        authTech = await dbService.authenticateTechnicianAsync(userToAuth, passToAuth);
+      }
+
       if (!authTech) {
         const allTechs = dbService.getTechniciansSync();
         const exists = allTechs.find(
@@ -1888,8 +1892,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           gap: '0.5rem',
                         }}
                       >
-                        {/* Tab Switcher: Station Quick Login vs Activate Station with Code (Desktop / Web only) */}
-                        {!isMobileDevice && !isMandatoryActivation && (
+                        {/* Tab Switcher: Station Quick Login vs Activate Station with Code */}
+                        {!isMandatoryActivation && (
                           <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
                             <button
                               type="button"
@@ -1949,8 +1953,8 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                           </div>
                         )}
 
-                        {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING (Desktop / Web only) */}
-                        {(!isMobileDevice && mobileAuthTab === 'activate') ? (
+                        {/* TAB 1: CODE-BASED ACTIVATION & HARDWARE PAIRING */}
+                        {mobileAuthTab === 'activate' ? (
                           <div
                             style={{
                               display: 'flex',
@@ -2191,33 +2195,91 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                         ) : (
                           /* TAB 2: STATION QUICK LOGIN */
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                            {deviceAuth && (
-                              <div
-                                style={{
-                                  padding: '0.5rem 0.75rem',
-                                  backgroundColor: '#f0fdfa',
-                                  border: '1px solid #99f6e4',
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  flexWrap: 'wrap',
-                                  gap: '0.4rem',
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f766e' }}>
-                                    🏥 {deviceAuth.hospitalName} ({deviceAuth.hospitalCode})
-                                  </span>
-                                  <span className="podo-badge podo-badge-green" style={{ fontSize: '0.6rem' }}>
-                                    ● Authorized Diagnostic Station
-                                  </span>
+                            {/* Hardware Device Binding Identity Banner */}
+                            {(() => {
+                              const hw = deviceBindingService.getCurrentDeviceInfo();
+                              const boundDevs = deviceBindingService.getBoundDevices();
+                              const isBound = boundDevs.some((d) => d.id === hw.id || d.macAddress === hw.macAddress);
+                              const activeHosp = dbService.getActiveHospitalSync();
+                              const clinicLabel = deviceAuth?.hospitalName
+                                ? `${deviceAuth.hospitalName} (${deviceAuth.hospitalCode})`
+                                : activeHosp?.name
+                                  ? `${activeHosp.name} (${activeHosp.code})`
+                                  : 'Technomind Healthcare Systems (TMH)';
+
+                              return (
+                                <div
+                                  style={{
+                                    backgroundColor: '#f8fafc',
+                                    border: '1px solid #99f6e4',
+                                    borderRadius: '7px',
+                                    padding: '0.55rem 0.75rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem',
+                                    boxShadow: '0 1px 2px rgba(13, 148, 136, 0.05)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.3rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                      {isMobileDevice ? (
+                                        <Smartphone className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                                      ) : (
+                                        <Laptop className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                                      )}
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f766e' }}>
+                                        🏥 {clinicLabel}
+                                      </span>
+                                    </div>
+                                    <span className={`podo-badge ${isBound || deviceAuth ? 'podo-badge-green' : 'podo-badge-gray'}`} style={{ fontSize: '0.6rem' }}>
+                                      {isBound || deviceAuth ? '● Bound & Authorized Station' : '📱 Station Ready for Binding'}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.66rem', color: '#334155', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span style={{ fontWeight: 600, color: '#64748b' }}>Station ID:</span>
+                                      <code style={{ fontWeight: 800, color: '#0f766e', backgroundColor: '#e6fffa', padding: '1px 5px', borderRadius: '4px' }}>
+                                        {hw.id}
+                                      </code>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      <span style={{ fontWeight: 600, color: '#64748b' }}>MAC:</span>
+                                      <code style={{ fontWeight: 800, color: '#0f766e', backgroundColor: '#e6fffa', padding: '1px 5px', borderRadius: '4px' }}>
+                                        {hw.macAddress}
+                                      </code>
+                                      <span className="podo-badge podo-badge-gray" style={{ fontSize: '0.58rem' }}>
+                                        {hw.platform ? hw.platform.split(' ')[0] : (isMobileDevice ? 'Mobile' : 'Workstation')}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.62rem', color: '#64748b' }}>
+                                    <span>100% Offline Clinical Scanning Ready</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileAuthTab('activate');
+                                        setPinError(null);
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#0d9488',
+                                        cursor: 'pointer',
+                                        fontWeight: 700,
+                                        padding: 0,
+                                        textDecoration: 'underline',
+                                        fontSize: '0.62rem',
+                                      }}
+                                    >
+                                      Device Binding &amp; Activation Code →
+                                    </button>
+                                  </div>
                                 </div>
-                                <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
-                                  100% Offline Clinical Scanning Ready
-                                </span>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             {/* 2-Column Grid on Desktop, 1-Column on Mobile: Technician User ID & Password Input */}
                             <div
@@ -2239,7 +2301,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                 <input
                                   type="text"
                                   className="podoload-input"
-                                  placeholder="e.g. tech@technomind.health or kavita.rao"
+                                  placeholder="e.g. raja or tech@technomind.health"
                                   value={techUsernameInput}
                                   autoComplete="username"
                                   onChange={(e) => {
@@ -2260,7 +2322,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                                   <input
                                     type={showTechPassword ? 'text' : 'password'}
                                     className="podoload-input"
-                                    placeholder="••••••••"
+                                    placeholder="Enter Password / PIN (e.g. 1234)"
                                     value={techPassword}
                                     autoComplete="current-password"
                                     onChange={(e) => {
@@ -2724,7 +2786,7 @@ export const PodoLoadRoleModal: React.FC<PodoLoadRoleModalProps> = ({
                   <span>Log In as Hospital Administrator</span>
                 </button>
               ) : (
-                (!isMobileDevice && mobileAuthTab === 'activate') ? (
+                mobileAuthTab === 'activate' ? (
                   <button
                     type="button"
                     className="podoload-btn-primary"

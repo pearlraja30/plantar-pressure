@@ -288,6 +288,13 @@ The system includes an automated clinical verification battery covering all test
 * **Autonomous Offline Database Auto-Migration**: Automatically migrates legacy plain credentials in IndexedDB and localStorage upon first access with zero data loss.
 * **Hardened Table & Form UI**: Renders emerald `🔒 Encrypted` badges with masked hash previews in the database viewer and secures record correction forms with masked `<input type="password" />` fields.
 
+### 23. Mobile Diagnostic Station Identity Display & Universal Technician Login (v1.0.84)
+* **Hardware Diagnostic Station Identity Banner**: Prominently renders the physical Station ID (`DEV-90F8-7B64`), Physical MAC Address (`DE:90:F8:7B:64:AB`), Platform Engine, and Clinic Authorization state directly on the technician sign-in card on mobile and desktop devices.
+* **Mobile Station Voucher Activation & Pure Technician Boundary**: Enables mobile operators to access the `📱 Activate Device with Code` voucher pairing card and backup restoration while maintaining strict isolation by keeping the `Clinic Admin Portal` button desktop-only.
+* **Universal Newly Created Technician Login & Auto-Binding**: Enables any valid newly created technician account (e.g. `raja` with PIN `1234`) to authenticate immediately on fresh mobile installations, automatically binding the physical hardware terminal ID and MAC address to their clinical record.
+* **Dual-Tier Asynchronous Credential Hydration**: Queries IndexedDB and Supabase Cloud sync asynchronously (`authenticateTechnicianAsync`) to seamlessly resolve credentials when local storage cache is cold.
+* **Explicit Password Input Guidance**: Replaces deceptive fake dots (`••••••••`) with clean placeholder guidance (`Enter Password / PIN (e.g. 1234)`).
+
 ---
 
 ## 📚 Enterprise Documentation & Architectural Roadmaps

@@ -24,6 +24,87 @@ To ensure total traceability, regulatory audit readiness, and engineering clarit
 
 ---
 
+### [v1.0.84] — 2026-11-13
+#### Mobile Station Identity & Autonomous Diagnostic Terminal Binding: Hardware Identity Display & Universal Technician Login Authorization
+
+#### 1. Clinical & Operational Problem Statement
+- On newly installed Android and iOS mobile diagnostic stations, the **Clinical Technician Sign-In** card completely omitted the physical terminal's hardware binding identity—specifically the **Station ID** (e.g., `DEV-90F8-7B64`), the **Physical MAC Address** (e.g., `DE:90:F8:7B:64:AB`), and the terminal's **Clinic Authorization & Binding Status**. Operators and clinic auditors had no visible confirmation of station pairing on mobile devices.
+- In v1.0.82, mobile isolation logic (`!isMobileDevice`) was inadvertently applied to the station authorization tab switcher, completely suppressing the `📱 Activate Device with Code` voucher pairing card and device identity banner on mobile viewports.
+- When clinic administrators created newly enrolled technician accounts in the Admin Portal (e.g., `raja`), or when technicians attempted to log in on freshly deployed mobile devices, the application rejected their login with `"Technician User ID not found"`. `dbService.authenticateTechnician` was strictly hardcoded to auto-provision only if the username was `'tech'` or `'operator'`, failing for any custom clinical staff names.
+- Furthermore, existing technician login records were never physically bound to the device hardware upon successful authentication (`isRegisteredOnDevice` remained `false`).
+- Deceptive password placeholder dots (`••••••••`) rendered in the technician password input created visual ambiguity, misleading clinical operators into believing credentials had already been populated.
+
+#### 2. Why the Change Was Suggested
+- **Transparent Diagnostic Station Identity**: To comply with IEC 62304 traceability and station governance, physical diagnostic terminals must prominently present their Station ID, MAC address, hardware platform engine, and clinic binding state directly on the sign-in card.
+- **Mobile Activation & Voucher Pairing Access**: Clinical technicians deploying new Android or iOS stations must be able to switch to `📱 Activate Device with Code` to bind their station using clinic activation vouchers or import platform configuration backups, without exposing the desktop-only `Clinic Admin Portal` button.
+- **Universal Newly Created Technician Login**: Any legitimate technician account created by a hospital administrator or provisioned via cloud synchronization (e.g., `raja`) must be immediately permitted to authenticate on mobile and desktop kiosks, automatically binding the station's physical hardware identity upon first login.
+- **Asynchronous Dual-Tier Credential Resolution**: Stations with cold local storage caches must asynchronously query IndexedDB and Supabase Cloud sync (`authenticateTechnicianAsync`) to hydrate newly created clinical accounts without requiring manual cache resets.
+- **Elimination of Deceptive Password Placeholders**: The technician PIN input placeholder must explicitly instruct operators (`Enter Password / PIN (e.g. 1234)`), completely eliminating fake masked placeholder dots.
+
+#### 3. Technical Root Cause Analysis
+- In `src/components/podoload/PodoLoadRoleModal.tsx`:
+  - Line 1892: `{!isMobileDevice && !isMandatoryActivation && (` hid the tab switcher completely on mobile, locking mobile users out of the station registration view.
+  - Line 1953: `{(!isMobileDevice && mobileAuthTab === 'activate') ? (` prevented mobile devices from viewing or interacting with the station activation and backup import card.
+  - Lines 2198–2224: The `mobileAuthTab === 'login'` view only rendered a basic hospital title card and lacked any hardware device info (`hw.id`, `hw.macAddress`, platform badge).
+  - Line 2267: `placeholder="••••••••"` created the illusion that a 8-character password had already been entered into the form.
+  - Line 2727: Action button text selector used `!isMobileDevice && mobileAuthTab === 'activate'`.
+- In `src/services/dbService.ts`:
+  - Lines 1708–1725: `authenticateTechnician` returned matching technician records without updating `isRegisteredOnDevice = true`, leaving `registeredDeviceId` and `macAddress` unassigned.
+  - Lines 1728–1735: Auto-provisioning on clean installations was restricted strictly to `(normalizedUser === 'tech' || normalizedUser === 'operator')`, immediately rejecting newly created clinical usernames like `raja`.
+  - Lacked asynchronous cloud and IndexedDB resolution fallback for freshly installed devices whose local storage was cold.
+
+#### 4. End-to-End Architectural Solution
+1. **Hardware Device Binding Identity Banner (`src/components/podoload/PodoLoadRoleModal.tsx`)**:
+   - Added a dedicated, emerald-accented **Hardware Device Binding Identity Banner** displayed prominently in the technician login card across both mobile and desktop platforms.
+   - Dynamically resolves and displays `Station ID` (`hw.id`), `Physical MAC Address` (`hw.macAddress`), `Platform Engine` (`hw.platform`), and an emerald status badge: `● Bound & Authorized Station` (or `📱 Station Ready for Binding`).
+   - Surfaces a direct tap shortcut on mobile: `Device Binding & Activation Code →` allowing instant navigation to the activation voucher form.
+2. **Mobile Station Activation Tab & Pure Technician Boundary (`PodoLoadRoleModal.tsx`)**:
+   - Removed `!isMobileDevice` restrictions from the tab switcher (`Station Login` | `📱 Activate Device with Code`) and activation container, enabling mobile operators to pair stations with vouchers or import `.json` clinic backups.
+   - Maintained strict mobile isolation for administrative governance: `Clinic Admin Portal` button remains shielded (`!isMobileDevice`), guaranteeing zero admin clutter on mobile apps.
+   - Updated password input placeholder to `Enter Password / PIN (e.g. 1234)`.
+3. **Universal Newly Created Technician Login & Auto-Binding (`src/services/dbService.ts`)**:
+   - Enhanced `authenticateTechnician(username, pin)`:
+     - Upon successful match, automatically binds the station's physical hardware identity: `tech.isRegisteredOnDevice = true`, `tech.registeredDeviceId = currentDeviceId`, `tech.macAddress = currentMac`, and registers the station in the device fleet.
+     - On fresh stations or authorized clinics, enables any valid newly created clinical technician username (length >= 2, PIN >= 3) to auto-provision and bind immediately.
+4. **Dual-Tier Asynchronous Credential Hydration (`dbService.ts`, `PodoLoadRoleModal.tsx`)**:
+   - Introduced `authenticateTechnicianAsync(username, pin)`:
+     - Falls back to querying IndexedDB (`getTechnicians()`) if local storage cache is cold.
+     - Falls back to pulling remote technician credentials from Supabase Cloud (`pullTechniciansFromCloud()`) if online.
+     - Connected `handleSwitchAccount` in `PodoLoadRoleModal.tsx` to asynchronously await credential resolution before returning an error.
+
+#### 5. Modified Artifacts & Code Responsibilities
+- `src/components/podoload/PodoLoadRoleModal.tsx`:
+  - Added Hardware Device Binding Identity Banner rendering Station ID, MAC address, and authorization state.
+  - Enabled mobile tab switcher for `Station Login` and `📱 Activate Device with Code`.
+  - Updated password input placeholder to `Enter Password / PIN (e.g. 1234)`.
+  - Connected asynchronous technician authentication via `dbService.authenticateTechnicianAsync`.
+  - Maintained `!isMobileDevice` guard on `Clinic Admin Portal` button.
+- `src/services/dbService.ts`:
+  - Bumped `APP_CURRENT_VERSION` to `1.0.84`.
+  - Enhanced `authenticateTechnician` with automatic hardware device binding and universal technician auto-provisioning.
+  - Implemented `authenticateTechnicianAsync` for multi-tier IndexedDB and Supabase Cloud credential lookup.
+- `scripts/unit_tests.cjs`:
+  - Added **Section 50**: Mobile Station Device Binding Display & Newly Created Technician Login verification.
+  - Updated Section 48 to align mobile voucher activation accessibility.
+  - Maintained 100% test pass rate (130/130 unit tests).
+- `package.json`, `android/app/build.gradle`, `ios/App/App/Info.plist`:
+  - Synchronized multi-platform version to `v1.0.84`.
+
+#### 6. Regulatory Verification & Test Battery
+- **IEC 62304 / ISO 14971 Validation Suite**: 15/15 clinical scenarios verified (100% pass rate).
+- **Clinical Unit Test Suite (`scripts/unit_tests.cjs`)**: 130/130 automated unit tests passing across all 50 sections.
+  - Section 48: Mobile platform isolation (Clinic Admin Portal eliminated, technician login enforced).
+  - Section 50: Hardware device binding display, mobile voucher activation, newly created technician login, and automatic hardware binding.
+- **TypeScript & Vite Bundler Compilation**: `tsc -b && vite build` completed with 0 errors.
+- **Capacitor Mobile Sync**: `npx cap sync` completed cleanly for Android and iOS.
+
+#### 7. Upstream & Downstream System Impact
+- **Mobile Diagnostic Stations (Android & iOS)**: Operators can inspect physical Station ID and MAC address immediately upon launching the app and log in seamlessly with newly created technician credentials.
+- **Clinic Administrators**: Able to assign usernames (e.g., `raja`) and passwords (e.g., `1234`) in the Admin Portal with confidence that technicians can authenticate on new mobile installations without lockout.
+- **Cloud Telemetry & Supabase Sync**: Newly created technician credentials and hardware device bindings synchronize bidirectionally across clinical stations.
+
+---
+
 ### [v1.0.83] — 2026-11-12
 #### Cryptographic Credential Security: Salted FIPS 180-4 SHA-256 Storage Encryption & Database Explorer Password Masking
 
